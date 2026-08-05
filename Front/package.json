@@ -1,0 +1,21 @@
+{
+  "name": "hormuz-holdem",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "art": "node scripts/art.mjs"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "lil-gui": "^0.21.0",
+    "sharp": "^0.33.5",
+    "typescript": "^5.4.0",
+    "vite": "^5.4.0"
+  }
+}

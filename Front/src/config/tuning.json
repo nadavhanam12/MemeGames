@@ -1,0 +1,204 @@
+{
+  "session": {
+    "startPrice": 112,
+    "startCredits": 30,
+    "failPrice": 195,
+    "failSeconds": 8
+  },
+  "spawn": {
+    "startInterval": 5.2,
+    "minInterval": 1.2,
+    "rampSeconds": 180,
+    "maxThreatsStart": 5,
+    "maxThreatsEnd": 10,
+    "tankerInterval": 8,
+    "maxTankers": 2,
+    "speedRampPerMinute": 0.3,
+    "speedRampMax": 1.2
+  },
+  "speeds": {
+    "missile": 51,
+    "drone": 27,
+    "mine": 32,
+    "patrol": 45,
+    "tankerMin": 20,
+    "tankerMax": 39,
+    "vipTanker": 46
+  },
+  "economy": {
+    "interceptDrop": 0.5,
+    "patrolDrop": 1,
+    "nearMissDrop": 1.5,
+    "tankerDropMin": 3,
+    "tankerDropMax": 5,
+    "vipDrop": 6,
+    "hitSpike": 8,
+    "vipHitSpike": 12,
+    "interceptCredits": 2,
+    "tankerCredits": 15,
+    "vipCredits": 30,
+    "eventWinCredits": 20
+  },
+  "upgrades": {
+    "jammerSlowPerLevel": 0.22,
+    "escortSpeedPerLevel": 0.15,
+    "ciwsBaseInterval": 7,
+    "ciwsIntervalStep": 1.5,
+    "jammerCosts": [
+      25,
+      45,
+      70
+    ],
+    "ciwsCosts": [
+      30,
+      50,
+      80
+    ],
+    "escortCosts": [
+      20,
+      40,
+      65
+    ]
+  },
+  "juice": {
+    "tapRadius": 80,
+    "nearMissDist": 130,
+    "hitDist": 55,
+    "mineActivateDist": 150,
+    "shakeSmall": 0.0015,
+    "shakeBig": 0.006,
+    "slowmoScale": 0.25,
+    "slowmoMs": 450,
+    "particleScale": 1
+  },
+  "route": {
+    "map2": [
+      [
+        1400,
+        400
+      ],
+      [
+        1335,
+        512
+      ],
+      [
+        1270,
+        624
+      ],
+      [
+        1103,
+        554
+      ],
+      [
+        951,
+        474
+      ],
+      [
+        781,
+        390
+      ],
+      [
+        694,
+        264
+      ],
+      [
+        544,
+        339
+      ],
+      [
+        330,
+        394
+      ],
+      [
+        -18,
+        113
+      ],
+      [
+        -120,
+        420
+      ]
+    ],
+    "flat2": [
+      [
+        1400,
+        430
+      ],
+      [
+        640,
+        430
+      ],
+      [
+        -120,
+        430
+      ]
+    ],
+    "map": [
+      [
+        -120,
+        235
+      ],
+      [
+        -101,
+        128
+      ],
+      [
+        -82,
+        20
+      ],
+      [
+        55,
+        73
+      ],
+      [
+        289,
+        247
+      ],
+      [
+        462,
+        304
+      ],
+      [
+        713,
+        229
+      ],
+      [
+        800,
+        337
+      ],
+      [
+        935,
+        393
+      ],
+      [
+        1089,
+        449
+      ],
+      [
+        1252,
+        493
+      ],
+      [
+        1304,
+        433
+      ],
+      [
+        1400,
+        400
+      ]
+    ],
+    "flat": [
+      [
+        -120,
+        360
+      ],
+      [
+        640,
+        360
+      ],
+      [
+        1400,
+        360
+      ]
+    ]
+  }
+}
