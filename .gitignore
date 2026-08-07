@@ -13,3 +13,9 @@ dist/
 # Environment files
 .env
 .env.local
+
+# Vite stray cache
+.vite/
+
+# Meme pack delivery zips (contents are extracted alongside)
+Front/assets/raw/Meme/*.zip

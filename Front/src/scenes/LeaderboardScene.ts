@@ -19,7 +19,7 @@ const PERIODS: Array<{ key: LeaderboardPeriod; label: string }> = [
 const PAGE_SIZE = 10;
 
 export class LeaderboardScene extends Phaser.Scene {
-  private period: LeaderboardPeriod = 'daily';
+  private period: LeaderboardPeriod = 'all';
   private page = 1;
   private from: string = 'Menu';
   private rows!: Phaser.GameObjects.Container;
@@ -34,7 +34,7 @@ export class LeaderboardScene extends Phaser.Scene {
 
   create(data: { from?: string }): void {
     this.from = data?.from ?? 'Menu';
-    this.period = 'daily';
+    this.period = 'all';
     this.page = 1;
     this.tabs = [];
     const cx = GAME_W / 2;

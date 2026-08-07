@@ -3,6 +3,7 @@ import { GAME_H, GAME_W, HEX, PAL, VIEW } from '../core/palette';
 import { settings, vibrate } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
+import { MEMES, resetMemeLog } from '../core/memes';
 import { TUNING, persistTuningLocal } from '../config/tuning';
 import { devState } from '../dev/state';
 import { leaderboard } from '../backend/leaderboard';
@@ -66,6 +67,8 @@ export class GameScene extends Phaser.Scene {
   private spawnTimer = 0;
   private tankerTimer = 5;
   private historyTimer = 0;
+  private jitterTimer = 0;
+  private noiseOffset = 0;
   private over = false;
   private lastPriceSide: Record<string, boolean> = {};
   private mapArt = false;
@@ -73,6 +76,7 @@ export class GameScene extends Phaser.Scene {
   private upgrades = { jammer: 0, ciws: 0, escort: 0 };
   private ciwsTimer = 0;
 
+  private nightOverlay!: Phaser.GameObjects.Rectangle;
   private eventProb = 0;
   private eventLabel = 'DRONE SWARM SURGE';
   private eventActive = false;
@@ -98,6 +102,7 @@ export class GameScene extends Phaser.Scene {
     // Prefetch a score token now so it satisfies the server's 60s minimum age
     // by the time the run ends and the player submits from the results screen.
     leaderboard.beginRun();
+    resetMemeLog();
     this.stats = freshStats();
     this.tankers = [];
     this.threats = [];
@@ -118,6 +123,11 @@ export class GameScene extends Phaser.Scene {
     this.drawWorld();
     if (import.meta.env.DEV && devState.routeEdit) this.enableRouteEdit(true);
     this.waveGfx = this.add.graphics().setDepth(6);
+    // day/night light: navy wash over the world, alpha driven in update()
+    this.nightOverlay = this.add
+      .rectangle(GAME_W / 2, GAME_H / 2, GAME_W * 1.25, GAME_H * 1.25, 0x0a1a3c)
+      .setAlpha(0)
+      .setDepth(900);
 
     // render the world inside the broadcast window; HUD frames it
     this.baseZoom = Math.min(VIEW.w / GAME_W, VIEW.h / GAME_H);
@@ -630,6 +640,7 @@ export class GameScene extends Phaser.Scene {
     this.stats.bestCombo = Math.max(this.stats.bestCombo, this.stats.combo);
     const milestone = COMBO_MILESTONES[this.stats.combo];
     bus.emit(EV.COMBO, this.stats.combo, milestone);
+    if (this.stats.combo === MEMES.settings.streakCombo) bus.emit('meme-moment', 'ON A RAMPAGE');
     if (milestone) {
       this.addCredits(this.stats.combo, GAME_W / 2, 200);
       sfx.comboSting(Math.floor(this.stats.combo / 10));
@@ -764,11 +775,13 @@ export class GameScene extends Phaser.Scene {
       confetti(this, GAME_W / 2, 200, 20);
       sfx.fanfare();
       this.stats.memeMoment = this.stats.memeMoment || `SURVIVED: ${this.eventLabel}`;
+      bus.emit('meme-moment', 'EVENT SURVIVED');
     } else {
       this.stats.eventsLost++;
       bus.emit(EV.HEADLINE, 'EVENT GOES BADLY; MARKETS TYPE FURIOUSLY', 'bad');
       this.changePrice(6);
       this.stats.memeMoment = this.stats.memeMoment || `LOST: ${this.eventLabel}`;
+      bus.emit('meme-moment', 'EVENT LOST');
     }
     this.eventLabel = this.eventLabel === 'DRONE SWARM SURGE' ? 'VIP TANKER TRANSIT' : 'DRONE SWARM SURGE';
   }
@@ -812,8 +825,9 @@ export class GameScene extends Phaser.Scene {
     sfx.priceUp();
     bus.emit(EV.HEADLINE, Phaser.Math.RND.pick(BAD_HEADLINES), 'bad');
     floatText(this, t.sprite.x, t.sprite.y - 70, `+$${spike} OIL`, HEX.red, 36);
-    this.stats.memeMoment = this.stats.memeMoment || 'LOST A TANKER ON CAMERA';
-    bus.emit('meme-moment', 'LOST A TANKER ON CAMERA');
+    const lossLabel = this.stats.tankersLost >= 2 ? 'ANOTHER TANKER DOWN' : 'LOST A TANKER ON CAMERA';
+    this.stats.memeMoment = this.stats.memeMoment || lossLabel;
+    bus.emit('meme-moment', lossLabel);
     this.tweens.add({
       targets: t.sprite,
       angle: 14,
@@ -849,6 +863,11 @@ export class GameScene extends Phaser.Scene {
 
     // endless survival: timer counts UP; the run ends only via market meltdown
     bus.emit(EV.TIMER, this.elapsed);
+
+    // day/night light: brightest at each day boundary, darkest mid-day
+    const dn = TUNING.dayNight;
+    const phase = (this.elapsed % dn.dayLengthSec) / dn.dayLengthSec;
+    this.nightOverlay.setAlpha(dn.nightMaxAlpha * (0.5 - 0.5 * Math.cos(phase * Math.PI * 2)));
     if (this.stats.oilPrice >= TUNING.session.failPrice) {
       this.dangerActive = true;
       this.dangerT += rawDt;
@@ -871,6 +890,19 @@ export class GameScene extends Phaser.Scene {
         this.lastTickSecond = -1;
         bus.emit(EV.DANGER, null);
       }
+    }
+
+    // live-market jitter: small mean-reverting ticks between the real
+    // event-driven moves; bypasses changePrice() so it never fires
+    // threshold alarms or price sfx
+    this.jitterTimer += rawDt;
+    if (this.jitterTimer > TUNING.economy.jitterInterval) {
+      this.jitterTimer = 0;
+      const e = TUNING.economy;
+      const step = (Math.random() * 2 - 1) * e.jitterAmp - this.noiseOffset * e.jitterReversion;
+      this.noiseOffset += step;
+      this.stats.oilPrice = Phaser.Math.Clamp(this.stats.oilPrice + step, 40, 220);
+      bus.emit(EV.PRICE, this.stats.oilPrice, step, true);
     }
 
     this.historyTimer += rawDt;

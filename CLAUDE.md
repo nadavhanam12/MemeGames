@@ -14,12 +14,16 @@ server.
     the canonical submitted score), `art.ts`, `juice.ts`, `sfx.ts`,
     `palette.ts`, `settings.ts`.
   - `src/config/` — `tuning.ts` + `tuning.json` (gameplay values),
-    `layout.json` (UI layout). Tweak values in the JSON, not in code.
+    `layout.json` (UI layout), `memes.json` (meme reaction library: templates,
+    slot geometry, per-trigger caption variants — picked/rendered by
+    `src/core/memes.ts`). Tweak values in the JSON, not in code.
   - `src/backend/` — **the layer between front and back**; see below.
   - `src/dev/` — lil-gui devtools, layout/tuning live-editing helpers.
   - `scripts/art.mjs` (`npm run art`) — asset pipeline (sharp) that processes
     `assets/raw/` per `assets/manifest.json`.
-  - `design/ART_DIRECTION.md`, `assets/CHATGPT_BRIEF.md` — art direction docs.
+  - `design/ART_DIRECTION.md`, `assets/CHATGPT_BRIEF.md` (core game art),
+    `assets/MEME_BRIEF.md` (meme atlas workflow; generation rules + per-cell
+    catalog live in `assets/raw/Meme/`) — art direction docs.
 - `docs/leaderboard-contract.md` — API contract for the leaderboard server
   (a separate Bun + SQLite repo; consumed over HTTP, no backend code here).
 

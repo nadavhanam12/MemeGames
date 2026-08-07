@@ -1,9 +1,12 @@
 // Generated-art loader: maps canonical game texture keys to files produced by
 // `npm run art` (public/assets/). Anything missing falls back to programmatic art.
 import Phaser from 'phaser';
+import MEMES_DATA from '../config/memes.json';
 
-// Keep in sync with the ART_MAP in scripts/art.mjs.
-export const ART_MAP: Record<string, string> = {
+// Core game art. Keep in sync with the ART_MAP in scripts/art.mjs.
+// Meme template keys are NOT listed here — they come from src/config/memes.json
+// (each template's artKey/artFile pair), so adding a meme needs no code change.
+const CORE_ART: Record<string, string> = {
   map_bg: 'map_bg.png',
   tanker0: 'tanker_red.png',
   tanker1: 'tanker_blue.png',
@@ -14,7 +17,6 @@ export const ART_MAP: Record<string, string> = {
   patrol: 'threat_patrol.png',
   chyron: 'ui_chyron_frame.png',
   memeFrame: 'meme_frame_broadcast.png',
-  memeTwoButtons: 'meme_twobuttons_blank.png',
   charAnchorCalm: 'char_anchor_calm.png',
   charAnchorPanic: 'char_anchor_panic.png',
   charAnalystCalm: 'char_analyst_calm.png',
@@ -24,6 +26,14 @@ export const ART_MAP: Record<string, string> = {
   charSpokesperson: 'char_spokesperson.png',
   charCaptain: 'char_captain.png'
 };
+
+const MEME_ART: Record<string, string> = Object.fromEntries(
+  Object.values((MEMES_DATA as { templates: Record<string, { artKey: string; artFile: string }> }).templates).map(
+    t => [t.artKey, t.artFile]
+  )
+);
+
+export const ART_MAP: Record<string, string> = { ...CORE_ART, ...MEME_ART };
 
 export const artStatus = {
   generated: new Set<string>(),

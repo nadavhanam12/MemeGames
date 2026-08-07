@@ -21,7 +21,8 @@ const IMAGE_TARGETS = {
   map_bg: { width: 1280, height: 720 },
   ui_chyron_frame: { width: 1280 },
   meme_frame_broadcast: { width: 1280, height: 720 },
-  meme_twobuttons_blank: { width: 720 }
+  meme_twobuttons_blank: { width: 720 },
+  meme_thisisfine_blank: { width: 720 }
 };
 
 const errors = [];
@@ -81,7 +82,7 @@ async function processAtlas(asset) {
       img = img.trim({ threshold: 10 });
     }
     const trimmed = await img.toBuffer();
-    const targetW = asset.targetWidths?.[frameName];
+    const targetW = asset.targetWidths?.[frameName] ?? asset.targetWidth;
     let out = sharp(trimmed);
     if (targetW) out = out.resize({ width: targetW });
     const outFile = path.join(OUT, `${frameName}.png`);
@@ -112,7 +113,8 @@ async function main() {
   const index = produced.map(p => p.split(' ')[0]);
   await writeFile(path.join(OUT, 'index.json'), JSON.stringify(index, null, 2));
 
-  // canonical game texture keys -> generated file (keep in sync with src/core/art.ts)
+  // canonical game texture keys -> generated file (keep in sync with src/core/art.ts).
+  // Meme template keys are appended from src/config/memes.json below.
   const ART_MAP = {
     map_bg: 'map_bg.png',
     tanker0: 'tanker_red.png',
@@ -124,7 +126,6 @@ async function main() {
     patrol: 'threat_patrol.png',
     chyron: 'ui_chyron_frame.png',
     memeFrame: 'meme_frame_broadcast.png',
-    memeTwoButtons: 'meme_twobuttons_blank.png',
     charAnchorCalm: 'char_anchor_calm.png',
     charAnchorPanic: 'char_anchor_panic.png',
     charAnalystCalm: 'char_analyst_calm.png',
@@ -134,6 +135,8 @@ async function main() {
     charSpokesperson: 'char_spokesperson.png',
     charCaptain: 'char_captain.png'
   };
+  const memesCfg = JSON.parse(await readFile(path.join(root, 'src', 'config', 'memes.json'), 'utf8'));
+  for (const t of Object.values(memesCfg.templates)) ART_MAP[t.artKey] = t.artFile;
   const fallbackKeys = Object.entries(ART_MAP)
     .filter(([, file]) => !index.includes(file))
     .map(([key, file]) => `${key} (missing ${file})`);

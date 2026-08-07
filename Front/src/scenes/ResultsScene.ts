@@ -3,6 +3,7 @@ import { FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL } from '../core/palet
 import { settings } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
+import { MEMES, getMemeLog } from '../core/memes';
 import { EASE, confetti, countTo, popIn } from '../core/juice';
 import { SessionStats, computeScore, freshStats } from '../core/state';
 import { leaderboard } from '../backend/leaderboard';
@@ -130,7 +131,10 @@ export class ResultsScene extends Phaser.Scene {
     const meme = this.buildMemeCard(stats, rank);
     meme.setAlpha(0);
 
-    const replay = this.add.container(950, 640).setAlpha(0);
+    const memeChain = this.buildMemeChain();
+    memeChain?.setAlpha(0);
+
+    const replay = this.add.container(950, 655).setAlpha(0);
     const rb = this.add.rectangle(0, 0, 340, 80, PAL.green).setStrokeStyle(6, PAL.ink);
     const rt = this.add.text(0, 0, 'DEFEND AGAIN', { fontFamily: FONT_DISPLAY, fontSize: '30px', color: HEX.ink }).setOrigin(0.5);
     replay.add([rb, rt]);
@@ -142,7 +146,7 @@ export class ResultsScene extends Phaser.Scene {
     const finalScore = computeScore(stats);
     let submitted = this.registry.get('submittedFor') === stats;
 
-    const submitBtn = this.add.container(190, 640).setAlpha(0);
+    const submitBtn = this.add.container(190, 655).setAlpha(0);
     const sbBg = this.add.rectangle(0, 0, 280, 70, PAL.gold).setStrokeStyle(6, PAL.ink);
     const sbTxt = this.add
       .text(0, 0, 'SUBMIT SCORE', { fontFamily: FONT_DISPLAY, fontSize: '24px', color: HEX.ink })
@@ -154,7 +158,7 @@ export class ResultsScene extends Phaser.Scene {
       sbTxt.setText('SUBMITTED ✓').setColor(HEX.cream);
     }
 
-    const lbBtn = this.add.container(490, 640).setAlpha(0);
+    const lbBtn = this.add.container(490, 655).setAlpha(0);
     const lbBg = this.add.rectangle(0, 0, 280, 70, PAL.ocean).setStrokeStyle(6, PAL.ink);
     const lbTxt = this.add
       .text(0, 0, 'LEADERBOARD', { fontFamily: FONT_DISPLAY, fontSize: '24px', color: HEX.cream })
@@ -220,7 +224,13 @@ export class ResultsScene extends Phaser.Scene {
         popIn(this, rankC, 350);
         sfx.comboSting(2);
       },
-      () => sfx.whoosh(),
+      () => {
+        sfx.whoosh();
+        if (memeChain) {
+          memeChain.setAlpha(1);
+          popIn(this, memeChain, 300);
+        }
+      },
       () => {
         meme.setAlpha(1);
         popIn(this, meme, 450);
@@ -310,6 +320,51 @@ export class ResultsScene extends Phaser.Scene {
         g.strokePath();
       }
     });
+  }
+
+  /** Bottom strip: every meme that fired during the run, oldest → newest.
+   *  Art-only thumbnails (captions are unreadable at this size). */
+  private buildMemeChain(): Phaser.GameObjects.Container | null {
+    const log = getMemeLog();
+    const entries = log.map(v => MEMES.templates[v.t]).filter(Boolean);
+    if (!entries.length) return null;
+
+    const H = 48;
+    const gap = 8;
+    const labelW = 170;
+    const maxRowW = GAME_W - 140 - labelW;
+    const widths = entries.map(tpl => Math.max(32, Math.round(H / tpl.aspect)));
+    // oldest memes drop first if the row would overflow
+    while (widths.length > 1 && widths.reduce((a, b) => a + b + gap, -gap) > maxRowW) {
+      widths.shift();
+      entries.shift();
+    }
+    const rowW = widths.reduce((a, b) => a + b + gap, -gap);
+
+    const c = this.add.container(GAME_W / 2, 592);
+    c.add(
+      this.add
+        .text(-rowW / 2 - 14, 0, 'RUN IN MEMES →', {
+          fontFamily: FONT_SANS,
+          fontSize: '15px',
+          fontStyle: 'bold',
+          color: HEX.gold
+        })
+        .setOrigin(1, 0.5)
+    );
+    let x = -rowW / 2;
+    entries.forEach((tpl, i) => {
+      const w = widths[i];
+      const cardX = x + w / 2;
+      if (hasArt(this, tpl.artKey)) {
+        c.add(this.add.image(cardX, 0, tpl.artKey).setDisplaySize(w, H));
+      } else {
+        c.add(this.add.rectangle(cardX, 0, w, H, 0x39424e));
+      }
+      c.add(this.add.rectangle(cardX, 0, w, H).setStrokeStyle(3, PAL.ink));
+      x += w + gap;
+    });
+    return c;
   }
 
   /** Shareable meme card — uses generated character portraits when available. */

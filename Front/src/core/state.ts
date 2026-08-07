@@ -51,6 +51,8 @@ export function computeScore(s: SessionStats): number {
 
 // One global emitter for cross-scene events (HUD <-> gameplay).
 export const bus = new Phaser.Events.EventEmitter();
+// Dev console handle, e.g. bus.emit('meme-moment', 'EVENT LOST')
+if (import.meta.env.DEV) (window as any).bus = bus;
 
 export const EV = {
   PRICE: 'price-changed', // (newPrice, delta)

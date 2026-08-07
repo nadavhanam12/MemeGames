@@ -26,6 +26,9 @@
     "vipTanker": 46
   },
   "economy": {
+    "jitterAmp": 0.45,
+    "jitterInterval": 0.2,
+    "jitterReversion": 0.12,
     "interceptDrop": 0.5,
     "patrolDrop": 1,
     "nearMissDrop": 1.5,
@@ -59,6 +62,10 @@
       40,
       65
     ]
+  },
+  "dayNight": {
+    "dayLengthSec": 20,
+    "nightMaxAlpha": 0.35
   },
   "juice": {
     "tapRadius": 80,

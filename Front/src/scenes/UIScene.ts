@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL, VIEW } from '../core/palette';
 import { settings } from '../core/settings';
 import { sfx } from '../core/sfx';
-import { hasArt } from '../core/art';
+import { MEMES, pickMeme, renderMeme } from '../core/memes';
 import { EASE, countTo, floatText, popIn, pressPulse } from '../core/juice';
 import { EV, SessionStats, bus } from '../core/state';
 import { TUNING } from '../config/tuning';
@@ -33,19 +33,8 @@ const TICKER_ITEMS = [
   'PREDICTION MARKETS BUZZING'
 ];
 
-// Two-buttons meme captions per event / big moment (left card, right card)
-const MEME_CAPTIONS: Record<string, [string, string]> = {
-  'DRONE SWARM SURGE': ['INTERCEPT EVERYTHING', 'BLAME THE INTERN'],
-  'VIP TANKER TRANSIT': ['GUARD THE VIP', 'GUARD EVERYONE ELSE'],
-  'MARKET CALM-ISH': ['RELAX FINALLY', 'PANIC ANYWAY'],
-  'AFFORDABLE ROAD TRIP UNLOCKED': ['BUY GAS NOW', 'WAIT, IT DROPS MORE'],
-  'GROUP CHAT STARTING TO WORRY': ['MUTE THE GROUP CHAT', 'BECOME THE NEWS GUY'],
-  'EVERYONE BECOMES AN ENERGY EXPERT': ['TRUST THE EXPERTS', 'TRUST TWITTER'],
-  'BICYCLES NOW A LUXURY ASSET': ['BUY A BIKE', 'SELL THE CAR'],
-  'LAST-SECOND SAVE': ['NERVES OF STEEL', 'PURE LUCK'],
-  'LOST A TANKER ON CAMERA': ['CUT TO COMMERCIAL', 'ZOOM IN SLOWLY']
-};
-const MEME_FALLBACK: [string, string] = ['KEEP CALM', 'PANIC ON AIR'];
+// Meme reactions (templates + captions) live in src/config/memes.json,
+// picked/rendered by src/core/memes.ts.
 
 // Broadcast-studio frame geometry (CNBC-style reference): blue outer border,
 // left info box (price graph / meme cutaway), game box right (VIEW), red
@@ -75,6 +64,9 @@ export class UIScene extends Phaser.Scene {
   private graphTip!: Phaser.GameObjects.Text;
   private history: number[] = [112];
   private graphFlash = 0;
+  private elapsedSec = 0;
+  private dayLabels: Phaser.GameObjects.Text[] = [];
+  private yAxisLabels: Phaser.GameObjects.Text[] = [];
 
   private creditsText!: Phaser.GameObjects.Text;
   private displayedCredits = 30;
@@ -100,6 +92,8 @@ export class UIScene extends Phaser.Scene {
   private upgradeToggleBg!: Phaser.GameObjects.Rectangle;
   private panelOpen = false;
   private memePopup?: Phaser.GameObjects.Container;
+  private memeGen = 0;
+  private lastMemeAt = -Infinity;
   private heartbeat = 0;
 
   constructor() {
@@ -112,6 +106,7 @@ export class UIScene extends Phaser.Scene {
     this.history = [112];
     this.upgradeLevels = { jammer: 0, ciws: 0, escort: 0 };
     this.panelOpen = false;
+    this.lastMemeAt = -Infinity;
     this.registry.set('ui-modal', false);
 
     this.buildStudioFrame();
@@ -218,7 +213,22 @@ export class UIScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setAlpha(0);
+    // axis label pools, positioned each frame by drawGraph()
+    this.yAxisLabels = [0, 1, 2].map(() =>
+      this.add
+        .text(0, 0, '', { fontFamily: FONT_SANS, fontSize: '11px', fontStyle: 'bold', color: '#8FA6BC' })
+        .setOrigin(0, 0.5)
+        .setAlpha(0)
+    );
+    this.dayLabels = [0, 1, 2, 3].map(() =>
+      this.add
+        .text(0, 0, '', { fontFamily: FONT_SANS, fontSize: '11px', fontStyle: 'bold', color: HEX.gold })
+        .setOrigin(0.5, 1)
+        .setAlpha(0)
+    );
     group.add([oilLabel, this.priceBox, this.priceText, this.priceArrow, this.graph, this.graphTip]);
+    group.add(this.yAxisLabels);
+    group.add(this.dayLabels);
     registerLayout(this, 'hud-price', group, { x: LEFT_BOX.x, y: LEFT_BOX.y, w: LEFT_BOX.w, h: LEFT_BOX.h });
   }
 
@@ -518,9 +528,14 @@ export class UIScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------- events
-  private onPrice(price: number, delta: number): void {
+  private onPrice(price: number, delta: number, jitter = false): void {
     const from = this.displayedPrice;
     this.displayedPrice = price;
+    if (jitter) {
+      // market noise: tick the readout quietly — no arrow, shake, or flash
+      this.priceText.setText(`$${price.toFixed(2)}`);
+      return;
+    }
     countTo(this, this.priceText, from, price, v => `$${v.toFixed(2)}`, delta < 0 ? 500 : 300);
     const down = delta < 0;
     this.priceArrow.setText(down ? '▼' : '▲').setColor(down ? HEX.green : HEX.red).setAlpha(1);
@@ -671,23 +686,8 @@ export class UIScene extends Phaser.Scene {
   }
 
   private onThreshold(label: string, tone: 'good' | 'bad'): void {
-    const card = this.add.container(VIEW.x + VIEW.w / 2, 300).setDepth(1600);
-    const bg = this.add.rectangle(0, 0, 620, 80, tone === 'good' ? PAL.green : PAL.red).setStrokeStyle(6, PAL.ink);
-    const txt = this.add
-      .text(0, 0, label, {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '28px',
-        color: tone === 'good' ? HEX.ink : HEX.cream,
-        align: 'center',
-        wordWrap: { width: 580 }
-      })
-      .setOrigin(0.5);
-    card.add([bg, txt]);
-    popIn(this, card, 320);
-    this.time.delayedCall(1600, () => {
-      this.tweens.add({ targets: card, alpha: 0, scale: 0.8, duration: 250, onComplete: () => card.destroy() });
-    });
-    this.time.delayedCall(600, () => this.showMemeReaction(label));
+    // price thresholds live in the breaking-news band, no popup card
+    this.onHeadline(label, tone);
   }
 
   private onEventProb(label: string, prob: number, active: boolean): void {
@@ -697,63 +697,31 @@ export class UIScene extends Phaser.Scene {
     this.predLabel?.setColor(active ? '#EB5757' : '#858D92');
   }
 
-  private onEventCard(title: string, colorHex: string): void {
+  private onEventCard(title: string, _colorHex: string): void {
+    // events announce through the breaking-news band, no popup card
     sfx.eventCard();
-    const color = Phaser.Display.Color.HexStringToColor(colorHex).color;
-    const card = this.add.container(VIEW.x + VIEW.w / 2, 330).setDepth(1700);
-    const flash = this.add.rectangle(0, 0, GAME_W, GAME_H, color, 0.18).setDepth(-1);
-    const bg = this.add.rectangle(0, 0, 640, 120, PAL.ink, 0.95).setStrokeStyle(8, color);
-    const small = this.add
-      .text(0, -34, 'SPECIAL EVENT', { fontFamily: FONT_SANS, fontSize: '18px', fontStyle: 'bold', color: colorHex })
-      .setOrigin(0.5);
-    const txt = this.add
-      .text(0, 10, title, {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '38px',
-        color: HEX.cream,
-        stroke: HEX.ink,
-        strokeThickness: 6
-      })
-      .setOrigin(0.5);
-    card.add([flash, bg, small, txt]);
-    popIn(this, card, 350);
-    this.time.delayedCall(1700, () => {
-      this.tweens.add({ targets: card, alpha: 0, y: 300, duration: 350, onComplete: () => card.destroy() });
-    });
-    this.time.delayedCall(900, () => this.showMemeReaction(title));
+    this.onHeadline(`SPECIAL EVENT: ${title}`, 'event');
   }
 
-  /** Breaking-meme cutaway: the left box switches from the price graph to the
-   *  two-buttons meme captioned for the current moment, then back. */
+  /** Breaking-meme cutaway: "MEME UPDATE IN 3..2..1" over the price graph,
+   *  then the meme (picked from src/config/memes.json) bounces in, holds,
+   *  and bounces back out. */
   private showMemeReaction(label: string): void {
-    const [left, right] = MEME_CAPTIONS[label] ?? MEME_FALLBACK;
+    // memes react to game moments, but sparingly — respect the cooldown so
+    // back-to-back moments don't turn the left box into a meme channel
+    if (this.time.now - this.lastMemeAt < MEMES.settings.minGapMs) return;
+    this.lastMemeAt = this.time.now;
+    const gen = ++this.memeGen; // cancels any countdown/popup still running
     this.memePopup?.destroy();
-    const W = 300;
-    const H = 450;
+    this.memePopup = undefined;
+
+    const tick = settings.reducedMotion ? 260 : MEMES.settings.countdownTickMs;
     const pop = this.add.container(LEFT_BOX.x + LEFT_BOX.w / 2, LEFT_BOX.y + LEFT_BOX.h / 2).setDepth(1200);
     this.memePopup = pop;
 
-    // opaque backing covers the graph while the meme is up
+    // opaque backing covers the graph; band + backing stay static while the
+    // countdown/meme content animates inside `inner`
     pop.add(this.add.rectangle(0, 0, LEFT_BOX.w, LEFT_BOX.h, PAL.ink, 1));
-    if (hasArt(this, 'memeTwoButtons')) {
-      pop.add(this.add.image(0, 0, 'memeTwoButtons').setDisplaySize(W, H));
-    } else {
-      pop.add(this.add.rectangle(0, 0, W, H, 0x1d2b39, 0.97));
-      pop.add(this.add.rectangle(-W * 0.19, -H * 0.21, 92, 70, 0xf2f2f2));
-      pop.add(this.add.rectangle(W * 0.2, -H * 0.21, 92, 70, 0xf2f2f2));
-    }
-    // captions over the two blank cards (card centers ≈ 31%/70% x, 21% y of art)
-    const capStyle = {
-      fontFamily: FONT_SANS,
-      fontSize: '13px',
-      fontStyle: 'bold',
-      color: '#1a1a1a',
-      align: 'center',
-      wordWrap: { width: 88 }
-    };
-    pop.add(this.add.text(-W * 0.19, -H * 0.29, left, capStyle).setOrigin(0.5));
-    pop.add(this.add.text(W * 0.2, -H * 0.29, right, capStyle).setOrigin(0.5));
-    // breaking-meme tag at the top of the box
     pop.add(this.add.rectangle(0, -LEFT_BOX.h / 2 + 20, 190, 28, BAND_RED).setStrokeStyle(3, PAL.ink));
     pop.add(
       this.add
@@ -765,11 +733,68 @@ export class UIScene extends Phaser.Scene {
         })
         .setOrigin(0.5)
     );
-    popIn(this, pop, 300);
-    this.time.delayedCall(4000, () => {
-      if (this.memePopup !== pop) return;
-      this.tweens.add({ targets: pop, alpha: 0, duration: 300, onComplete: () => pop.destroy() });
-      this.memePopup = undefined;
+
+    // -- countdown teaser
+    const cd = this.add.container(0, 0);
+    pop.add(cd);
+    cd.add(
+      this.add
+        .text(0, -70, 'MEME UPDATE IN', {
+          fontFamily: FONT_SANS,
+          fontSize: '20px',
+          fontStyle: 'bold',
+          color: HEX.gold
+        })
+        .setOrigin(0.5)
+    );
+    const num = this.add
+      .text(0, 20, '3', {
+        fontFamily: FONT_DISPLAY,
+        fontSize: '96px',
+        color: HEX.cream,
+        stroke: HEX.ink,
+        strokeThickness: 8
+      })
+      .setOrigin(0.5);
+    cd.add(num);
+    const setNum = (n: number): void => {
+      num.setText(String(n));
+      sfx.tick(n === 1);
+      if (!settings.reducedMotion) {
+        num.setScale(0.4);
+        this.tweens.add({ targets: num, scale: 1, duration: tick * 0.6, ease: 'Back.easeOut' });
+      }
+    };
+    setNum(3);
+    this.time.delayedCall(tick, () => gen === this.memeGen && setNum(2));
+    this.time.delayedCall(tick * 2, () => gen === this.memeGen && setNum(1));
+
+    // -- the meme itself, bouncing in after the countdown
+    this.time.delayedCall(tick * 3, () => {
+      if (gen !== this.memeGen || this.memePopup !== pop) return;
+      cd.destroy();
+      const inner = this.add.container(0, 0);
+      pop.add(inner);
+      renderMeme(this, inner, pickMeme(label), 300, LEFT_BOX.h - 70);
+      if (settings.reducedMotion) {
+        inner.setAlpha(0);
+        this.tweens.add({ targets: inner, alpha: 1, duration: 200 });
+      } else {
+        inner.setScale(0);
+        this.tweens.add({ targets: inner, scale: 1, duration: 380, ease: 'Back.easeOut' });
+      }
+      sfx.whoosh();
+
+      // hold, then bounce out and drop the cutaway
+      this.time.delayedCall(MEMES.settings.durationMs, () => {
+        if (gen !== this.memeGen || this.memePopup !== pop) return;
+        this.memePopup = undefined;
+        const done = (): void => {
+          this.tweens.add({ targets: pop, alpha: 0, duration: 180, onComplete: () => pop.destroy() });
+        };
+        if (settings.reducedMotion) done();
+        else this.tweens.add({ targets: inner, scale: 0, duration: 260, ease: 'Back.easeIn', onComplete: done });
+      });
     });
   }
 
@@ -777,6 +802,7 @@ export class UIScene extends Phaser.Scene {
     const total = Math.floor(elapsed);
     const m = Math.floor(total / 60);
     const s = total % 60;
+    this.elapsedSec = elapsed;
     this.timerText.setText(`${m}:${s.toString().padStart(2, '0')}`);
     if (!this.dangerBanner?.visible) this.timerText.setColor(HEX.cream).setFontSize(36);
   }
@@ -848,25 +874,78 @@ export class UIScene extends Phaser.Scene {
     const data = hist.slice(-SAMPLES);
     if (data.length < 2) {
       this.graphTip.setAlpha(0);
+      for (const t of [...this.yAxisLabels, ...this.dayLabels]) t.setAlpha(0);
       return;
     }
-    const min = Math.min(...data) - 2;
-    const max = Math.max(...data) + 2;
+    // the head of the line is "now": the live (tweened) price readout. Samples
+    // sit behind it by their age, so the line slides continuously instead of
+    // jumping from sample to sample every half second.
+    const live = this.displayedPrice;
+    const min = Math.min(...data, live) - 2;
+    const max = Math.max(...data, live) + 2;
     const step = w / (SAMPLES - 1);
     const yOf = (v: number): number => y0 + h - ((v - min) / (max - min)) * h;
+    const SAMPLE_SEC = 0.5;
+    const n = data.length;
+    const full = hist.length >= SAMPLES;
+    const liveT = (this.elapsedSec % SAMPLE_SEC) / SAMPLE_SEC;
+    const headX = full ? x0 + w : x0 + (n - 1 + liveT) * step;
+    const xOf = (i: number): number => headX - (n - 1 - i + liveT) * step;
+
+    // y axis: price gridlines + labels at max / mid / min
+    const yLevels = [max - 2, (min + max) / 2, min + 2];
+    g.lineStyle(1, 0x8fa6bc, 0.2);
+    yLevels.forEach((v, i) => {
+      g.lineBetween(x0, yOf(v), x0 + w, yOf(v));
+      this.yAxisLabels[i]
+        .setText(`$${v.toFixed(0)}`)
+        .setPosition(x0 + 4, Phaser.Math.Clamp(yOf(v), y0 + 8, y0 + h - 8))
+        .setAlpha(0.9);
+    });
+
+    // x axis: DAY N markers at day boundaries, in the same continuous mapping
+    const pps = step / SAMPLE_SEC; // pixels per second
+    const dayLen = TUNING.dayNight.dayLengthSec;
+    const tEnd = this.elapsedSec;
+    const tMin = tEnd - (headX - x0) / pps;
+    let li = 0;
+    for (let k = Math.max(0, Math.ceil(tMin / dayLen)); k * dayLen <= tEnd && li < this.dayLabels.length; k++) {
+      const px = headX - (tEnd - k * dayLen) * pps;
+      g.lineStyle(1, PAL.gold, 0.35);
+      g.lineBetween(px, y0, px, y0 + h);
+      this.dayLabels[li++]
+        .setText(`DAY ${k + 1}`)
+        .setPosition(Phaser.Math.Clamp(px, x0 + 24, x0 + w - 24), y0 + h - 4)
+        .setAlpha(0.95);
+    }
+    for (; li < this.dayLabels.length; li++) this.dayLabels[li].setAlpha(0);
+
     g.lineStyle(3, PAL.gold, 0.9);
     g.beginPath();
-    data.forEach((v, i) => {
-      const px = x0 + i * step;
-      if (i === 0) g.moveTo(px, yOf(v));
-      else g.lineTo(px, yOf(v));
-    });
+    let started = false;
+    for (let i = 0; i < n; i++) {
+      const px = xOf(i);
+      if (px < x0) continue;
+      if (!started) {
+        if (i > 0) {
+          // clip the segment entering from the left edge
+          const f = (x0 - xOf(i - 1)) / step;
+          g.moveTo(x0, yOf(Phaser.Math.Linear(data[i - 1], data[i], f)));
+          g.lineTo(px, yOf(data[i]));
+        } else {
+          g.moveTo(px, yOf(data[i]));
+        }
+        started = true;
+      } else {
+        g.lineTo(px, yOf(data[i]));
+      }
+    }
+    if (!started) g.moveTo(x0, yOf(live));
+    g.lineTo(headX, yOf(live));
     g.strokePath();
-    const last = data[data.length - 1];
-    const prev = data[data.length - 2];
-    const tipX = x0 + (data.length - 1) * step;
-    const tipY = yOf(last);
-    const down = last <= prev;
+    const tipX = headX;
+    const tipY = yOf(live);
+    const down = live <= data[n - 1];
     // dashed-ish guide line at the current price level
     g.lineStyle(1, PAL.gold, 0.25);
     g.lineBetween(x0, tipY, x0 + w, tipY);
@@ -874,7 +953,7 @@ export class UIScene extends Phaser.Scene {
     g.fillCircle(tipX, tipY, 5);
     // price tag riding the tip of the line
     this.graphTip
-      .setText(`$${last.toFixed(1)}`)
+      .setText(`$${live.toFixed(1)}`)
       .setColor(down ? HEX.green : HEX.red)
       .setAlpha(1);
     if (tipX > x0 + w - 72) {

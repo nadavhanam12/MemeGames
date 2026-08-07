@@ -127,6 +127,14 @@ buttons. Editorial news-caricature illustration style. No text anywhere.
 
 ---
 
+## Meme template pack — separate brief
+
+The ten blank meme-template images (`meme_*_blank.png` beyond the two-buttons one)
+are generated in their own chat from `assets/MEME_BRIEF.md` — do not generate them
+from this brief.
+
+---
+
 ## Removed in v2 (do not generate)
 
 - `map_labels_overlay.png` — rejected; the game renders labels, route lines and

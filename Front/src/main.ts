@@ -25,3 +25,6 @@ const game = new Phaser.Game({
 });
 
 initDevtools(game);
+
+// Dev console handle, e.g. phaserGame.scene.start('Game')
+if (import.meta.env.DEV) (window as any).phaserGame = game;

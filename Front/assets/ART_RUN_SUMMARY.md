@@ -1,7 +1,7 @@
 # Art run summary
 
-- Date: 2026-08-04T23:22:40.346Z
-- Written: 19 • Skipped: 0 • Errors: 0
+- Date: 2026-08-06T21:51:10.809Z
+- Written: 64 • Skipped: 0 • Errors: 0
 
 ## Produced (public/assets/)
 - map_bg.png
@@ -23,6 +23,51 @@
 - char_spokesperson.png (512x512)
 - char_captain.png (512x512)
 - meme_twobuttons_blank.png
+- meme_thisisfine_blank.png
+- meme_squint_captain.png (720x720)
+- meme_squint_analyst.png (720x720)
+- meme_squint_trump.png (720x720)
+- meme_squint_iran.png (720x720)
+- meme_temple_captain.png (720x720)
+- meme_temple_analyst.png (720x720)
+- meme_temple_trump.png (720x720)
+- meme_temple_iran.png (720x720)
+- meme_distracted_captain.png (720x720)
+- meme_distracted_trump.png (720x720)
+- meme_distracted_soldier.png (720x560)
+- meme_distracted_analyst.png (720x560)
+- meme_podcast_captain.png (720x720)
+- meme_podcast_analyst.png (720x720)
+- meme_podcast_khamenei.png (720x720)
+- meme_podcast_commander.png (720x720)
+- meme_condescending_anchor.png (720x720)
+- meme_condescending_trump.png (720x720)
+- meme_condescending_khamenei.png (720x720)
+- meme_condescending_exec.png (720x720)
+- meme_disaster_captain.png (720x720)
+- meme_disaster_trump.png (720x720)
+- meme_disaster_khamenei.png (720x720)
+- meme_disaster_anchor.png (720x720)
+- meme_crying_analyst.png (720x720)
+- meme_crying_captain.png (720x720)
+- meme_crying_anchor.png (720x720)
+- meme_crying_soldier.png (720x720)
+- meme_vehicle_anchor.png (720x720)
+- meme_vehicle_analyst.png (720x720)
+- meme_vehicle_civilian.png (720x720)
+- meme_vehicle_diplomat.png (720x720)
+- meme_success_captain.png (720x720)
+- meme_success_trump.png (720x720)
+- meme_success_soldier.png (720x720)
+- meme_success_responder.png (720x720)
+- meme_calmfire_anchor.png (720x720)
+- meme_calmfire_trump.png (720x720)
+- meme_calmfire_khamenei.png (720x720)
+- meme_calmfire_captain.png (720x720)
+- meme_changemind_analyst.png (720x720)
+- meme_changemind_diplomat.png (720x720)
+- meme_changemind_civilian.png (720x488)
+- meme_changemind_exec.png (720x488)
 
 ## Skipped (missing raw files → game uses programmatic fallback)
 - (none)
