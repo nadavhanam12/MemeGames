@@ -24,7 +24,19 @@ const CORE_ART: Record<string, string> = {
   charCommander: 'char_commander.png',
   charDealmaker: 'char_dealmaker.png',
   charSpokesperson: 'char_spokesperson.png',
-  charCaptain: 'char_captain.png'
+  charCaptain: 'char_captain.png',
+  trump_right_idle_1: 'trump_right_idle_1.png',
+  trump_right_idle_2: 'trump_right_idle_2.png',
+  trump_right_fire_1: 'trump_right_fire_1.png',
+  trump_right_fire_2: 'trump_right_fire_2.png',
+  trump_mid_idle_1: 'trump_mid_idle_1.png',
+  trump_mid_idle_2: 'trump_mid_idle_2.png',
+  trump_mid_fire_1: 'trump_mid_fire_1.png',
+  trump_mid_fire_2: 'trump_mid_fire_2.png',
+  trump_left_idle_1: 'trump_left_idle_1.png',
+  trump_left_idle_2: 'trump_left_idle_2.png',
+  trump_left_fire_1: 'trump_left_fire_1.png',
+  trump_left_fire_2: 'trump_left_fire_2.png'
 };
 
 const MEME_ART: Record<string, string> = Object.fromEntries(

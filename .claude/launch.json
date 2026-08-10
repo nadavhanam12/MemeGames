@@ -4,8 +4,13 @@
     {
       "name": "hormuz-holdem",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd Front && exec npm run dev -- --port 5173 --strictPort"],
-      "port": 5173
+      "runtimeArgs": ["-c", "cd Front && exec npm run dev -- --port ${PORT:-5173} --strictPort"],
+      "port": 5173,
+      "autoPort": true
+    },
+    {
+      "name": "hormuz-holdem-attach",
+      "url": "http://localhost:5173"
     }
   ]
 }

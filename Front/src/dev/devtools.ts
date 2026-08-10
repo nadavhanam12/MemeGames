@@ -26,7 +26,7 @@ const TIPS: Record<string, string> = {
   'Spawning.maxTankers': 'Maximum tankers sailing simultaneously.',
   'Spawning.speedRampPerMinute': 'Extra threat speed gained per minute survived (0.3 = +30%/min).',
   'Spawning.speedRampMax': 'Cap on the survival speed bonus (1.2 = at most +120%).',
-  'Speeds.missile': 'Missile travel speed, pixels/second (before jammer and late-game ramp).',
+  'Speeds.missile': 'Missile travel speed, pixels/second (before the late-game ramp).',
   'Speeds.drone': 'Drone travel speed, pixels/second.',
   'Speeds.mine': 'Unused — mines are stationary (they pop into place and wait).',
   'Speeds.patrol': 'Patrol boat speed, pixels/second.',
@@ -41,14 +41,18 @@ const TIPS: Record<string, string> = {
   'Economy.vipDrop': 'Price drop ($) when the VIP tanker exits safely.',
   'Economy.hitSpike': 'Price SPIKE ($) when a tanker is hit — the punishment.',
   'Economy.vipHitSpike': 'Price spike ($) when the VIP tanker is lost.',
-  'Economy.interceptCredits': 'Defense Credits per interception (escort upgrade adds +1/level).',
+  'Economy.interceptCredits': 'Defense Credits per interception (before the OIL MONEY multiplier).',
   'Economy.tankerCredits': 'Credits for each safe tanker.',
   'Economy.vipCredits': 'Credits for a safe VIP tanker.',
   'Economy.eventWinCredits': 'Credit bonus for winning a special event.',
-  'Upgrades.jammerSlowPerLevel': 'Threat slowdown per jammer level (0.15 = 15% slower per level).',
-  'Upgrades.escortSpeedPerLevel': 'Tanker speedup per escort level (0.15 = 15% faster per level).',
-  'Upgrades.ciwsBaseInterval': 'Seconds between CIWS auto-intercepts at level 1.',
-  'Upgrades.ciwsIntervalStep': 'CIWS interval reduction per level (faster auto-fire).',
+  'Upgrades.airCooldownBase': 'Seconds between jet intercepts before level scaling.',
+  'Upgrades.airCooldownStep': 'Jet intercept cooldown reduction per air level.',
+  'Upgrades.airSpeedBase': 'Jet flight speed at level 0, pixels/second.',
+  'Upgrades.airSpeedPerLevel': 'Extra jet speed per air level.',
+  'Upgrades.airInterceptDist': 'How close the jet must get to intercept, pixels.',
+  'Upgrades.hullHpPerLevel': 'Extra hits a tanker survives per hull level.',
+  'Upgrades.hullDamagedSpikeFactor': 'Price-spike fraction when armor absorbs a hit (1 = full spike).',
+  'Upgrades.goldBonusPerLevel': 'Credit income bonus per gold level (0.25 = +25%/level).',
   'Juice / FX.tapRadius': 'Tap hit radius in px — how close a tap must be to a threat to count.',
   'Juice / FX.nearMissDist': 'Interceptions closer than this (px) to a tanker count as last-second saves.',
   'Juice / FX.hitDist': 'Distance (px) at which a threat detonates on a tanker.',
@@ -157,11 +161,15 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
   );
 
   const up = folder('Upgrades', true);
-  tipped(up.add(TUNING.upgrades, 'jammerSlowPerLevel', 0, 0.5, 0.01).onChange(onChange), 'Upgrades', 'jammerSlowPerLevel');
-  tipped(up.add(TUNING.upgrades, 'escortSpeedPerLevel', 0, 0.5, 0.01).onChange(onChange), 'Upgrades', 'escortSpeedPerLevel');
-  tipped(up.add(TUNING.upgrades, 'ciwsBaseInterval', 1, 15, 0.5).onChange(onChange), 'Upgrades', 'ciwsBaseInterval');
-  tipped(up.add(TUNING.upgrades, 'ciwsIntervalStep', 0, 4, 0.25).onChange(onChange), 'Upgrades', 'ciwsIntervalStep');
-  (['jammerCosts', 'ciwsCosts', 'escortCosts'] as const).forEach(name => {
+  tipped(up.add(TUNING.upgrades, 'airCooldownBase', 1, 15, 0.5).onChange(onChange), 'Upgrades', 'airCooldownBase');
+  tipped(up.add(TUNING.upgrades, 'airCooldownStep', 0, 4, 0.25).onChange(onChange), 'Upgrades', 'airCooldownStep');
+  tipped(up.add(TUNING.upgrades, 'airSpeedBase', 40, 300, 5).onChange(onChange), 'Upgrades', 'airSpeedBase');
+  tipped(up.add(TUNING.upgrades, 'airSpeedPerLevel', 0, 100, 5).onChange(onChange), 'Upgrades', 'airSpeedPerLevel');
+  tipped(up.add(TUNING.upgrades, 'airInterceptDist', 20, 150, 5).onChange(onChange), 'Upgrades', 'airInterceptDist');
+  tipped(up.add(TUNING.upgrades, 'hullHpPerLevel', 0, 3, 1).onChange(onChange), 'Upgrades', 'hullHpPerLevel');
+  tipped(up.add(TUNING.upgrades, 'hullDamagedSpikeFactor', 0, 1, 0.05).onChange(onChange), 'Upgrades', 'hullDamagedSpikeFactor');
+  tipped(up.add(TUNING.upgrades, 'goldBonusPerLevel', 0, 1, 0.05).onChange(onChange), 'Upgrades', 'goldBonusPerLevel');
+  (['airCosts', 'hullCosts', 'goldCosts'] as const).forEach(name => {
     const arr = TUNING.upgrades[name];
     const f = folder(name, true);
     arr.forEach((_, i) => {

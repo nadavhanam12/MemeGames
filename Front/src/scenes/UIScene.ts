@@ -4,20 +4,20 @@ import { settings } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { MEMES, pickMeme, renderMeme } from '../core/memes';
 import { EASE, countTo, floatText, popIn, pressPulse } from '../core/juice';
-import { EV, SessionStats, bus } from '../core/state';
+import { DayMission, DaySummary, EV, SessionStats, bus } from '../core/state';
 import { TUNING } from '../config/tuning';
 import { registerLayout } from '../dev/layout';
 
 interface UpgradeDef {
-  key: 'jammer' | 'ciws' | 'escort';
+  key: 'air' | 'hull' | 'gold';
   name: string;
   desc: string;
 }
 
 const UPGRADES: UpgradeDef[] = [
-  { key: 'jammer', name: 'DRONE JAMMER', desc: 'Threats move slower' },
-  { key: 'ciws', name: 'AUTO-CIWS', desc: 'Auto-intercepts periodically' },
-  { key: 'escort', name: 'ROUTE ESCORT', desc: 'Faster ships, +1 credit/hit' }
+  { key: 'air', name: 'AIR ASSISTANCE', desc: 'Friendly jet patrols and intercepts' },
+  { key: 'hull', name: 'HULL ARMOR', desc: 'Tankers survive +1 hit per level' },
+  { key: 'gold', name: 'OIL MONEY', desc: 'Earn +25% $ per level' }
 ];
 
 function costsOf(key: UpgradeDef['key']): number[] {
@@ -60,13 +60,34 @@ export class UIScene extends Phaser.Scene {
   private priceArrow!: Phaser.GameObjects.Text;
   private priceBox!: Phaser.GameObjects.Rectangle;
   private displayedPrice = 112;
+  private graphPrice = 112;
+  private graphMin = NaN;
+  private graphMax = NaN;
   private graph!: Phaser.GameObjects.Graphics;
   private graphTip!: Phaser.GameObjects.Text;
   private history: number[] = [112];
   private graphFlash = 0;
+  // big-move color flash: price UI is white by default, green/red only while
+  // a |delta| >= market.priceBigDelta move is fresh
+  private priceFlashUntil = 0;
+  private priceFlashDown = false;
   private elapsedSec = 0;
   private dayLabels: Phaser.GameObjects.Text[] = [];
+  private targetLabel!: Phaser.GameObjects.Text;
   private yAxisLabels: Phaser.GameObjects.Text[] = [];
+
+  // day system
+  private mission: DayMission | null = null;
+  private hourText!: Phaser.GameObjects.Text;
+  private summaryPanel?: Phaser.GameObjects.Container;
+  private summaryCountdown?: Phaser.GameObjects.Text;
+  private summaryNextDay = 2;
+  private missionChipBg!: Phaser.GameObjects.Rectangle;
+  private missionDayText!: Phaser.GameObjects.Text;
+  private missionText!: Phaser.GameObjects.Text;
+  private headlineQueue: Array<{ text: string; tone: 'good' | 'bad' | 'event'; hold: number }> = [];
+  private headlineBusy = false;
+  private upgradeLocked: Record<string, boolean> = { air: true, hull: true, gold: true };
 
   private creditsText!: Phaser.GameObjects.Text;
   private displayedCredits = 30;
@@ -74,19 +95,22 @@ export class UIScene extends Phaser.Scene {
   private timerText!: Phaser.GameObjects.Text;
   private headlineText!: Phaser.GameObjects.Text;
   private tickerText!: Phaser.GameObjects.Text;
-  private predShown = 0;
-  private predTargetProb = 0;
+  private predShown = 0.92;
+  private predBase = 0.92;
+  private predNudge = 0;
   private predActive = false;
+  private predFlash = 0;
+  private predFlashGood = false;
+  private predLastChipYes = 92;
+  private predLastChipAt = 0;
   private predChance!: Phaser.GameObjects.Text;
   private predYesText!: Phaser.GameObjects.Text;
   private predNoText!: Phaser.GameObjects.Text;
   private predCardGfx!: Phaser.GameObjects.Graphics;
   private dangerBanner?: Phaser.GameObjects.Container;
   private dangerText!: Phaser.GameObjects.Text;
-  private streakBadge!: Phaser.GameObjects.Container;
-  private streakText!: Phaser.GameObjects.Text;
   private predLabel!: Phaser.GameObjects.Text;
-  private upgradeLevels: Record<string, number> = { jammer: 0, ciws: 0, escort: 0 };
+  private upgradeLevels: Record<string, number> = { air: 0, hull: 0, gold: 0 };
   private upgradeButtons: Record<string, Phaser.GameObjects.Container> = {};
   private upgradePanel!: Phaser.GameObjects.Container;
   private upgradeToggleBg!: Phaser.GameObjects.Rectangle;
@@ -102,11 +126,25 @@ export class UIScene extends Phaser.Scene {
 
   create(): void {
     this.displayedPrice = 112;
+    this.graphPrice = 112;
+    this.graphMin = NaN;
+    this.graphMax = NaN;
+    this.priceFlashUntil = 0;
     this.displayedCredits = 30;
     this.history = [112];
-    this.upgradeLevels = { jammer: 0, ciws: 0, escort: 0 };
+    this.mission = null;
+    this.headlineQueue = [];
+    this.headlineBusy = false;
+    this.upgradeLocked = { air: true, hull: true, gold: true };
+    this.upgradeLevels = { air: 0, hull: 0, gold: 0 };
     this.panelOpen = false;
     this.lastMemeAt = -Infinity;
+    this.predBase = TUNING.market.baseAtStart;
+    this.predShown = this.predBase;
+    this.predNudge = 0;
+    this.predFlash = 0;
+    this.predLastChipYes = Math.round(this.predBase * 100);
+    this.predLastChipAt = 0;
     this.registry.set('ui-modal', false);
 
     this.buildStudioFrame();
@@ -114,16 +152,20 @@ export class UIScene extends Phaser.Scene {
     this.buildStrip();
     this.buildPredictionPanel();
     this.buildNewsBand();
-    this.buildCombo();
+    this.buildMissionChip();
     this.buildUpgradePanel();
 
     bus.on(EV.PRICE, this.onPrice, this);
     bus.on(EV.CREDITS, this.onCredits, this);
     bus.on(EV.COMBO, this.onCombo, this);
     bus.on(EV.HEADLINE, this.onHeadline, this);
-    bus.on(EV.THRESHOLD, this.onThreshold, this);
+    bus.on(EV.MISSION, this.onMission, this);
+    bus.on(EV.DAY_START, this.onDayStart, this);
+    bus.on(EV.DAY_END, this.onDayEnd, this);
+    bus.on(EV.DAY_BREAK, this.onDayBreak, this);
+    bus.on(EV.UPGRADE_REVEAL, this.onUpgradeReveal, this);
+    bus.on(EV.MARKET_NUDGE, this.nudgeMarket, this);
     bus.on(EV.EVENT_PROB, this.onEventProb, this);
-    bus.on(EV.EVENT_CARD, this.onEventCard, this);
     bus.on(EV.TIMER, this.onTimer, this);
     bus.on(EV.DANGER, this.onDanger, this);
     bus.on(EV.UPGRADE_DEMO, this.onUpgradeBought, this);
@@ -135,9 +177,13 @@ export class UIScene extends Phaser.Scene {
       bus.off(EV.CREDITS, this.onCredits, this);
       bus.off(EV.COMBO, this.onCombo, this);
       bus.off(EV.HEADLINE, this.onHeadline, this);
-      bus.off(EV.THRESHOLD, this.onThreshold, this);
+      bus.off(EV.MISSION, this.onMission, this);
+      bus.off(EV.DAY_START, this.onDayStart, this);
+      bus.off(EV.DAY_END, this.onDayEnd, this);
+      bus.off(EV.DAY_BREAK, this.onDayBreak, this);
+      bus.off(EV.UPGRADE_REVEAL, this.onUpgradeReveal, this);
+      bus.off(EV.MARKET_NUDGE, this.nudgeMarket, this);
       bus.off(EV.EVENT_PROB, this.onEventProb, this);
-      bus.off(EV.EVENT_CARD, this.onEventCard, this);
       bus.off(EV.TIMER, this.onTimer, this);
       bus.off(EV.DANGER, this.onDanger, this);
       bus.off(EV.UPGRADE_DEMO, this.onUpgradeBought, this);
@@ -170,8 +216,11 @@ export class UIScene extends Phaser.Scene {
     g.lineStyle(3, 0xdde6f0, 0.85);
     g.strokeRect(LEFT_BOX.x, LEFT_BOX.y, LEFT_BOX.w, LEFT_BOX.h);
     g.strokeRect(VIEW.x, VIEW.y, VIEW.w, VIEW.h);
-    // LIVE badge on the game window's top-right corner
-    this.add.circle(VIEW.x + VIEW.w - 62, VIEW.y + 18, 6, PAL.red).setDepth(991);
+    // LIVE badge on the game window's top-right corner — blinking on-air dot
+    const liveDot = this.add.circle(VIEW.x + VIEW.w - 62, VIEW.y + 18, 6, PAL.red).setDepth(991);
+    if (!settings.reducedMotion) {
+      this.tweens.add({ targets: liveDot, alpha: 0.15, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
     this.add
       .text(VIEW.x + VIEW.w - 50, VIEW.y + 18, 'LIVE', {
         fontFamily: FONT_SANS,
@@ -180,6 +229,16 @@ export class UIScene extends Phaser.Scene {
         color: HEX.cream
       })
       .setOrigin(0, 0.5)
+      .setDepth(991);
+    // broadcast clock: in-game hour of the current day, right under LIVE
+    this.hourText = this.add
+      .text(VIEW.x + VIEW.w - 41, VIEW.y + 40, '00:00', {
+        fontFamily: FONT_SANS,
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: HEX.gold
+      })
+      .setOrigin(0.5)
       .setDepth(991);
   }
 
@@ -195,7 +254,7 @@ export class UIScene extends Phaser.Scene {
     });
     this.priceBox = this.add.rectangle(cx - 10, 92, 200, 56, 0x22303e).setStrokeStyle(3, PAL.gold);
     this.priceText = this.add
-      .text(cx - 10, 92, '$112.00', { fontFamily: FONT_DISPLAY, fontSize: '34px', color: HEX.cream })
+      .text(cx - 10, 92, '$112', { fontFamily: FONT_DISPLAY, fontSize: '34px', color: HEX.cream })
       .setOrigin(0.5);
     this.priceArrow = this.add
       .text(cx + 112, 92, '▼', { fontFamily: FONT_SANS, fontSize: '30px', color: HEX.green })
@@ -207,7 +266,7 @@ export class UIScene extends Phaser.Scene {
         fontFamily: FONT_SANS,
         fontSize: '13px',
         fontStyle: 'bold',
-        color: HEX.green,
+        color: HEX.cream,
         backgroundColor: '#101a24',
         padding: { x: 5, y: 2 }
       })
@@ -216,7 +275,7 @@ export class UIScene extends Phaser.Scene {
     // axis label pools, positioned each frame by drawGraph()
     this.yAxisLabels = [0, 1, 2].map(() =>
       this.add
-        .text(0, 0, '', { fontFamily: FONT_SANS, fontSize: '11px', fontStyle: 'bold', color: '#8FA6BC' })
+        .text(0, 0, '', { fontFamily: FONT_SANS, fontSize: '11px', fontStyle: 'bold', color: HEX.green })
         .setOrigin(0, 0.5)
         .setAlpha(0)
     );
@@ -226,7 +285,12 @@ export class UIScene extends Phaser.Scene {
         .setOrigin(0.5, 1)
         .setAlpha(0)
     );
-    group.add([oilLabel, this.priceBox, this.priceText, this.priceArrow, this.graph, this.graphTip]);
+    // price-mission target line label ("TARGET $120"), shown on price days only
+    this.targetLabel = this.add
+      .text(0, 0, '', { fontFamily: FONT_SANS, fontSize: '11px', fontStyle: 'bold', color: HEX.gold })
+      .setOrigin(1, 1)
+      .setAlpha(0);
+    group.add([oilLabel, this.priceBox, this.priceText, this.priceArrow, this.graph, this.graphTip, this.targetLabel]);
     group.add(this.yAxisLabels);
     group.add(this.dayLabels);
     registerLayout(this, 'hud-price', group, { x: LEFT_BOX.x, y: LEFT_BOX.y, w: LEFT_BOX.w, h: LEFT_BOX.h });
@@ -243,9 +307,9 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0.5);
     logo.add([chip, logoText]);
 
-    // timer + safe streak
+    // day counter + combo
     this.timerText = this.add
-      .text(640, cy - 14, '0:00', {
+      .text(640, cy - 14, 'DAY 1', {
         fontFamily: FONT_DISPLAY,
         fontSize: '40px',
         color: HEX.cream,
@@ -254,12 +318,16 @@ export class UIScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(1000);
-    this.streakBadge = this.add.container(640, cy + 28).setDepth(1000);
-    const sb = this.add.rectangle(0, 0, 104, 26, PAL.green).setStrokeStyle(3, PAL.ink);
-    this.streakText = this.add
-      .text(0, 0, 'SAFE ×0', { fontFamily: FONT_SANS, fontSize: '15px', fontStyle: 'bold', color: HEX.ink })
-      .setOrigin(0.5);
-    this.streakBadge.add([sb, this.streakText]);
+    this.comboText = this.add
+      .text(640, cy + 28, '', {
+        fontFamily: FONT_DISPLAY,
+        fontSize: '22px',
+        color: HEX.cream,
+        stroke: HEX.ink,
+        strokeThickness: 4
+      })
+      .setOrigin(0.5)
+      .setDepth(1000);
 
     // UPGRADES button — opens the upgrades panel; shows credits
     const btn = this.add.container(1130, cy).setDepth(1001);
@@ -268,7 +336,7 @@ export class UIScene extends Phaser.Scene {
       .text(0, -14, 'UPGRADES ▴', { fontFamily: FONT_SANS, fontSize: '20px', fontStyle: 'bold', color: HEX.cream })
       .setOrigin(0.5);
     this.creditsText = this.add
-      .text(0, 16, 'DC 30', { fontFamily: FONT_SANS, fontSize: '18px', fontStyle: 'bold', color: HEX.gold })
+      .text(0, 16, '$30', { fontFamily: FONT_SANS, fontSize: '18px', fontStyle: 'bold', color: HEX.green })
       .setOrigin(0.5);
     btn.add([this.upgradeToggleBg, btnTitle, this.creditsText]);
     btn.setSize(220, 74);
@@ -293,7 +361,7 @@ export class UIScene extends Phaser.Scene {
 
     this.predCardGfx = this.add.graphics();
     group.add(this.predCardGfx);
-    this.drawPredCard(false);
+    this.drawPredCard(false, true);
 
     // small circular market icon (anchor glyph on navy)
     const icon = this.add.graphics();
@@ -362,7 +430,7 @@ export class UIScene extends Phaser.Scene {
     registerLayout(this, 'hud-prediction', group, { x: X, y: Y, w: W, h: H });
   }
 
-  private drawPredCard(hot: boolean): void {
+  private drawPredCard(hot: boolean, good: boolean): void {
     const X = PRED_X,
       Y = PRED_Y,
       W = PRED_W,
@@ -371,8 +439,46 @@ export class UIScene extends Phaser.Scene {
     g.clear();
     g.fillStyle(0x1d2b39, 0.97);
     g.fillRoundedRect(X, Y, W, H, 12);
-    g.lineStyle(2, hot ? 0xeb5757 : 0x344452, 1);
+    if (this.predFlash > 0) {
+      // big-move flash: brief green/red wash over the card fill
+      g.fillStyle(this.predFlashGood ? 0x27ae60 : 0xeb5757, 0.18 * this.predFlash);
+      g.fillRoundedRect(X, Y, W, H, 12);
+    }
+    g.lineStyle(2, hot ? (good ? 0x27ae60 : 0xeb5757) : 0x344452, 1);
     g.strokeRoundedRect(X, Y, W, H, 12);
+  }
+
+  /** Push the market a few points; decays back to the price baseline. Big
+   *  single pushes also flash the card. */
+  private nudgeMarket(delta: number): void {
+    const m = TUNING.market;
+    this.predNudge = Phaser.Math.Clamp(this.predNudge + delta, -m.nudgeMax, m.nudgeMax);
+    if (Math.abs(delta) >= m.flashThreshold) {
+      this.predFlash = 1;
+      this.predFlashGood = delta > 0;
+    }
+  }
+
+  /** Polymarket-style "▲2 / ▼3" odds-tick chip beside the % figure. */
+  private spawnOddsChip(delta: number): void {
+    const up = delta > 0;
+    const chip = this.add
+      .text(PRED_X + PRED_W - 10, PRED_Y + 44, `${up ? '▲' : '▼'}${Math.abs(delta)}`, {
+        fontFamily: FONT_SANS,
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: up ? '#27AE60' : '#EB5757'
+      })
+      .setOrigin(1, 0.5)
+      .setDepth(1001);
+    this.tweens.add({
+      targets: chip,
+      y: chip.y - (settings.reducedMotion ? 0 : 10),
+      alpha: 0,
+      duration: settings.reducedMotion ? 300 : 700,
+      ease: 'Cubic.easeOut',
+      onComplete: () => chip.destroy()
+    });
   }
 
   /** Red BREAKING NEWS band between the boxes and the bottom strip:
@@ -419,21 +525,6 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setAlpha(0)
       .setDepth(1001);
-  }
-
-  private buildCombo(): void {
-    const group = this.add.container(0, 0).setDepth(1001);
-    this.comboText = this.add
-      .text(860, 50, '', {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '30px',
-        color: HEX.cream,
-        stroke: HEX.ink,
-        strokeThickness: 6
-      })
-      .setOrigin(0.5);
-    group.add(this.comboText);
-    registerLayout(this, 'hud-combo', group, { x: 710, y: 28, w: 300, h: 44 });
   }
 
   /** Modal upgrades panel over the game window, opened by the strip button. */
@@ -487,19 +578,44 @@ export class UIScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
       const cost = this.add
-        .text(-42, 22, `DC ${costsOf(u.key)[0]}`, { fontFamily: FONT_DISPLAY, fontSize: '19px', color: HEX.gold })
+        .text(-42, 22, `$${costsOf(u.key)[0]}`, { fontFamily: FONT_DISPLAY, fontSize: '19px', color: HEX.green })
         .setOrigin(0.5);
       const pips = this.add
-        .text(54, 22, '○○○', { fontFamily: FONT_SANS, fontSize: '15px', color: HEX.green })
+        .text(54, 22, '○'.repeat(costsOf(u.key).length), { fontFamily: FONT_SANS, fontSize: '15px', color: HEX.green })
         .setOrigin(0.5);
       c.add([bg, name, desc, cost, pips]);
+      // locked shroud until the upgrade's reveal day (news announces the unlock)
+      const lock = this.add.container(0, 0);
+      lock.add(this.add.rectangle(0, 0, 205, 96, PAL.ink, 0.82));
+      lock.add(
+        this.add
+          .text(0, -6, '🔒 CLASSIFIED', { fontFamily: FONT_SANS, fontSize: '16px', fontStyle: 'bold', color: '#AAB4BD' })
+          .setOrigin(0.5)
+      );
+      lock.add(
+        this.add
+          .text(0, 18, `UNLOCKS DAY ${TUNING.days.upgradeRevealDays[u.key]}`, {
+            fontFamily: FONT_SANS,
+            fontSize: '12px',
+            fontStyle: 'bold',
+            color: HEX.gold
+          })
+          .setOrigin(0.5)
+      );
+      lock.setVisible(this.upgradeLocked[u.key]);
+      c.add(lock);
       c.setSize(205, 96);
       c.setInteractive({ useHandCursor: true });
-      c.setData({ bg, cost, pips, def: u, baseScale: 1 });
+      c.setData({ bg, cost, pips, def: u, baseScale: 1, lock });
       c.on('pointerover', () => this.tweens.add({ targets: c, scale: 1.05, duration: 100 }));
       c.on('pointerout', () => this.tweens.add({ targets: c, scale: 1, duration: 100 }));
       c.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
         ev.stopPropagation();
+        if (this.upgradeLocked[u.key]) {
+          this.tweens.add({ targets: c, x: x - 6, duration: 40, yoyo: true, repeat: 2 });
+          sfx.tap();
+          return;
+        }
         pressPulse(this, c);
         const costs = costsOf(u.key);
         const lvl = this.upgradeLevels[u.key];
@@ -521,6 +637,9 @@ export class UIScene extends Phaser.Scene {
     // GameScene checks this to ignore map taps while the panel is up
     this.registry.set('ui-modal', open);
     this.upgradePanel.setVisible(open);
+    // freeze the run while shopping: buy as many upgrades as you like
+    if (open) this.scene.pause('Game');
+    else this.scene.resume('Game');
     if (open) {
       this.upgradePanel.setAlpha(0);
       this.tweens.add({ targets: this.upgradePanel, alpha: 1, duration: settings.reducedMotion ? 60 : 150 });
@@ -531,16 +650,29 @@ export class UIScene extends Phaser.Scene {
   private onPrice(price: number, delta: number, jitter = false): void {
     const from = this.displayedPrice;
     this.displayedPrice = price;
+    // market confidence baseline follows the oil price (jitter included, so
+    // the odds tick like a live market)
+    this.predBase = Phaser.Math.Clamp(
+      TUNING.market.baseAtStart - (price - TUNING.session.startPrice) * TUNING.market.perDollar,
+      0.01,
+      0.97
+    );
     if (jitter) {
       // market noise: tick the readout quietly — no arrow, shake, or flash
-      this.priceText.setText(`$${price.toFixed(2)}`);
+      this.priceText.setText(`$${Math.round(price)}`);
       return;
     }
-    countTo(this, this.priceText, from, price, v => `$${v.toFixed(2)}`, delta < 0 ? 500 : 300);
+    countTo(this, this.priceText, from, price, v => `$${Math.round(v)}`, delta < 0 ? 500 : 300);
     const down = delta < 0;
     this.priceArrow.setText(down ? '▼' : '▲').setColor(down ? HEX.green : HEX.red).setAlpha(1);
     this.tweens.add({ targets: this.priceArrow, alpha: 0, delay: 400, duration: 300 });
-    this.priceBox.setStrokeStyle(3, down ? PAL.green : PAL.red);
+    // only a big move colors the price UI — small ticks stay white
+    if (Math.abs(delta) >= TUNING.market.priceBigDelta) {
+      this.priceFlashDown = down;
+      this.priceFlashUntil = this.time.now + TUNING.market.priceColorHoldSec * 1000;
+      this.priceText.setColor(down ? HEX.green : HEX.red);
+      this.priceBox.setStrokeStyle(3, down ? PAL.green : PAL.red);
+    }
     if (down) {
       this.tweens.add({ targets: this.priceText, scale: { from: 1.25, to: 1 }, duration: 300, ease: EASE.snap });
     } else {
@@ -552,7 +684,7 @@ export class UIScene extends Phaser.Scene {
   private onCredits(credits: number, gain: number, x: number, y: number): void {
     const from = this.displayedCredits;
     this.displayedCredits = credits;
-    countTo(this, this.creditsText, from, credits, v => `DC ${Math.round(v)}`, 350);
+    countTo(this, this.creditsText, from, credits, v => `$${Math.round(v)}`, 350);
     if (gain > 0 && x > 0 && !settings.reducedMotion) {
       const m = this.creditsText.getWorldTransformMatrix();
       for (let i = 0; i < Math.min(gain, 5); i++) {
@@ -578,6 +710,7 @@ export class UIScene extends Phaser.Scene {
   private refreshUpgradeAffordability(): void {
     // glow the strip button when anything is buyable
     const anyAffordable = UPGRADES.some(u => {
+      if (this.upgradeLocked[u.key]) return false;
       const lvl = this.upgradeLevels[u.key];
       const costs = costsOf(u.key);
       return lvl < costs.length && this.displayedCredits >= costs[lvl];
@@ -586,6 +719,10 @@ export class UIScene extends Phaser.Scene {
     for (const u of UPGRADES) {
       const c = this.upgradeButtons[u.key];
       if (!c) continue;
+      if (this.upgradeLocked[u.key]) {
+        (c.getData('bg') as Phaser.GameObjects.Rectangle).setStrokeStyle(4, PAL.gold, 0.4);
+        continue;
+      }
       const lvl = this.upgradeLevels[u.key];
       const costs = costsOf(u.key);
       const bg = c.getData('bg') as Phaser.GameObjects.Rectangle;
@@ -597,7 +734,8 @@ export class UIScene extends Phaser.Scene {
       const price = costs[lvl];
       const affordable = this.displayedCredits >= price;
       bg.setStrokeStyle(4, affordable ? PAL.green : PAL.gold, affordable ? 1 : 0.7);
-      cost.setText(`DC ${price}`).setColor(affordable ? HEX.green : HEX.gold);
+      // money is always green; affordability shows via the border + dimming
+      cost.setText(`$${price}`).setColor(HEX.green).setAlpha(affordable ? 1 : 0.55);
       if (affordable && !c.getData('pulsing')) {
         c.setData('pulsing', true);
         if (!settings.reducedMotion) {
@@ -616,16 +754,16 @@ export class UIScene extends Phaser.Scene {
     const c = this.upgradeButtons[key];
     const def = UPGRADES.find(u => u.key === key)!;
     const pips = c.getData('pips') as Phaser.GameObjects.Text;
-    pips.setText('●'.repeat(level) + '○'.repeat(Math.max(0, 3 - level)));
+    pips.setText('●'.repeat(level) + '○'.repeat(Math.max(0, costsOf(def.key).length - level)));
     this.tweens.add({ targets: c, scale: { from: 1.25, to: 1 }, duration: 300, ease: EASE.pop });
     const m = c.getWorldTransformMatrix();
     floatText(this, m.tx, m.ty - 70, `${def.name} LV${level}`, HEX.green, 24);
     floatText(this, m.tx, m.ty - 98, def.desc, HEX.cream, 16);
     this.refreshUpgradeAffordability();
-    this.toggleUpgradePanel(false); // auto-close after a purchase
   }
 
   private onCombo(combo: number, milestone?: string): void {
+    if (combo > 0) this.nudgeMarket(milestone ? TUNING.market.nudgeMilestone : TUNING.market.nudgeCombo);
     if (combo === 0) {
       this.tweens.add({ targets: this.comboText, alpha: 0, duration: 200 });
       return;
@@ -635,39 +773,40 @@ export class UIScene extends Phaser.Scene {
     this.comboText.setText(`COMBO ×${combo}`).setColor(colors[tier]).setAlpha(1);
     this.tweens.add({ targets: this.comboText, scale: { from: 1.4, to: 1 }, duration: 200, ease: EASE.pop });
     if (milestone) {
-      const banner = this.add.container(VIEW.x + VIEW.w / 2, 168).setDepth(1400);
-      const bg = this.add.rectangle(0, 0, 560, 64, PAL.purple).setStrokeStyle(5, PAL.ink);
-      const txt = this.add
-        .text(0, 0, milestone, {
-          fontFamily: FONT_DISPLAY,
-          fontSize: '28px',
-          color: HEX.cream,
-          stroke: HEX.ink,
-          strokeThickness: 5
-        })
-        .setOrigin(0.5);
-      banner.add([bg, txt]);
-      popIn(this, banner, 300);
-      this.time.delayedCall(1400, () => {
-        this.tweens.add({ targets: banner, alpha: 0, y: 140, duration: 300, onComplete: () => banner.destroy() });
-      });
-      floatText(this, VIEW.x + VIEW.w / 2, 220, `+${combo} DC BONUS`, HEX.gold, 24);
+      // milestone banner removed — just show the bonus payout
+      floatText(this, VIEW.x + VIEW.w / 2, 220, `+$${combo} BONUS`, HEX.green, 24);
     }
   }
 
-  private onTankerSafe(streak: number): void {
-    this.streakText.setText(`SAFE ×${streak}`);
-    this.tweens.add({ targets: this.streakBadge, scale: { from: 1.4, to: 1 }, duration: 300, ease: EASE.pop });
+  private onTankerSafe(_streak: number): void {
+    this.nudgeMarket(TUNING.market.nudgeTankerSafe);
   }
 
-  private onHeadline(text: string, tone: 'good' | 'bad' | 'event'): void {
+  /** Headlines queue up and play one after another so day-break sequences
+   *  (summary, then intel warnings) all get read. */
+  private onHeadline(text: string, tone: 'good' | 'bad' | 'event', holdMs = 2600): void {
+    // bad news knocks market confidence down (good news is already counted
+    // via tanker-safe, so no + nudge here — it would double-count)
+    if (tone === 'bad') this.nudgeMarket(TUNING.market.nudgeBadNews);
+    this.headlineQueue.push({ text, tone, hold: holdMs });
+    if (!this.headlineBusy) this.pumpHeadline();
+  }
+
+  private pumpHeadline(): void {
+    const next = this.headlineQueue.shift();
+    if (!next) {
+      this.headlineBusy = false;
+      this.tickerText.setAlpha(1);
+      return;
+    }
+    this.headlineBusy = true;
     this.tweens.killTweensOf(this.headlineText);
     this.headlineText
-      .setText(text)
-      .setColor(tone === 'good' ? '#B8F5CD' : tone === 'event' ? '#F2D8FF' : HEX.cream)
+      .setText(next.text)
+      .setColor(next.tone === 'good' ? '#B8F5CD' : next.tone === 'event' ? '#F2D8FF' : HEX.cream)
       .setAlpha(0)
       .setX(BAND.x + 240);
-    // headline takes over the band; ticker comes back when it fades
+    // headline takes over the band; ticker comes back when the queue drains
     this.tickerText.setAlpha(0);
     this.tweens.add({
       targets: this.headlineText,
@@ -679,28 +818,186 @@ export class UIScene extends Phaser.Scene {
     this.tweens.add({
       targets: this.headlineText,
       alpha: 0,
-      delay: 2600,
+      delay: next.hold,
       duration: 400,
-      onComplete: () => this.tickerText.setAlpha(1)
+      onComplete: () => this.pumpHeadline()
     });
   }
 
-  private onThreshold(label: string, tone: 'good' | 'bad'): void {
-    // price thresholds live in the breaking-news band, no popup card
-    this.onHeadline(label, tone);
+  // ---------------------------------------------------------------- day system
+  /** Mission chip pinned to the game window's bottom-left corner. */
+  private buildMissionChip(): void {
+    const chipY = VIEW.y + VIEW.h - 58; // 12px inset from the window's bottom edge
+    const group = this.add.container(0, 0).setDepth(1001);
+    this.missionChipBg = this.add
+      .rectangle(VIEW.x + 12, chipY, 348, 46, PAL.ink, 0.85)
+      .setOrigin(0, 0)
+      .setStrokeStyle(3, PAL.gold, 0.9);
+    this.missionDayText = this.add.text(VIEW.x + 22, chipY + 6, 'DAY 1 · MISSION', {
+      fontFamily: FONT_SANS,
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: HEX.gold
+    });
+    this.missionText = this.add.text(VIEW.x + 22, chipY + 22, 'INCOMING ORDERS…', {
+      fontFamily: FONT_SANS,
+      fontSize: '15px',
+      fontStyle: 'bold',
+      color: HEX.cream
+    });
+    group.add([this.missionChipBg, this.missionDayText, this.missionText]);
+    registerLayout(this, 'hud-mission', group, { x: VIEW.x + 12, y: chipY, w: 348, h: 46 });
   }
 
-  private onEventProb(label: string, prob: number, active: boolean): void {
-    this.predTargetProb = prob;
+  private renderMissionChip(): void {
+    const m = this.mission;
+    if (!m) return;
+    this.missionDayText.setText(`DAY ${m.day} · MISSION`);
+    let suffix = '';
+    let border: number = PAL.gold;
+    let color: string = HEX.cream;
+    if (m.done) {
+      suffix = ' ✓';
+      border = PAL.green;
+      color = HEX.green;
+    } else if (m.type === 'price') {
+      suffix = ` — NOW $${Math.round(this.displayedPrice)}`;
+    } else if (m.type === 'perfect') {
+      if (m.progress > 0) {
+        suffix = ' ✗';
+        border = PAL.red;
+        color = HEX.red;
+      }
+    } else {
+      suffix = ` (${Math.min(m.progress, m.target)}/${m.target})`;
+    }
+    this.missionText.setText(`${m.text}${suffix}`).setColor(color);
+    this.missionChipBg.setStrokeStyle(3, border, 0.9);
+  }
+
+  private onMission(m: DayMission): void {
+    const wasDone = this.mission?.done ?? false;
+    this.mission = m;
+    this.renderMissionChip();
+    if (m.done && !wasDone && !settings.reducedMotion) {
+      this.tweens.add({ targets: [this.missionText, this.missionDayText], scale: { from: 1.15, to: 1 }, duration: 250, ease: EASE.pop });
+    }
+  }
+
+  private onDayStart(day: number, missionText: string, reveals: Array<'air' | 'hull' | 'gold'>): void {
+    // safety: the recap card never outlives the break
+    this.summaryPanel?.destroy();
+    this.summaryPanel = undefined;
+    this.summaryCountdown = undefined;
+    this.onHeadline(`DAY ${day} — MISSION: ${missionText}`, 'event', 3200);
+    for (const key of reveals) {
+      const def = UPGRADES.find(u => u.key === key)!;
+      this.onHeadline(`NEW TECH UNLOCKED: ${def.name} — ${def.desc.toUpperCase()}`, 'good', 2600);
+    }
+  }
+
+  private onDayEnd(s: DaySummary): void {
+    const mission = s.missionDone ? `MISSION COMPLETE +$${s.rewardCredits}` : 'MISSION FAILED';
+    const delta = s.priceDelta >= 0 ? `+$${s.priceDelta}` : `−$${Math.abs(s.priceDelta)}`;
+    this.onHeadline(
+      `DAY ${s.day} ENDS — ${mission} · ${s.safe} SAFE, ${s.lost} LOST · OIL $${s.price} (${delta})`,
+      s.missionDone ? 'good' : 'bad',
+      3600
+    );
+    for (const warn of s.warnings) this.onHeadline(warn, 'event', 2600);
+    if (!s.missionDone) this.graphFlash = 1;
+    this.showDaySummaryPanel(s, delta);
+  }
+
+  /** Frozen-world recap card over the game window; counts down to the next day. */
+  private showDaySummaryPanel(s: DaySummary, delta: string): void {
+    this.summaryPanel?.destroy();
+    this.summaryNextDay = s.day + 1;
+    const panel = this.add.container(VIEW.x + VIEW.w / 2, VIEW.y + VIEW.h / 2).setDepth(1700);
+    this.summaryPanel = panel;
+    const H = 250 + s.warnings.length * 26;
+    panel.add(this.add.rectangle(0, 0, 620, H, PAL.ink, 0.94).setStrokeStyle(4, PAL.gold, 0.9));
+    let y = -H / 2 + 38;
+    panel.add(
+      this.add
+        .text(0, y, `DAY ${s.day} COMPLETE`, { fontFamily: FONT_DISPLAY, fontSize: '34px', color: HEX.gold })
+        .setOrigin(0.5)
+    );
+    y += 44;
+    panel.add(
+      this.add
+        .text(0, y, s.missionDone ? `✓ ${s.missionText}` : `✗ ${s.missionText}`, {
+          fontFamily: FONT_SANS,
+          fontSize: '18px',
+          fontStyle: 'bold',
+          color: s.missionDone ? HEX.green : HEX.red
+        })
+        .setOrigin(0.5)
+    );
+    y += 28;
+    panel.add(
+      this.add
+        .text(0, y, s.missionDone ? `BONUS PAID: +$${s.rewardCredits}` : 'NO BONUS TODAY', {
+          fontFamily: FONT_SANS,
+          fontSize: '15px',
+          fontStyle: 'bold',
+          color: s.missionDone ? HEX.green : '#AAB4BD'
+        })
+        .setOrigin(0.5)
+    );
+    y += 30;
+    panel.add(
+      this.add
+        .text(0, y, `${s.safe} TANKERS SAFE · ${s.lost} LOST · OIL $${s.price} (${delta})`, {
+          fontFamily: FONT_SANS,
+          fontSize: '15px',
+          fontStyle: 'bold',
+          color: HEX.cream
+        })
+        .setOrigin(0.5)
+    );
+    y += 30;
+    for (const warn of s.warnings) {
+      panel.add(
+        this.add
+          .text(0, y, `⚠ ${warn}`, { fontFamily: FONT_SANS, fontSize: '13px', fontStyle: 'bold', color: '#F2D8FF' })
+          .setOrigin(0.5)
+      );
+      y += 26;
+    }
+    this.summaryCountdown = this.add
+      .text(0, H / 2 - 36, `DAY ${this.summaryNextDay} STARTS IN ${Math.ceil(TUNING.days.breakSec)}`, {
+        fontFamily: FONT_DISPLAY,
+        fontSize: '26px',
+        color: HEX.cream
+      })
+      .setOrigin(0.5);
+    panel.add(this.summaryCountdown);
+    popIn(this, panel, 250);
+  }
+
+  private onDayBreak(remaining: number | null): void {
+    if (remaining === null) {
+      this.summaryPanel?.destroy();
+      this.summaryPanel = undefined;
+      this.summaryCountdown = undefined;
+      return;
+    }
+    this.summaryCountdown?.setText(`DAY ${this.summaryNextDay} STARTS IN ${Math.ceil(remaining)}`);
+  }
+
+  private onUpgradeReveal(key: string): void {
+    this.upgradeLocked[key] = false;
+    const c = this.upgradeButtons[key];
+    if (!c) return;
+    (c.getData('lock') as Phaser.GameObjects.Container).setVisible(false);
+    this.tweens.add({ targets: c, scale: { from: 1.2, to: 1 }, duration: 300, ease: EASE.pop });
+    this.refreshUpgradeAffordability();
+  }
+
+  private onEventProb(_label: string, _prob: number, active: boolean): void {
+    // events run silently — no LIVE footer swap, only the card's hot state
     this.predActive = active;
-    this.predLabel?.setText(active ? `⚡ LIVE: ${label}` : '$4.2m Vol.  ·  Hormuz Markets');
-    this.predLabel?.setColor(active ? '#EB5757' : '#858D92');
-  }
-
-  private onEventCard(title: string, _colorHex: string): void {
-    // events announce through the breaking-news band, no popup card
-    sfx.eventCard();
-    this.onHeadline(`SPECIAL EVENT: ${title}`, 'event');
   }
 
   /** Breaking-meme cutaway: "MEME UPDATE IN 3..2..1" over the price graph,
@@ -711,6 +1008,9 @@ export class UIScene extends Phaser.Scene {
     // back-to-back moments don't turn the left box into a meme channel
     if (this.time.now - this.lastMemeAt < MEMES.settings.minGapMs) return;
     this.lastMemeAt = this.time.now;
+    // news band announces the cutaway for as long as it runs
+    const cutawayMs = MEMES.settings.countdownTickMs * 3 + MEMES.settings.durationMs;
+    this.onHeadline('MEME BREAK • MEME BREAK • MEME BREAK', 'event', cutawayMs);
     const gen = ++this.memeGen; // cancels any countdown/popup still running
     this.memePopup?.destroy();
     this.memePopup = undefined;
@@ -799,11 +1099,13 @@ export class UIScene extends Phaser.Scene {
   }
 
   private onTimer(elapsed: number): void {
-    const total = Math.floor(elapsed);
-    const m = Math.floor(total / 60);
-    const s = total % 60;
     this.elapsedSec = elapsed;
-    this.timerText.setText(`${m}:${s.toString().padStart(2, '0')}`);
+    const dayLen = TUNING.dayNight.dayLengthSec;
+    const day = Math.floor(elapsed / dayLen) + 1;
+    this.timerText.setText(`DAY ${day}`);
+    // broadcast clock: the day maps to a 24h cycle, ticking hour by hour
+    const hour = Math.min(23, Math.floor(((elapsed % dayLen) / dayLen) * 24));
+    this.hourText.setText(`${hour.toString().padStart(2, '0')}:00`);
     if (!this.dangerBanner?.visible) this.timerText.setColor(HEX.cream).setFontSize(36);
   }
 
@@ -831,18 +1133,36 @@ export class UIScene extends Phaser.Scene {
   // ---------------------------------------------------------------- loop
   update(_t: number, dtMs: number): void {
     const dt = dtMs / 1000;
-    // "Will the US keep the strait open?" — Yes falls as event probability rises
-    this.predShown = Phaser.Math.Linear(this.predShown, this.predTargetProb, 0.08);
-    const yes = Phaser.Math.Clamp(Math.round((1 - this.predShown) * 100), 1, 99);
+    // "Will the US keep the strait open?" — Yes = market confidence in the
+    // player: price-driven baseline + decaying nudges from gameplay moments
+    const m = TUNING.market;
+    this.predNudge *= Math.exp(-m.nudgeDecayPerSec * dt);
+    let target = Phaser.Math.Clamp(this.predBase + this.predNudge, 0.01, 0.99);
+    if (this.dangerBanner?.visible) target = Math.min(target, m.dangerCap);
+    this.predShown = Phaser.Math.Linear(this.predShown, target, m.lerpRate);
+    const yes = Phaser.Math.Clamp(Math.round(this.predShown * 100), 1, 99);
     const no = 100 - yes;
     this.predChance.setText(`${yes}%`);
     this.predChance.setColor(yes >= 50 ? '#27AE60' : '#EB5757');
     this.predYesText.setText(`Buy Yes ${yes}¢`);
     this.predNoText.setText(`Buy No ${no}¢`);
-    const hot = this.predShown > 0.6 || this.predActive;
-    this.drawPredCard(hot);
+
+    // odds tick: whole-% moves pop a ▲/▼ chip and pulse the figure
+    const chipDelta = yes - this.predLastChipYes;
+    if (chipDelta !== 0 && this.time.now - this.predLastChipAt > 450) {
+      this.predLastChipYes = yes;
+      this.predLastChipAt = this.time.now;
+      this.spawnOddsChip(chipDelta);
+      if (!settings.reducedMotion) {
+        this.tweens.add({ targets: this.predChance, scale: { from: 1.25, to: 1 }, duration: 180, ease: EASE.snap });
+      }
+    }
+
+    if (this.predFlash > 0) this.predFlash = Math.max(0, this.predFlash - dt * 2.5);
+    const hot = yes < m.hotLow * 100 || yes > m.hotHigh * 100 || this.predActive;
+    this.drawPredCard(hot, yes >= 50);
     if (hot && !settings.reducedMotion) {
-      this.heartbeat += dt * (4 + this.predShown * 6);
+      this.heartbeat += dt * (yes < 50 ? 8 : 5);
       this.predChance.setAlpha(0.7 + Math.sin(this.heartbeat) * 0.3);
     } else {
       this.predChance.setAlpha(1);
@@ -850,11 +1170,21 @@ export class UIScene extends Phaser.Scene {
 
     const stats = this.registry.get('finalStats') as SessionStats | undefined;
     const hist = (this.scene.get('Game') as any)?.stats?.priceHistory ?? stats?.priceHistory ?? this.history;
-    this.drawGraph(hist);
+    // graph head glides toward the live price instead of snapping each tick
+    this.graphPrice = Phaser.Math.Linear(this.graphPrice, this.displayedPrice, 1 - Math.exp(-3.5 * dt));
+    // big-move color flash expired → back to the neutral white/gold look
+    if (this.priceFlashUntil && this.time.now > this.priceFlashUntil) {
+      this.priceFlashUntil = 0;
+      this.priceText.setColor(HEX.cream);
+      this.priceBox.setStrokeStyle(3, PAL.gold);
+    }
+    this.drawGraph(hist, dt);
     if (this.graphFlash > 0) this.graphFlash = Math.max(0, this.graphFlash - dt * 2);
+    // price missions read off the live price, so the chip tracks it each frame
+    if (this.mission?.type === 'price' && !this.mission.done) this.renderMissionChip();
   }
 
-  private drawGraph(hist: number[]): void {
+  private drawGraph(hist: number[], dt: number): void {
     const g = this.graph;
     g.clear();
     // fills the left box below the price readout
@@ -874,23 +1204,41 @@ export class UIScene extends Phaser.Scene {
     const data = hist.slice(-SAMPLES);
     if (data.length < 2) {
       this.graphTip.setAlpha(0);
+      this.targetLabel.setAlpha(0);
       for (const t of [...this.yAxisLabels, ...this.dayLabels]) t.setAlpha(0);
       return;
     }
-    // the head of the line is "now": the live (tweened) price readout. Samples
-    // sit behind it by their age, so the line slides continuously instead of
-    // jumping from sample to sample every half second.
-    const live = this.displayedPrice;
-    const min = Math.min(...data, live) - 2;
-    const max = Math.max(...data, live) + 2;
-    const step = w / (SAMPLES - 1);
-    const yOf = (v: number): number => y0 + h - ((v - min) / (max - min)) * h;
+    // the head of the line is "now": a smoothed follower of the live price,
+    // pinned at the center of the x axis. History trails off to the left,
+    // the right half is the future (upcoming targets/day lines scroll in).
+    const live = this.graphPrice;
+    const step = (w / 2) / (SAMPLES - 1);
     const SAMPLE_SEC = 0.5;
     const n = data.length;
-    const full = hist.length >= SAMPLES;
     const liveT = (this.elapsedSec % SAMPLE_SEC) / SAMPLE_SEC;
-    const headX = full ? x0 + w : x0 + (n - 1 + liveT) * step;
+    const headX = x0 + w / 2;
     const xOf = (i: number): number => headX - (n - 1 - i + liveT) * step;
+    const ppsX = step / SAMPLE_SEC; // pixels per second
+    const dayLenX = TUNING.dayNight.dayLengthSec;
+    // today's price target (price-type missions only): drawn as a line across
+    // the chart so the player always sees where the day has to close
+    const priceTarget = this.mission && this.mission.type === 'price' && !this.mission.done ? this.mission.target : null;
+    // y range eases toward the data extents instead of snapping when a
+    // sample enters/leaves the window — kills the vertical "jump" rescales
+    const tgtMin = Math.min(...data, live, ...(priceTarget !== null ? [priceTarget] : [])) - 2;
+    const tgtMax = Math.max(...data, live, ...(priceTarget !== null ? [priceTarget] : [])) + 2;
+    if (Number.isNaN(this.graphMin)) {
+      this.graphMin = tgtMin;
+      this.graphMax = tgtMax;
+    } else {
+      const k = 1 - Math.exp(-2 * dt);
+      this.graphMin = Phaser.Math.Linear(this.graphMin, tgtMin, k);
+      this.graphMax = Phaser.Math.Linear(this.graphMax, tgtMax, k);
+    }
+    // never let the eased range clip the actual data
+    const min = Math.min(this.graphMin, tgtMin + 1);
+    const max = Math.max(this.graphMax, tgtMax - 1);
+    const yOf = (v: number): number => y0 + h - ((v - min) / (max - min)) * h;
 
     // y axis: price gridlines + labels at max / mid / min
     const yLevels = [max - 2, (min + max) / 2, min + 2];
@@ -904,12 +1252,14 @@ export class UIScene extends Phaser.Scene {
     });
 
     // x axis: DAY N markers at day boundaries, in the same continuous mapping
-    const pps = step / SAMPLE_SEC; // pixels per second
-    const dayLen = TUNING.dayNight.dayLengthSec;
+    const pps = ppsX;
+    const dayLen = dayLenX;
     const tEnd = this.elapsedSec;
     const tMin = tEnd - (headX - x0) / pps;
+    // right half of the chart is the future — draw upcoming day lines too
+    const tMax = tEnd + (x0 + w - headX) / pps;
     let li = 0;
-    for (let k = Math.max(0, Math.ceil(tMin / dayLen)); k * dayLen <= tEnd && li < this.dayLabels.length; k++) {
+    for (let k = Math.max(0, Math.ceil(tMin / dayLen)); k * dayLen <= tMax && li < this.dayLabels.length; k++) {
       const px = headX - (tEnd - k * dayLen) * pps;
       g.lineStyle(1, PAL.gold, 0.35);
       g.lineBetween(px, y0, px, y0 + h);
@@ -920,41 +1270,72 @@ export class UIScene extends Phaser.Scene {
     }
     for (; li < this.dayLabels.length; li++) this.dayLabels[li].setAlpha(0);
 
-    g.lineStyle(3, PAL.gold, 0.9);
-    g.beginPath();
-    let started = false;
+    // 5-point moving average flattens per-tick jitter so the line reads as a
+    // flow, not a zigzag (the head sample stays live via graphPrice below)
+    const sm = data.map((_, i) => {
+      let sum = 0,
+        c = 0;
+      for (let j = i - 2; j <= i + 2; j++) {
+        if (j < 0 || j >= n) continue;
+        sum += data[j];
+        c++;
+      }
+      return sum / c;
+    });
+    const pts: Phaser.Math.Vector2[] = [];
     for (let i = 0; i < n; i++) {
       const px = xOf(i);
       if (px < x0) continue;
-      if (!started) {
-        if (i > 0) {
-          // clip the segment entering from the left edge
-          const f = (x0 - xOf(i - 1)) / step;
-          g.moveTo(x0, yOf(Phaser.Math.Linear(data[i - 1], data[i], f)));
-          g.lineTo(px, yOf(data[i]));
-        } else {
-          g.moveTo(px, yOf(data[i]));
-        }
-        started = true;
-      } else {
-        g.lineTo(px, yOf(data[i]));
+      if (!pts.length && i > 0) {
+        // clip the segment entering from the left edge
+        const f = (x0 - xOf(i - 1)) / step;
+        pts.push(new Phaser.Math.Vector2(x0, yOf(Phaser.Math.Linear(sm[i - 1], sm[i], f))));
       }
+      pts.push(new Phaser.Math.Vector2(px, yOf(sm[i])));
     }
-    if (!started) g.moveTo(x0, yOf(live));
-    g.lineTo(headX, yOf(live));
-    g.strokePath();
+    if (!pts.length) pts.push(new Phaser.Math.Vector2(x0, yOf(live)));
+    pts.push(new Phaser.Math.Vector2(headX, yOf(live)));
+    // spline through the samples rounds the corners into a continuous curve
+    const curve = pts.length > 2 ? new Phaser.Curves.Spline(pts).getPoints(pts.length * 4) : pts;
+    // soft area fill under the line, closed down to the graph floor
+    g.fillStyle(PAL.gold, 0.16);
+    g.fillPoints(
+      [...curve, new Phaser.Math.Vector2(headX, y0 + h), new Phaser.Math.Vector2(curve[0].x, y0 + h)],
+      true
+    );
+    g.lineStyle(3, PAL.gold, 0.9);
+    g.strokePoints(curve, false);
+
+    // day-mission price target: dashed line + label; green side = success side
+    if (priceTarget !== null) {
+      const ty = yOf(priceTarget);
+      const below = live < priceTarget;
+      const col = below ? PAL.green : PAL.red;
+      g.lineStyle(2, col, 0.8);
+      for (let px = x0; px < x0 + w - 8; px += 16) g.lineBetween(px, ty, px + 8, ty);
+      this.targetLabel
+        .setText(`DAY TARGET $${priceTarget}`)
+        .setColor(below ? HEX.green : HEX.red)
+        .setPosition(x0 + w - 6, Phaser.Math.Clamp(ty - 3, y0 + 16, y0 + h - 4))
+        .setAlpha(1);
+    } else {
+      this.targetLabel.setAlpha(0);
+    }
     const tipX = headX;
     const tipY = yOf(live);
-    const down = live <= data[n - 1];
+    // white by default; green/red only while a big move is fresh
+    const flashing = this.priceFlashUntil > this.time.now;
+    const tipHex = flashing ? (this.priceFlashDown ? HEX.green : HEX.red) : HEX.cream;
+    const tipCol = flashing ? (this.priceFlashDown ? PAL.green : PAL.red) : PAL.cream;
     // dashed-ish guide line at the current price level
     g.lineStyle(1, PAL.gold, 0.25);
     g.lineBetween(x0, tipY, x0 + w, tipY);
-    g.fillStyle(down ? PAL.green : PAL.red, 1);
+    g.fillStyle(tipCol, 1);
     g.fillCircle(tipX, tipY, 5);
     // price tag riding the tip of the line
     this.graphTip
-      .setText(`$${live.toFixed(1)}`)
-      .setColor(down ? HEX.green : HEX.red)
+      .setText(`$${Math.round(live)}`)
+      .setColor(tipHex)
       .setAlpha(1);
     if (tipX > x0 + w - 72) {
       this.graphTip.setOrigin(1, 0.5).setPosition(tipX - 10, tipY);

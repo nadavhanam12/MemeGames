@@ -15,10 +15,10 @@ import {
   shockwave
 } from '../core/juice';
 import {
-  BAD_HEADLINES,
   COMBO_MILESTONES,
+  DayMission,
   EV,
-  SAFE_HEADLINES,
+  MissionType,
   SessionStats,
   bus,
   freshStats
@@ -30,6 +30,7 @@ interface Threat {
   sprite: Phaser.GameObjects.Image;
   type: ThreatType;
   speed: number;
+  hp: number; // late-run missiles/drones spawn with 2 — first hit slows, second kills
   target: Tanker | null;
   dead: boolean;
   swarmId?: number;
@@ -39,6 +40,19 @@ interface Threat {
   aimX?: number;
   aimY?: number;
   armed?: boolean; // mines: only live once a ship has come close
+  // patrols are lane-bound: they sail a shipping-lane spline, never open water
+  routeIdx?: number;
+  dist?: number; // distance along the route spline
+  spawnGrace?: number; // patrols can't hit while this counts down
+}
+
+// gunner tracer: homes on its designated threat; kills only when it arrives
+interface Bullet {
+  sprite: Phaser.GameObjects.Image;
+  target: Threat | null; // null = fired at empty water, fizzles at aim point
+  aimX: number;
+  aimY: number;
+  done?: boolean;
 }
 
 interface Tanker {
@@ -48,6 +62,7 @@ interface Tanker {
   dist: number; // distance travelled along its route spline
   routeIdx: number; // which shipping lane it sails
   vip: boolean;
+  hp: number; // hits it can still take (HULL ARMOR adds +1 per level)
   dead: boolean;
 }
 
@@ -73,8 +88,35 @@ export class GameScene extends Phaser.Scene {
   private lastPriceSide: Record<string, boolean> = {};
   private mapArt = false;
 
-  private upgrades = { jammer: 0, ciws: 0, escort: 0 };
-  private ciwsTimer = 0;
+  private upgrades = { air: 0, hull: 0, gold: 0 };
+  private revealed = { air: false, hull: false, gold: false };
+  private jet?: Phaser.GameObjects.Image;
+  private airTimer = 0;
+
+  // day / mission system: each day is a mini-level with one mission; between
+  // days the world freezes for a short break while the news band recaps
+  private day = 0;
+  private dayBreakT = 0;
+  private mission: DayMission | null = null;
+  private lastMissionType: MissionType | '' = '';
+  private dayCounters = { priceAtStart: 0, safe: 0, lost: 0, intercepts: 0, bestCombo: 0 };
+
+  // GUNNER TURRET: taps designate targets, the machine gun at bottom-center
+  // does the killing — tracers take real travel time to arrive
+  private turret?: Phaser.GameObjects.Container;
+  private turretBody!: Phaser.GameObjects.Image;
+  private turretBarrel?: Phaser.GameObjects.Image; // placeholder art only — atlas frames bake the gun in
+  private turretArt = false;
+  private turretAnimT = 0;
+  private turretAimX = 640;
+  private turretAimY = 300;
+  private bullets: Bullet[] = [];
+  private heat = 0; // 0..1; at 1 the gun locks until it cools down
+  private overheated = false;
+  private heatBar!: Phaser.GameObjects.Graphics;
+  private firingHeld = false;
+  private fireTimer = 0;
+  private lastShotAt = -10; // elapsed time of last shot, drives the firing pose
 
   private nightOverlay!: Phaser.GameObjects.Rectangle;
   private eventProb = 0;
@@ -107,6 +149,10 @@ export class GameScene extends Phaser.Scene {
     this.tankers = [];
     this.threats = [];
     this.elapsed = 0;
+    this.day = 0;
+    this.dayBreakT = 0;
+    this.mission = null;
+    this.lastMissionType = '';
     this.worldScale = 1;
     this.over = false;
     this.spawnTimer = 1.2;
@@ -114,13 +160,23 @@ export class GameScene extends Phaser.Scene {
     this.eventProb = 0;
     this.eventActive = false;
     this.eventCooldown = 14;
-    this.upgrades = { jammer: 0, ciws: 0, escort: 0 };
+    this.upgrades = { air: 0, hull: 0, gold: 0 };
+    this.revealed = { air: false, hull: false, gold: false };
+    this.jet = undefined;
+    this.airTimer = 0;
     this.lastPriceSide = {};
     this.dangerT = 0;
     this.dangerActive = false;
     this.mapArt = hasArt(this, 'map_bg');
+    this.bullets = [];
+    this.heat = 0;
+    this.overheated = false;
+    this.firingHeld = false;
+    this.fireTimer = 0;
+    this.lastShotAt = -10;
     this.buildRoute();
     this.drawWorld();
+    this.spawnTurret();
     if (import.meta.env.DEV && devState.routeEdit) this.enableRouteEdit(true);
     this.waveGfx = this.add.graphics().setDepth(6);
     // day/night light: navy wash over the world, alpha driven in update()
@@ -136,6 +192,8 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.centerOn(GAME_W / 2, GAME_H / 2);
     this.cameras.main.fadeIn(250, 7, 59, 92);
     this.scene.launch('UI');
+    // day 1 kicks off once the UI scene is up and listening
+    this.time.delayedCall(400, () => this.startDay(1));
 
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       // ignore taps while a UI modal (upgrades panel) is open
@@ -143,11 +201,18 @@ export class GameScene extends Phaser.Scene {
       // ignore taps on the HUD frame outside the broadcast window
       if (p.x < VIEW.x || p.x > VIEW.x + VIEW.w || p.y < VIEW.y || p.y > VIEW.y + VIEW.h) return;
       const wp = this.cameras.main.getWorldPoint(p.x, p.y);
-      this.onTap(wp.x, wp.y);
+      // tap = one shot; holding keeps the burst going (see update())
+      this.firingHeld = true;
+      this.fireTimer = TUNING.turret.fireInterval;
+      sfx.unlock();
+      shockwave(this, wp.x, wp.y, 0xffffff, 36); // designation marker
+      this.fireShot(wp.x, wp.y);
     });
+    this.input.on('pointerup', () => (this.firingHeld = false));
+    this.input.on('pointerupoutside', () => (this.firingHeld = false));
 
     bus.removeAllListeners('buy-upgrade');
-    bus.on('buy-upgrade', (key: 'jammer' | 'ciws' | 'escort', cost: number) => this.buyUpgrade(key, cost));
+    bus.on('buy-upgrade', (key: 'air' | 'hull' | 'gold', cost: number) => this.buyUpgrade(key, cost));
 
     this.events.on('shutdown', () => {
       bus.removeAllListeners('buy-upgrade');
@@ -347,10 +412,11 @@ export class GameScene extends Phaser.Scene {
     const t: Tanker = {
       sprite,
       wake,
-      speed: base * (1 + this.upgrades.escort * TUNING.upgrades.escortSpeedPerLevel),
+      speed: base,
       dist: 0,
       routeIdx,
       vip,
+      hp: 1 + this.upgrades.hull * TUNING.upgrades.hullHpPerLevel,
       dead: false
     };
     if (vip) {
@@ -362,19 +428,17 @@ export class GameScene extends Phaser.Scene {
         tint: 0xffe08a,
         follow: sprite
       }).setDepth(21);
-      bus.emit(EV.HEADLINE, 'VIP TANKER IN TRANSIT. NO PRESSURE.', 'event');
     }
     this.tankers.push(t);
   }
 
   private spawnThreat(type?: ThreatType, swarmId?: number): void {
     if (this.over) return;
-    const pool: ThreatType[] =
-      this.elapsed < 15
-        ? ['missile', 'drone']
-        : this.elapsed < 30
-          ? ['missile', 'drone', 'mine']
-          : ['missile', 'drone', 'mine', 'patrol'];
+    // enemy weapons unlock day by day (announced in the news the day before)
+    const unlock = TUNING.days.threatUnlockDays;
+    const pool: ThreatType[] = ['missile', 'drone'];
+    if (this.day >= unlock.mine) pool.push('mine');
+    if (this.day >= unlock.patrol) pool.push('patrol');
     const t = type ?? Phaser.Math.RND.pick(pool);
     const target = this.aliveTankers()[0] ?? null;
 
@@ -382,6 +446,7 @@ export class GameScene extends Phaser.Scene {
     let speed = 60;
     let x = 0;
     let y = 0;
+    let patrolRoute = 0;
 
     switch (t) {
       case 'missile':
@@ -398,42 +463,71 @@ export class GameScene extends Phaser.Scene {
         sprite = this.add.image(x, y, 'drone');
         break;
       case 'mine': {
-        // stationary: pops into the water near one of the shipping lanes
+        // stationary: pops into the water near one of the shipping lanes,
+        // but never close enough to a sailing tanker to arm on arrival
         speed = 0;
-        const ri = Phaser.Math.Between(0, this.routes.length - 1);
-        const tt = 0.15 + Math.random() * 0.7;
-        const p = this.routes[ri].getPoint(tt);
-        const tan = this.routes[ri].getTangent(tt).normalize();
-        const off = Phaser.Math.Between(-75, 75);
-        x = p.x - tan.y * off;
-        y = p.y + tan.x * off;
+        let placed = false;
+        for (let attempt = 0; attempt < 8 && !placed; attempt++) {
+          const ri = Phaser.Math.Between(0, this.routes.length - 1);
+          const tt = 0.15 + Math.random() * 0.7;
+          const p = this.routes[ri].getPoint(tt);
+          const tan = this.routes[ri].getTangent(tt).normalize();
+          const off = Phaser.Math.Between(-75, 75);
+          x = p.x - tan.y * off;
+          y = p.y + tan.x * off;
+          placed = !this.aliveTankers().some(
+            tk => Phaser.Math.Distance.Between(x, y, tk.sprite.x, tk.sprite.y) < TUNING.juice.mineActivateDist
+          );
+        }
+        if (!placed) return; // no safe water this tick — skip the spawn
         sprite = this.add.image(x, y, 'mine');
         break;
       }
       case 'patrol': {
-        // races out from the right end of the strait
+        // lane-bound: enters at the downstream end of a shipping lane and
+        // sails the spline upstream toward oncoming tankers. Never enters a
+        // lane whose exit has a tanker about to sail out of it.
         speed = TUNING.speeds.patrol;
-        const pri = Phaser.Math.Between(0, this.routes.length - 1);
-        const p = this.routePoint(this.routeLengths[pri] - 40, pri);
-        // emerge from whichever side that route's downstream end is on
-        x = p.x > GAME_W / 2 ? GAME_W + 80 : -80;
-        y = Phaser.Math.Clamp(p.y + Phaser.Math.Between(-30, 60), 80, GAME_H - 180);
+        const preferred = target ? target.routeIdx : Phaser.Math.Between(0, this.routes.length - 1);
+        const order = [preferred, ...this.routes.map((_, i) => i).filter(i => i !== preferred)];
+        const clear = order.find(ri => {
+          const entry = this.routePoint(this.routeLengths[ri] - 1, ri);
+          return !this.aliveTankers().some(
+            tk =>
+              Phaser.Math.Distance.Between(entry.x, entry.y, tk.sprite.x, tk.sprite.y) <
+              TUNING.spawn.patrolEntryClearance
+          );
+        });
+        if (clear === undefined) return; // both exits busy — skip the spawn
+        patrolRoute = clear;
+        const p = this.routePoint(this.routeLengths[clear] - 1, clear);
+        x = p.x;
+        y = p.y;
         sprite = this.add.image(x, y, 'patrol');
         break;
       }
     }
     sprite.setDepth(30);
-    const jam = 1 - this.upgrades.jammer * TUNING.upgrades.jammerSlowPerLevel;
     const late = 1 + Math.min((this.elapsed / 60) * TUNING.spawn.speedRampPerMinute, TUNING.spawn.speedRampMax);
+    // difficulty step: from the armored day on, flying weapons take two hits
+    const armored = (t === 'missile' || t === 'drone') && this.day >= TUNING.days.threatUnlockDays.armored;
     const threat: Threat = {
       sprite,
       type: t,
-      speed: speed * jam * late,
+      speed: speed * late,
+      hp: armored ? 2 : 1,
       target: t === 'missile' ? null : target,
       dead: false,
       swarmId,
       blinkTimer: 0
     };
+    if (t === 'patrol') {
+      threat.routeIdx = patrolRoute;
+      threat.dist = this.routeLengths[patrolRoute] - 1;
+      threat.spawnGrace = TUNING.spawn.patrolGraceSec;
+      // only tankers on its own lane are reachable
+      threat.target = this.aliveTankers().find(tk => tk.routeIdx === patrolRoute) ?? null;
+    }
     if (t === 'missile') {
       // ballistic launch: lock an impact point NOW — the predicted tanker
       // position, or a random spot along the route if nothing is sailing
@@ -477,16 +571,76 @@ export class GameScene extends Phaser.Scene {
     return this.tankers.filter(t => !t.dead);
   }
 
+  // ------------------------------------------------------------- gunner turret
+  /** Bottom-center machine-gun nest. Placeholder art until the atlas lands
+   *  (12 frames: left/mid/right x idle/fire x 2 — see assets/TRUMP_GUNNER_BRIEF.md). */
+  private spawnTurret(): void {
+    const tu = TUNING.turret;
+    this.turretArt = hasArt(this, 'trump_mid_idle_1');
+    this.turret?.destroy();
+    this.turretBarrel = undefined;
+    if (this.turretArt) {
+      this.turretBody = this.add.image(0, 0, 'trump_mid_idle_1');
+      this.turret = this.add.container(tu.x, tu.y, [this.turretBody]);
+    } else {
+      // placeholder gunner seen from behind: suit shoulders, blond hair, gun
+      if (!this.textures.exists('turretBodyGen')) {
+        const g = this.make.graphics({ x: 0, y: 0 }, false);
+        g.fillStyle(0x2b3a52, 1); // suit shoulders
+        g.fillRoundedRect(6, 30, 60, 26, 10);
+        g.fillStyle(0xf0c49b, 1); // head
+        g.fillCircle(36, 22, 13);
+        g.fillStyle(0xf7d154, 1); // the hair
+        g.fillEllipse(36, 13, 26, 12);
+        g.generateTexture('turretBodyGen', 72, 58);
+        g.destroy();
+      }
+      if (!this.textures.exists('turretBarrelGen')) {
+        const g = this.make.graphics({ x: 0, y: 0 }, false);
+        g.fillStyle(0x3a4048, 1);
+        g.fillRect(0, 3, 46, 6); // barrel
+        g.fillStyle(0x14181d, 1);
+        g.fillRect(40, 1, 10, 10); // muzzle brake
+        g.generateTexture('turretBarrelGen', 50, 12);
+        g.destroy();
+      }
+      this.turretBody = this.add.image(0, 6, 'turretBodyGen');
+      this.turretBarrel = this.add.image(0, -8, 'turretBarrelGen').setOrigin(0.1, 0.5);
+      this.turretBarrel.setRotation(-Math.PI / 2);
+      this.turret = this.add.container(tu.x, tu.y, [this.turretBody, this.turretBarrel]);
+    }
+    this.turret.setDepth(60);
+    if (!this.textures.exists('tracerGen')) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      g.fillStyle(0xffe08a, 1);
+      g.fillRoundedRect(0, 0, 16, 4, 2);
+      g.generateTexture('tracerGen', 16, 4);
+      g.destroy();
+    }
+    this.heatBar = this.add.graphics().setDepth(61);
+    this.drawHeatBar();
+  }
+
+  /** World-space point tracer rounds leave from. */
+  private muzzlePoint(): { x: number; y: number } {
+    const tu = TUNING.turret;
+    if (this.turretBarrel) {
+      const a = this.turretBarrel.rotation;
+      return { x: tu.x + Math.cos(a) * 42, y: tu.y - 8 + Math.sin(a) * 42 };
+    }
+    return { x: tu.x, y: tu.y - 34 };
+  }
+
   // ------------------------------------------------------------- input
-  private onTap(x: number, y: number): void {
-    if (this.over) return;
+  /** One tracer at the nearest threat to (x,y) — or at the water if nothing's there. */
+  private fireShot(x: number, y: number): void {
+    if (this.over || this.dayBreakT > 0) return;
     if (import.meta.env.DEV && (devState.layoutEdit || devState.routeEdit)) return;
-    sfx.unlock();
-    sfx.tap();
-    shockwave(this, x, y, 0xffffff, 36);
+    const tu = TUNING.turret;
+    if (this.overheated) return; // heat bar flashes red — the gun is the message
 
     let best: Threat | null = null;
-    let bestD = TUNING.juice.tapRadius;
+    let bestD = tu.lockRadius;
     for (const th of this.threats) {
       if (th.dead) continue;
       const d = Phaser.Math.Distance.Between(x, y, th.sprite.x, th.sprite.y);
@@ -495,12 +649,47 @@ export class GameScene extends Phaser.Scene {
         best = th;
       }
     }
-    if (best) this.intercept(best, true);
+
+    this.turretAimX = best ? best.sprite.x : x;
+    this.turretAimY = best ? best.sprite.y : y;
+    this.lastShotAt = this.elapsed;
+
+    const m = this.muzzlePoint();
+    const spr = this.add.image(m.x, m.y, 'tracerGen').setDepth(55);
+    spr.setRotation(Math.atan2(this.turretAimY - m.y, this.turretAimX - m.x));
+    this.bullets.push({ sprite: spr, target: best, aimX: this.turretAimX, aimY: this.turretAimY });
+
+    sfx.tap();
+    vibrate(5);
+    shockwave(this, m.x, m.y, 0xffe08a, 20); // muzzle flash — small, kills get the big one
+    camImpulse(this, TUNING.juice.shakeSmall * 0.6, 40);
+
+    this.heat = Math.min(1, this.heat + tu.heatPerShot);
+    if (this.heat >= 1) {
+      this.overheated = true;
+      this.firingHeld = false;
+      sfx.alarm();
+      floatText(this, TUNING.turret.x, TUNING.turret.y - 70, 'OVERHEATED!', HEX.red, 26);
+    }
   }
 
   // ------------------------------------------------------------- interception
   private intercept(th: Threat, byPlayer: boolean): void {
     if (th.dead) return;
+    if (th.hp > 1) {
+      // armored: first hit cripples — slows it down, no kill, no payout yet
+      th.hp--;
+      th.speed *= TUNING.spawn.firstHitSlowMult;
+      const { x, y } = th.sprite;
+      impactFlash(this, x, y);
+      shockwave(this, x, y, 0xdddddd, 50);
+      th.sprite.setTint(0x8a939b); // scorched — reads as "hit me again"
+      this.tweens.add({ targets: th.sprite, scale: { from: 1.3, to: 1 }, duration: 150, ease: 'Back.easeOut' });
+      sfx.hit();
+      camImpulse(this, TUNING.juice.shakeSmall, 60);
+      vibrate(10);
+      return;
+    }
     th.dead = true;
     const { x, y } = th.sprite;
 
@@ -520,7 +709,6 @@ export class GameScene extends Phaser.Scene {
     const eco = TUNING.economy;
     const drop = th.type === 'patrol' ? eco.patrolDrop : eco.interceptDrop;
     this.changePrice(-drop);
-    floatText(this, x, y - 40, `−$${drop.toFixed(2)} OIL`, HEX.green);
     sfx.hit();
     camImpulse(this, TUNING.juice.shakeSmall, 80);
     vibrate(15);
@@ -549,9 +737,11 @@ export class GameScene extends Phaser.Scene {
       bus.emit('meme-moment', 'LAST-SECOND SAVE');
     }
 
-    const gain = TUNING.economy.interceptCredits + this.upgrades.escort;
+    const gain = TUNING.economy.interceptCredits;
     this.addCredits(gain, x, y);
     this.stats.intercepts++;
+    this.dayCounters.intercepts++;
+    if (this.mission?.type === 'intercept') this.bumpMission(this.dayCounters.intercepts);
     this.bumpCombo();
 
     if (th.swarmId !== undefined) {
@@ -604,13 +794,17 @@ export class GameScene extends Phaser.Scene {
       case 'patrol': {
         sfx.retreat();
         floatText(this, x, y - 60, 'NOPE.', HEX.cream, 26);
-        this.tweens.add({ targets: s, scaleX: -s.scaleX, duration: 150, ease: 'Cubic.easeOut' });
         this.tweens.add({
           targets: s,
-          x: GAME_W + 160,
-          duration: 900,
-          ease: 'Cubic.easeIn',
-          onComplete: () => s.destroy()
+          alpha: 0,
+          y: y + 18,
+          scale: s.scale * 0.85,
+          duration: 550,
+          ease: 'Sine.easeIn',
+          onComplete: () => {
+            this.burst(x, y + 14, 0x8fd6ef, 'dot', 5);
+            s.destroy();
+          }
         });
         break;
       }
@@ -640,6 +834,8 @@ export class GameScene extends Phaser.Scene {
     this.stats.bestCombo = Math.max(this.stats.bestCombo, this.stats.combo);
     const milestone = COMBO_MILESTONES[this.stats.combo];
     bus.emit(EV.COMBO, this.stats.combo, milestone);
+    this.dayCounters.bestCombo = Math.max(this.dayCounters.bestCombo, this.stats.combo);
+    if (this.mission?.type === 'combo') this.bumpMission(this.dayCounters.bestCombo);
     if (this.stats.combo === MEMES.settings.streakCombo) bus.emit('meme-moment', 'ON A RAMPAGE');
     if (milestone) {
       this.addCredits(this.stats.combo, GAME_W / 2, 200);
@@ -671,25 +867,29 @@ export class GameScene extends Phaser.Scene {
       ['above150', p > 150, 'EVERYONE BECOMES AN ENERGY EXPERT', 'bad'],
       ['above175', p > 175, 'BICYCLES NOW A LUXURY ASSET', 'bad']
     ];
-    for (const [key, active, label, tone] of checks) {
+    for (const [key, active, , tone] of checks) {
       const was = this.lastPriceSide[key] ?? false;
       if (active && !was) {
-        bus.emit(EV.THRESHOLD, label, tone);
-        if (tone === 'bad') sfx.alarm();
-        else sfx.fanfare();
+        // no headline — the news band is day-system only; the market still flinches
+        if (tone === 'bad') {
+          sfx.alarm();
+          bus.emit(EV.MARKET_NUDGE, TUNING.market.nudgeBadNews);
+        } else sfx.fanfare();
       }
       this.lastPriceSide[key] = active;
     }
   }
 
   private addCredits(gain: number, x: number, y: number): void {
-    this.stats.credits += gain;
-    bus.emit(EV.CREDITS, this.stats.credits, gain, x, y);
+    // OIL MONEY: all credit income scales with the gold upgrade
+    const boosted = Math.round(gain * (1 + this.upgrades.gold * TUNING.upgrades.goldBonusPerLevel));
+    this.stats.credits += boosted;
+    bus.emit(EV.CREDITS, this.stats.credits, boosted, x, y);
   }
 
   // ------------------------------------------------------------- upgrades
-  private buyUpgrade(key: 'jammer' | 'ciws' | 'escort', cost: number): void {
-    if (this.over || this.stats.credits < cost) return;
+  private buyUpgrade(key: 'air' | 'hull' | 'gold', cost: number): void {
+    if (this.over || !this.revealed[key] || this.stats.credits < cost) return;
     this.stats.credits -= cost;
     this.upgrades[key]++;
     this.stats.upgradesBought++;
@@ -699,27 +899,45 @@ export class GameScene extends Phaser.Scene {
     vibrate(30);
 
     const mid = this.routes[0].getPoint(0.5);
-    if (key === 'jammer') {
-      const demo = this.add.image(GAME_W / 2, 120, 'drone').setDepth(30).setAlpha(0.9);
-      floatText(this, demo.x, demo.y - 50, 'JAMMED (DEMO)', HEX.purple, 24);
-      this.tweens.add({
-        targets: demo,
-        x: demo.x + 200,
-        duration: 1600,
-        ease: 'Sine.easeOut',
-        onComplete: () => demo.destroy()
-      });
-      this.tweens.add({ targets: demo, alpha: 0, delay: 1100, duration: 500 });
-      shockwave(this, mid.x, mid.y, PAL.purple, 320);
-    } else if (key === 'ciws') {
-      shockwave(this, mid.x, mid.y, PAL.orange, 260);
-      floatText(this, mid.x, mid.y - 60, 'AUTO-DEFENSE ONLINE', HEX.orange, 26);
-    } else {
+    if (key === 'air') {
+      if (!this.jet) this.spawnJet();
+      floatText(
+        this,
+        this.jet!.x,
+        this.jet!.y - 50,
+        this.upgrades.air === 1 ? 'AIR SUPPORT ONLINE' : `AIR SUPPORT LV${this.upgrades.air}`,
+        HEX.orange,
+        26
+      );
+      shockwave(this, this.jet!.x, this.jet!.y, PAL.orange, 260);
+    } else if (key === 'hull') {
+      // existing ships get the extra plating too
       for (const t of this.aliveTankers()) {
-        t.speed *= 1.15;
-        floatText(this, t.sprite.x, t.sprite.y - 60, 'ESCORTED!', HEX.green, 22);
+        t.hp += TUNING.upgrades.hullHpPerLevel;
+        floatText(this, t.sprite.x, t.sprite.y - 60, 'REINFORCED!', HEX.green, 22);
       }
+      shockwave(this, mid.x, mid.y, PAL.green, 260);
+    } else {
+      floatText(this, mid.x, mid.y - 60, 'PAYDAY BOOSTED', HEX.gold, 26);
+      shockwave(this, mid.x, mid.y, PAL.gold, 260);
     }
+  }
+
+  /** AIR ASSISTANCE: draw a simple jet texture once and put it in the sky. */
+  private spawnJet(): void {
+    if (!this.textures.exists('jetGen')) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      g.fillStyle(0xdde6f0, 1);
+      g.fillRect(4, 11, 38, 6); // fuselage
+      g.fillTriangle(42, 11, 48, 14, 42, 17); // nose
+      g.fillTriangle(16, 14, 30, 14, 22, 2); // wing top
+      g.fillTriangle(16, 14, 30, 14, 22, 26); // wing bottom
+      g.fillTriangle(4, 14, 0, 5, 9, 14); // tail top
+      g.fillTriangle(4, 14, 0, 23, 9, 14); // tail bottom
+      g.generateTexture('jetGen', 48, 28);
+      g.destroy();
+    }
+    this.jet = this.add.image(GAME_W / 2, 110, 'jetGen').setDepth(40);
   }
 
   // ------------------------------------------------------------- events
@@ -765,11 +983,6 @@ export class GameScene extends Phaser.Scene {
     this.eventCooldown = 12;
     if (won) {
       this.stats.eventsWon++;
-      bus.emit(
-        EV.HEADLINE,
-        this.eventLabel === 'DRONE SWARM SURGE' ? 'SWARM BONKED; SKY QUIET AGAIN' : 'VIP ARRIVES; SUNGLASSES INTACT',
-        'good'
-      );
       this.changePrice(-4);
       this.addCredits(TUNING.economy.eventWinCredits, GAME_W / 2, TANKER_Y);
       confetti(this, GAME_W / 2, 200, 20);
@@ -778,12 +991,143 @@ export class GameScene extends Phaser.Scene {
       bus.emit('meme-moment', 'EVENT SURVIVED');
     } else {
       this.stats.eventsLost++;
-      bus.emit(EV.HEADLINE, 'EVENT GOES BADLY; MARKETS TYPE FURIOUSLY', 'bad');
+      bus.emit(EV.MARKET_NUDGE, TUNING.market.nudgeBadNews);
       this.changePrice(6);
       this.stats.memeMoment = this.stats.memeMoment || `LOST: ${this.eventLabel}`;
       bus.emit('meme-moment', 'EVENT LOST');
     }
     this.eventLabel = this.eventLabel === 'DRONE SWARM SURGE' ? 'VIP TANKER TRANSIT' : 'DRONE SWARM SURGE';
+  }
+
+  // ------------------------------------------------------------- day system
+  /** New day: reveal scheduled upgrades, roll the daily mission, announce both. */
+  private startDay(n: number): void {
+    if (this.over) return;
+    this.day = n;
+    this.dayCounters = { priceAtStart: this.stats.oilPrice, safe: 0, lost: 0, intercepts: 0, bestCombo: 0 };
+    const reveals: Array<'air' | 'hull' | 'gold'> = [];
+    for (const key of ['air', 'hull', 'gold'] as const) {
+      if (!this.revealed[key] && n >= TUNING.days.upgradeRevealDays[key]) {
+        this.revealed[key] = true;
+        bus.emit(EV.UPGRADE_REVEAL, key);
+        reveals.push(key);
+      }
+    }
+    this.mission = this.rollMission(n);
+    bus.emit(EV.MISSION, { ...this.mission });
+    bus.emit(EV.DAY_START, n, this.mission.text, reveals);
+  }
+
+  /** Daily mission, scaled by day. Day 1 is always the teaching intercept quota. */
+  private rollMission(n: number): DayMission {
+    const d = TUNING.days;
+    let pool: MissionType[] = n === 1 ? ['intercept'] : ['price', 'escort', 'intercept', 'combo'];
+    if (n >= 3) pool.push('perfect');
+    const filtered = pool.filter(t => t !== this.lastMissionType);
+    const type = Phaser.Math.RND.pick(filtered.length ? filtered : pool);
+    this.lastMissionType = type;
+    let target = 0;
+    let text = '';
+    switch (type) {
+      case 'price':
+        target = Math.ceil((this.stats.oilPrice + d.priceMargin) / 5) * 5;
+        text = `END THE DAY UNDER $${target}`;
+        break;
+      case 'escort':
+        target = d.escortQuotaBase + Math.floor(n / d.escortQuotaPerDays);
+        text = `ESCORT ${target} TANKERS SAFELY`;
+        break;
+      case 'intercept':
+        target = d.interceptQuotaBase + n * d.interceptQuotaPerDay;
+        text = `SHOOT DOWN ${target} THREATS`;
+        break;
+      case 'combo':
+        target = d.comboTargetBase + n * d.comboTargetPerDay;
+        text = `REACH A x${target} COMBO`;
+        break;
+      case 'perfect':
+        target = 0;
+        text = 'LOSE NO TANKERS TODAY';
+        break;
+    }
+    return { day: n, type, text, target, progress: 0, done: false };
+  }
+
+  /** Quota-mission progress tick; completes mid-day (prize still pays at day end). */
+  private bumpMission(progress: number): void {
+    const m = this.mission;
+    if (!m || m.done) return;
+    m.progress = progress;
+    if (m.type !== 'price' && m.type !== 'perfect' && progress >= m.target) {
+      m.done = true;
+      sfx.fanfare();
+      floatText(this, GAME_W / 2, 250, 'MISSION COMPLETE!', HEX.green, 30);
+    }
+    bus.emit(EV.MISSION, { ...m });
+  }
+
+  /** Day boundary: resolve the mission, pay the prize, freeze the world for the
+   *  news-band recap, and pre-announce tomorrow's escalations. */
+  private endDay(): void {
+    const d = TUNING.days;
+    const m = this.mission!;
+    if (m.type === 'price') m.done = this.stats.oilPrice < m.target;
+    else if (m.type === 'perfect') m.done = this.dayCounters.lost === 0;
+    const rewardCredits = d.rewardCreditsBase + this.day * d.rewardCreditsPerDay;
+    if (m.done) {
+      this.addCredits(rewardCredits, GAME_W / 2, 220);
+      this.stats.milestoneBonus += this.day * d.rewardScorePerDay;
+      this.stats.missionsCompleted++;
+      confetti(this, GAME_W / 2, 220, 18);
+      sfx.fanfare();
+    } else {
+      sfx.alarm();
+    }
+    this.stats.daysSurvived = this.day;
+    bus.emit(EV.MISSION, { ...m });
+    bus.emit(EV.DAY_END, {
+      day: this.day,
+      missionText: m.text,
+      missionDone: m.done,
+      rewardCredits: m.done ? rewardCredits : 0,
+      safe: this.dayCounters.safe,
+      lost: this.dayCounters.lost,
+      price: Math.round(this.stats.oilPrice),
+      priceDelta: Math.round(this.stats.oilPrice - this.dayCounters.priceAtStart),
+      warnings: this.warningsFor(this.day + 1)
+    });
+    this.firingHeld = false;
+    this.dayBreakT = d.breakSec;
+  }
+
+  /** True while any hostile is still a live danger to the tankers we defend —
+   *  the day boundary waits for this to clear (dormant mines don't count). */
+  private threatsPressing(): boolean {
+    if (!this.aliveTankers().length) return false;
+    return this.threats.some(
+      th =>
+        !th.dead &&
+        (th.type === 'missile' ||
+          th.type === 'drone' ||
+          (th.type === 'patrol' && !!th.target) ||
+          (th.type === 'mine' && !!th.armed))
+    );
+  }
+
+  /** Intel headlines about what tomorrow brings (new weapons / new tech). */
+  private warningsFor(nextDay: number): string[] {
+    const d = TUNING.days;
+    const out: string[] = [];
+    if (nextDay === d.threatUnlockDays.mine) out.push('INTEL: MINES EXPECTED IN THE STRAIT TOMORROW');
+    if (nextDay === d.threatUnlockDays.patrol) out.push('INTEL: ENEMY PATROL BOATS INBOUND TOMORROW');
+    if (nextDay === d.threatUnlockDays.armored) out.push('INTEL: ARMORED WEAPONS TOMORROW — TWO HITS TO DOWN');
+    for (const key of ['air', 'hull', 'gold'] as const) {
+      if (nextDay === d.upgradeRevealDays[key] && !this.revealed[key]) {
+        const names = { air: 'AIR ASSISTANCE', hull: 'HULL ARMOR', gold: 'OIL MONEY' };
+        out.push(`NEW TECH TOMORROW: ${names[key]}`);
+      }
+    }
+    return out;
   }
 
   // ------------------------------------------------------------- tanker outcomes
@@ -798,8 +1142,9 @@ export class GameScene extends Phaser.Scene {
     // celebrate at whichever end of its route the tanker exited
     const ex = Phaser.Math.Clamp(t.sprite.x, 140, GAME_W - 140);
     this.addCredits(credits, ex, t.sprite.y);
-    bus.emit(EV.HEADLINE, Phaser.Math.RND.pick(SAFE_HEADLINES), 'good');
     bus.emit('tanker-safe', this.stats.tankersSafe, drop);
+    this.dayCounters.safe++;
+    if (this.mission?.type === 'escort') this.bumpMission(this.dayCounters.safe);
     this.bumpCombo();
     confetti(this, ex, t.sprite.y, this.stats.tankersSafe % 3 === 0 ? 26 : 10);
     floatText(this, ex, t.sprite.y - 60, `SAFE! −$${drop} OIL`, HEX.green, 34);
@@ -810,6 +1155,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tankerHit(t: Tanker, th: Threat): void {
+    // HULL ARMOR: the ship soaks the hit if it has spare hp — the threat still
+    // dies, the market flinches at half strength, and the run rolls on
+    t.hp -= 1;
+    if (t.hp > 0) {
+      th.dead = true;
+      sfx.hit();
+      camImpulse(this, TUNING.juice.shakeSmall, 150);
+      vibrate(25);
+      impactFlash(this, t.sprite.x, t.sprite.y, PAL.orange, 60);
+      this.burst(t.sprite.x, t.sprite.y, PAL.orange, 'puff', 8);
+      const dmgSpike = Math.round(
+        (t.vip ? TUNING.economy.vipHitSpike : TUNING.economy.hitSpike) * TUNING.upgrades.hullDamagedSpikeFactor
+      );
+      this.changePrice(dmgSpike);
+      floatText(this, t.sprite.x, t.sprite.y - 70, `HULL HOLDS (${t.hp} HP)`, HEX.gold, 26);
+      ((th.sprite as any).trail as Phaser.GameObjects.Particles.ParticleEmitter | undefined)?.destroy();
+      th.sprite.destroy();
+      th.warnRing?.destroy();
+      return;
+    }
     t.dead = true;
     th.dead = true;
     this.stats.tankersLost++;
@@ -823,7 +1188,9 @@ export class GameScene extends Phaser.Scene {
     const spike = t.vip ? TUNING.economy.vipHitSpike : TUNING.economy.hitSpike;
     this.changePrice(spike);
     sfx.priceUp();
-    bus.emit(EV.HEADLINE, Phaser.Math.RND.pick(BAD_HEADLINES), 'bad');
+    bus.emit(EV.MARKET_NUDGE, TUNING.market.nudgeBadNews);
+    this.dayCounters.lost++;
+    if (this.mission?.type === 'perfect') this.bumpMission(this.dayCounters.lost);
     floatText(this, t.sprite.x, t.sprite.y - 70, `+$${spike} OIL`, HEX.red, 36);
     const lossLabel = this.stats.tankersLost >= 2 ? 'ANOTHER TANKER DOWN' : 'LOST A TANKER ON CAMERA';
     this.stats.memeMoment = this.stats.memeMoment || lossLabel;
@@ -846,6 +1213,96 @@ export class GameScene extends Phaser.Scene {
     if (th.swarmId !== undefined && this.eventActive) this.resolveEvent(false);
   }
 
+  // ------------------------------------------------------------- turret loop
+  private updateTurret(rawDt: number, dt: number): void {
+    const tu = TUNING.turret;
+
+    // heat: always cooling; overheat locks the gun until it recovers
+    this.heat = Math.max(0, this.heat - tu.heatCoolPerSec * rawDt);
+    if (this.overheated && this.heat <= tu.overheatRecoverAt) {
+      this.overheated = false;
+      floatText(this, tu.x, tu.y - 70, 'GUN READY', HEX.green, 20);
+    }
+
+    // held burst: keep shooting at whatever is under the finger
+    this.fireTimer = Math.max(0, this.fireTimer - rawDt);
+    if (this.firingHeld && !this.overheated && this.fireTimer === 0 && !this.registry.get('ui-modal')) {
+      const p = this.input.activePointer;
+      if (p.isDown && p.x >= VIEW.x && p.x <= VIEW.x + VIEW.w && p.y >= VIEW.y && p.y <= VIEW.y + VIEW.h) {
+        this.fireTimer = tu.fireInterval;
+        const wp = this.cameras.main.getWorldPoint(p.x, p.y);
+        this.fireShot(wp.x, wp.y);
+      }
+    }
+
+    // tracers: home on their threat, fizzle at the aim point if it died
+    const step = tu.bulletSpeed * dt;
+    for (const b of this.bullets) {
+      if (b.target && !b.target.dead) {
+        b.aimX = b.target.sprite.x;
+        b.aimY = b.target.sprite.y;
+      }
+      const d = Phaser.Math.Distance.Between(b.sprite.x, b.sprite.y, b.aimX, b.aimY);
+      if (d <= Math.max(step, tu.bulletHitRadius)) {
+        if (b.target && !b.target.dead) {
+          this.intercept(b.target, true);
+        } else {
+          // wasted round — small splash so the miss still reads
+          this.burst(b.aimX, b.aimY, 0x8fd6ef, 'puff', 3);
+        }
+        b.sprite.destroy();
+        b.done = true;
+        continue;
+      }
+      const ang = Math.atan2(b.aimY - b.sprite.y, b.aimX - b.sprite.x);
+      b.sprite.x += Math.cos(ang) * step;
+      b.sprite.y += Math.sin(ang) * step;
+      b.sprite.setRotation(ang);
+    }
+    this.bullets = this.bullets.filter(b => !b.done);
+
+    // pose: direction from aim point, firing state from recent shots
+    this.turretAnimT += rawDt;
+    const firing = this.firingHeld || this.elapsed - this.lastShotAt < 0.18;
+    if (this.turretArt) {
+      const dx = this.turretAimX - tu.x;
+      const dir = dx < -110 ? 'left' : dx > 110 ? 'right' : 'mid';
+      const frame = Math.floor(this.turretAnimT * (firing ? 10 : 2)) % 2 + 1;
+      const key = `trump_${dir}_${firing ? 'fire' : 'idle'}_${frame}`;
+      if (this.textures.exists(key) && this.turretBody.texture.key !== key) this.turretBody.setTexture(key);
+    } else if (this.turretBarrel) {
+      const target = Math.atan2(this.turretAimY - (tu.y - 8), this.turretAimX - tu.x);
+      this.turretBarrel.rotation = Phaser.Math.Angle.RotateTo(this.turretBarrel.rotation, target, 8 * rawDt);
+      // recoil twitch while firing
+      this.turretBody.y = 6 + (firing ? Math.sin(this.turretAnimT * 60) * 1.5 : 0);
+    }
+
+    this.drawHeatBar();
+  }
+
+  /** Heat gauge beside the gun: green -> amber -> red, flashes when locked. */
+  private drawHeatBar(): void {
+    const tu = TUNING.turret;
+    const g = this.heatBar;
+    const x = tu.x + 58;
+    const y = tu.y + 30;
+    const w = 12;
+    const h = 62;
+    g.clear();
+    g.fillStyle(0x0e141b, 0.75);
+    g.fillRoundedRect(x - 2, y - h - 2, w + 4, h + 4, 4);
+    const f = this.heat;
+    const col = this.overheated
+      ? (Math.floor(this.turretAnimT * 8) % 2 ? 0xe6483d : 0x7a1f18) // flash while locked
+      : f > 0.75 ? 0xe6483d : f > 0.45 ? 0xf2a33c : 0x39b54a;
+    if (f > 0) {
+      g.fillStyle(col, 1);
+      g.fillRoundedRect(x, y - h * f, w, h * f, 3);
+    }
+    g.lineStyle(2, 0xdde6f0, 0.5);
+    g.strokeRoundedRect(x - 2, y - h - 2, w + 4, h + 4, 4);
+  }
+
   // ------------------------------------------------------------- slow motion
   private slowMo(scale: number, ms: number): void {
     if (settings.reducedMotion) return;
@@ -859,15 +1316,41 @@ export class GameScene extends Phaser.Scene {
     if (this.over) return;
     const rawDt = Math.min(deltaMs / 1000, 0.05);
     const dt = rawDt * this.worldScale;
+
+    // end-of-day break: the whole world freezes (ships, threats, prices, gun)
+    // so the player can read the recap in the news band
+    if (this.dayBreakT > 0) {
+      this.dayBreakT -= rawDt;
+      bus.emit(EV.DAY_BREAK, Math.max(this.dayBreakT, 0));
+      if (this.dayBreakT <= 0) {
+        bus.emit(EV.DAY_BREAK, null);
+        this.startDay(this.day + 1);
+      }
+      return;
+    }
+
     this.elapsed += rawDt;
 
+    const dnLen = TUNING.dayNight.dayLengthSec;
+    // day overtime: past the boundary the day can't close while hostiles are
+    // still pressing the lanes — the clock pins just before midnight and all
+    // spawning stops until the field is clear
+    const overtime = this.day > 0 && this.elapsed >= this.day * dnLen;
+
     // endless survival: timer counts UP; the run ends only via market meltdown
-    bus.emit(EV.TIMER, this.elapsed);
+    bus.emit(EV.TIMER, overtime ? this.day * dnLen - 0.001 : this.elapsed);
 
     // day/night light: brightest at each day boundary, darkest mid-day
     const dn = TUNING.dayNight;
     const phase = (this.elapsed % dn.dayLengthSec) / dn.dayLengthSec;
     this.nightOverlay.setAlpha(dn.nightMaxAlpha * (0.5 - 0.5 * Math.cos(phase * Math.PI * 2)));
+
+    // day boundary: resolve the mission and enter the frozen recap break —
+    // but only once no threat is still attacking the ships we defend
+    if (overtime && !this.threatsPressing()) {
+      this.endDay();
+      return;
+    }
     if (this.stats.oilPrice >= TUNING.session.failPrice) {
       this.dangerActive = true;
       this.dangerT += rawDt;
@@ -918,29 +1401,53 @@ export class GameScene extends Phaser.Scene {
     const interval = Phaser.Math.Linear(sp.startInterval, sp.minInterval, prog);
     const maxThreats = Math.round(Phaser.Math.Linear(sp.maxThreatsStart, sp.maxThreatsEnd, prog));
     this.spawnTimer -= rawDt;
-    if (this.spawnTimer <= 0 && this.threats.filter(t => !t.dead).length < maxThreats) {
+    if (this.spawnTimer <= 0 && !overtime && this.threats.filter(t => !t.dead).length < maxThreats) {
       this.spawnTimer = interval * (0.8 + Math.random() * 0.4);
       this.spawnThreat();
     }
 
     this.tankerTimer -= rawDt;
-    if (this.tankerTimer <= 0 && this.aliveTankers().length < sp.maxTankers) {
+    if (this.tankerTimer <= 0 && !overtime && this.aliveTankers().length < sp.maxTankers) {
       this.tankerTimer = sp.tankerInterval;
       this.spawnTanker();
     }
 
-    this.updateEvents(rawDt);
+    if (!overtime) this.updateEvents(rawDt);
+    this.updateTurret(rawDt, dt);
 
-    if (this.upgrades.ciws > 0) {
-      this.ciwsTimer -= rawDt;
-      if (this.ciwsTimer <= 0) {
-        this.ciwsTimer = TUNING.upgrades.ciwsBaseInterval - this.upgrades.ciws * TUNING.upgrades.ciwsIntervalStep;
-        const alive = this.threats.filter(t => !t.dead);
-        if (alive.length) {
-          const target = alive[0];
-          floatText(this, target.sprite.x, target.sprite.y - 50, 'CIWS', HEX.orange, 20);
-          this.intercept(target, false);
-        }
+    // AIR ASSISTANCE: the jet chases the nearest threat and intercepts on
+    // contact (rate-limited); with no threats up it loiters over the strait
+    if (this.upgrades.air > 0 && this.jet) {
+      const up = TUNING.upgrades;
+      this.airTimer = Math.max(0, this.airTimer - rawDt);
+      const alive = this.threats.filter(t => !t.dead);
+      let tx = GAME_W / 2;
+      let ty = 110 + Math.sin(this.waveT * 1.4) * 18;
+      let target: Threat | null = null;
+      if (alive.length) {
+        target = alive.reduce((a, b) =>
+          Phaser.Math.Distance.Between(this.jet!.x, this.jet!.y, a.sprite.x, a.sprite.y) <
+          Phaser.Math.Distance.Between(this.jet!.x, this.jet!.y, b.sprite.x, b.sprite.y)
+            ? a
+            : b
+        );
+        tx = target.sprite.x;
+        ty = target.sprite.y;
+      }
+      const jetSpeed = up.airSpeedBase + this.upgrades.air * up.airSpeedPerLevel;
+      const ang = Math.atan2(ty - this.jet.y, tx - this.jet.x);
+      const dist = Phaser.Math.Distance.Between(this.jet.x, this.jet.y, tx, ty);
+      const stepLen = Math.min(jetSpeed * dt, dist);
+      this.jet.x += Math.cos(ang) * stepLen;
+      this.jet.y += Math.sin(ang) * stepLen;
+      if (stepLen > 0.5) {
+        this.jet.setFlipY(Math.abs(ang) > Math.PI / 2);
+        this.jet.setRotation(ang);
+      }
+      if (target && dist < up.airInterceptDist && this.airTimer === 0) {
+        this.airTimer = up.airCooldownBase - this.upgrades.air * up.airCooldownStep;
+        floatText(this, target.sprite.x, target.sprite.y - 50, 'AIR INTERCEPT', HEX.orange, 20);
+        this.intercept(target, false);
       }
     }
 
@@ -997,6 +1504,49 @@ export class GameScene extends Phaser.Scene {
         }
         continue;
       }
+      if (th.type === 'patrol') {
+        // lane-bound: slides along its route spline, chasing the nearest
+        // tanker on the same lane; never cuts across open water or land
+        const ri = th.routeIdx!;
+        if (!th.target || th.target.dead || th.target.routeIdx !== ri) {
+          th.target = this.aliveTankers().find(tk => tk.routeIdx === ri) ?? null;
+        }
+        const dir = th.target ? Math.sign(th.target.dist - th.dist!) || -1 : -1;
+        th.dist = Phaser.Math.Clamp(th.dist! + dir * th.speed * dt, 0, this.routeLengths[ri]);
+        const p = this.routePoint(th.dist, ri);
+        // rotate to face the direction of travel along the lane, like tankers
+        // (art faces left, fallback faces right; dir can run the spline backwards)
+        const tan = this.routes[ri].getTangent(Phaser.Math.Clamp(th.dist / this.routeLengths[ri], 0, 1));
+        const heading = Math.atan2(tan.y * dir, tan.x * dir);
+        const rot = patrolFacesLeft ? heading + Math.PI : heading;
+        s.rotation = rot;
+        // keep the hull upright whichever way it sails
+        s.setFlipY(Math.abs(Phaser.Math.Angle.Wrap(rot)) > Math.PI / 2);
+        s.setPosition(p.x, p.y);
+        th.warnRing?.destroy();
+        th.warnRing = undefined;
+        if (th.target) {
+          const ring = this.add.graphics().setDepth(29);
+          const dTarget = Phaser.Math.Distance.Between(s.x, s.y, th.target.sprite.x, th.target.sprite.y);
+          const prog = Phaser.Math.Clamp(1 - dTarget / 500, 0, 1);
+          ring.lineStyle(5, PAL.red, 0.8);
+          ring.beginPath();
+          ring.arc(s.x, s.y - 50, 20, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2);
+          ring.strokePath();
+          th.warnRing = ring;
+          // spawn grace: freshly-arrived boats can't instantly sink a tanker
+          if (th.spawnGrace && th.spawnGrace > 0) th.spawnGrace -= dt;
+          else {
+            const d = Phaser.Math.Distance.Between(s.x, s.y, th.target.sprite.x, th.target.sprite.y);
+            if (d < TUNING.juice.hitDist) this.tankerHit(th.target, th);
+          }
+        } else if (th.dist <= 0) {
+          // sailed its whole lane with no prey — slips back out of the strait
+          th.dead = true;
+          s.destroy();
+        }
+        continue;
+      }
       let tx: number;
       let ty: number;
       if (th.type === 'missile') {
@@ -1038,22 +1588,6 @@ export class GameScene extends Phaser.Scene {
       s.y += Math.sin(ang + wob) * th.speed * dt;
       if (th.type === 'missile') s.rotation = ang + wob;
       if (th.type === 'drone') s.angle += 120 * dt;
-      if (th.type === 'patrol') {
-        // face the direction of travel (art faces left, fallback faces right)
-        const movingLeft = Math.cos(ang) < 0;
-        s.setFlipX(patrolFacesLeft ? !movingLeft : movingLeft);
-        th.warnRing?.destroy();
-        if (th.target) {
-          const ring = this.add.graphics().setDepth(29);
-          const dTarget = Phaser.Math.Distance.Between(s.x, s.y, tx, ty);
-          const prog = Phaser.Math.Clamp(1 - dTarget / 500, 0, 1);
-          ring.lineStyle(5, PAL.red, 0.8);
-          ring.beginPath();
-          ring.arc(s.x, s.y - 50, 20, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2);
-          ring.strokePath();
-          th.warnRing = ring;
-        }
-      }
       if (th.target && !th.target.dead) {
         const d = Phaser.Math.Distance.Between(s.x, s.y, th.target.sprite.x, th.target.sprite.y);
         if (d < TUNING.juice.hitDist) this.tankerHit(th.target, th);

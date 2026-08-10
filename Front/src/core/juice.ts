@@ -37,7 +37,7 @@ export function pressPulse(scene: Phaser.Scene, obj: Phaser.GameObjects.Componen
   });
 }
 
-/** Floating reward text ("−$0.50 OIL", "+5 DC"). */
+/** Floating reward text ("−$0.50 OIL", "+$5"). */
 export function floatText(
   scene: Phaser.Scene,
   x: number,

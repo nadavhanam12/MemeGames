@@ -35,6 +35,10 @@ for (const key of ['map2', 'flat2'] as const) {
   if (pts && pts.length > 1 && pts[0][0] < pts[pts.length - 1][0]) pts.reverse();
 }
 
+// Migration: the day/mission system moved the default day length 20 -> 45.
+// Stale dev overrides still carry the exact old default; bump only those.
+if (TUNING.dayNight.dayLengthSec === 20) TUNING.dayNight.dayLengthSec = 45;
+
 /** Mirror the current tuning into localStorage (dev only). */
 export function persistTuningLocal(): void {
   if (!import.meta.env.DEV) return;

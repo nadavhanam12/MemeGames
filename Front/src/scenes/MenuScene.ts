@@ -58,10 +58,11 @@ export class MenuScene extends Phaser.Scene {
     // the situation, in plain english
     const blurb = [
       'Iran is threatening to shut the Strait of Hormuz, the narrow sea lane',
-      'that carries a fifth of the world’s oil. Tap the incoming threats before',
-      'they sink the tankers — keep the oil moving and prices from exploding.'
+      'that carries a fifth of the world’s oil. Tap a threat and your gunner',
+      'shoots it down — hold for a full burst, but don’t overheat the gun.',
+      'Keep the tankers safe and complete each day’s mission for bonus cash.'
     ];
-    this.add.rectangle(cx, 300, 900, 160, PAL.ink, 0.75).setStrokeStyle(3, PAL.gold, 0.6);
+    this.add.rectangle(cx, 319, 900, 200, PAL.ink, 0.75).setStrokeStyle(3, PAL.gold, 0.6);
     blurb.forEach((line, i) => {
       this.add
         .text(cx, 262 + i * 38, line, {

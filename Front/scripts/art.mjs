@@ -59,6 +59,17 @@ async function processImage(asset) {
   produced.push(`${asset.name}.png`);
 }
 
+/** Turn a green-screen delivery into a transparent PNG buffer (with despill). */
+async function chromaKeyImage(src) {
+  const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    if (g > 90 && g > r * 1.4 && g > b * 1.4) data[i + 3] = 0;
+    else if (g > Math.max(r, b)) data[i + 1] = Math.max(r, b); // kill green fringe on edges
+  }
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+}
+
 async function processAtlas(asset) {
   const src = path.join(RAW, asset.file);
   const meta = await sharp(src).metadata();
@@ -68,12 +79,14 @@ async function processAtlas(asset) {
     );
     return;
   }
-  if (asset.alpha && !meta.hasAlpha) {
+  if (asset.alpha && !meta.hasAlpha && !asset.chromaKey) {
     errors.push(`${asset.file}: expected an alpha channel but none found — regenerate with a true transparent background`);
     return;
   }
+  // chromaKey: alpha is produced by keying out the backdrop, not delivered
+  const source = asset.chromaKey ? await chromaKeyImage(src) : src;
   for (const [frameName, f] of Object.entries(asset.frames)) {
-    const cell = await sharp(src)
+    const cell = await sharp(source)
       .extract({ left: f.x, top: f.y, width: f.w, height: f.h })
       .toBuffer();
     let img = sharp(cell);
@@ -92,10 +105,18 @@ async function processAtlas(asset) {
 }
 
 async function main() {
+  // `npm run art -- --only <name>` re-processes a single manifest asset
+  const onlyIdx = process.argv.indexOf('--only');
+  const only = onlyIdx !== -1 ? process.argv[onlyIdx + 1] : null;
   const manifest = JSON.parse(await readFile(path.join(root, 'assets', 'manifest.json'), 'utf8'));
+  if (only && !manifest.assets.some(a => a.name === only)) {
+    console.error(`--only ${only}: no such asset in manifest.json`);
+    process.exit(1);
+  }
   await mkdir(OUT, { recursive: true });
 
   for (const asset of manifest.assets) {
+    if (only && asset.name !== only) continue;
     const src = path.join(RAW, asset.file);
     if (!(await exists(src))) {
       warnings.push(`${asset.file}: not found in assets/raw/ — skipped (game falls back to programmatic art)`);
@@ -109,8 +130,15 @@ async function main() {
     }
   }
 
-  // index of available generated assets, read by the game's loader
-  const index = produced.map(p => p.split(' ')[0]);
+  // index of available generated assets, read by the game's loader.
+  // On --only runs, merge into the existing index instead of clobbering it.
+  let index = produced.map(p => p.split(' ')[0]);
+  if (only) {
+    try {
+      const prev = JSON.parse(await readFile(path.join(OUT, 'index.json'), 'utf8'));
+      index = [...new Set([...prev, ...index])];
+    } catch { /* no existing index — fresh write */ }
+  }
   await writeFile(path.join(OUT, 'index.json'), JSON.stringify(index, null, 2));
 
   // canonical game texture keys -> generated file (keep in sync with src/core/art.ts).
@@ -133,7 +161,19 @@ async function main() {
     charCommander: 'char_commander.png',
     charDealmaker: 'char_dealmaker.png',
     charSpokesperson: 'char_spokesperson.png',
-    charCaptain: 'char_captain.png'
+    charCaptain: 'char_captain.png',
+    trump_right_idle_1: 'trump_right_idle_1.png',
+    trump_right_idle_2: 'trump_right_idle_2.png',
+    trump_right_fire_1: 'trump_right_fire_1.png',
+    trump_right_fire_2: 'trump_right_fire_2.png',
+    trump_mid_idle_1: 'trump_mid_idle_1.png',
+    trump_mid_idle_2: 'trump_mid_idle_2.png',
+    trump_mid_fire_1: 'trump_mid_fire_1.png',
+    trump_mid_fire_2: 'trump_mid_fire_2.png',
+    trump_left_idle_1: 'trump_left_idle_1.png',
+    trump_left_idle_2: 'trump_left_idle_2.png',
+    trump_left_fire_1: 'trump_left_fire_1.png',
+    trump_left_fire_2: 'trump_left_fire_2.png'
   };
   const memesCfg = JSON.parse(await readFile(path.join(root, 'src', 'config', 'memes.json'), 'utf8'));
   for (const t of Object.values(memesCfg.templates)) ART_MAP[t.artKey] = t.artFile;

@@ -14,7 +14,10 @@
     "tankerInterval": 8,
     "maxTankers": 2,
     "speedRampPerMinute": 0.3,
-    "speedRampMax": 1.2
+    "speedRampMax": 1.2,
+    "firstHitSlowMult": 0.55,
+    "patrolEntryClearance": 200,
+    "patrolGraceSec": 1
   },
   "speeds": {
     "missile": 51,
@@ -43,29 +46,82 @@
     "eventWinCredits": 20
   },
   "upgrades": {
-    "jammerSlowPerLevel": 0.22,
-    "escortSpeedPerLevel": 0.15,
-    "ciwsBaseInterval": 7,
-    "ciwsIntervalStep": 1.5,
-    "jammerCosts": [
-      25,
-      45,
-      70
+    "airCooldownBase": 7.5,
+    "airCooldownStep": 1.2,
+    "airSpeedBase": 130,
+    "airSpeedPerLevel": 40,
+    "airInterceptDist": 55,
+    "hullHpPerLevel": 1,
+    "hullDamagedSpikeFactor": 0.5,
+    "goldBonusPerLevel": 0.25,
+    "airCosts": [
+      60,
+      120,
+      210,
+      340,
+      520
     ],
-    "ciwsCosts": [
-      30,
+    "hullCosts": [
       50,
-      80
+      100,
+      180,
+      300,
+      470
     ],
-    "escortCosts": [
-      20,
+    "goldCosts": [
       40,
-      65
+      90,
+      160,
+      270,
+      430
     ]
   },
+  "market": {
+    "baseAtStart": 0.92,
+    "perDollar": 0.01,
+    "nudgeTankerSafe": 0.04,
+    "nudgeBadNews": -0.08,
+    "nudgeMilestone": 0.06,
+    "nudgeCombo": 0.01,
+    "nudgeMax": 0.25,
+    "nudgeDecayPerSec": 0.35,
+    "lerpRate": 0.08,
+    "flashThreshold": 0.05,
+    "priceBigDelta": 3,
+    "priceColorHoldSec": 1.5,
+    "hotLow": 0.25,
+    "hotHigh": 0.9,
+    "dangerCap": 0.05
+  },
   "dayNight": {
-    "dayLengthSec": 20,
-    "nightMaxAlpha": 0.35
+    "dayLengthSec": 45,
+    "nightMaxAlpha": 0
+  },
+  "days": {
+    "breakSec": 6,
+    "threatUnlockDays": { "mine": 2, "patrol": 3, "armored": 5 },
+    "upgradeRevealDays": { "hull": 1, "gold": 2, "air": 3 },
+    "rewardCreditsBase": 15,
+    "rewardCreditsPerDay": 5,
+    "rewardScorePerDay": 20,
+    "escortQuotaBase": 2,
+    "escortQuotaPerDays": 4,
+    "interceptQuotaBase": 6,
+    "interceptQuotaPerDay": 2,
+    "comboTargetBase": 6,
+    "comboTargetPerDay": 2,
+    "priceMargin": 6
+  },
+  "turret": {
+    "x": 610,
+    "y": 660,
+    "bulletSpeed": 720,
+    "fireInterval": 0.13,
+    "lockRadius": 130,
+    "bulletHitRadius": 30,
+    "heatPerShot": 0.07,
+    "heatCoolPerSec": 0.35,
+    "overheatRecoverAt": 0.3
   },
   "juice": {
     "tapRadius": 80,

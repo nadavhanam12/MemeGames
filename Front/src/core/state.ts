@@ -16,8 +16,35 @@ export interface SessionStats {
   eventsWon: number;
   eventsLost: number;
   survivalTime: number;
+  milestoneBonus: number;
+  daysSurvived: number;
+  missionsCompleted: number;
   memeMoment: string;
   priceHistory: number[];
+}
+
+// Daily mission carried by EV.MISSION / resolved in the day-end summary.
+export type MissionType = 'price' | 'escort' | 'intercept' | 'perfect' | 'combo';
+
+export interface DayMission {
+  day: number;
+  type: MissionType;
+  text: string;
+  target: number;
+  progress: number;
+  done: boolean;
+}
+
+export interface DaySummary {
+  day: number;
+  missionText: string;
+  missionDone: boolean;
+  rewardCredits: number; // 0 when the mission failed
+  safe: number;
+  lost: number;
+  price: number;
+  priceDelta: number;
+  warnings: string[]; // pre-announcements for tomorrow's escalations
 }
 
 export function freshStats(): SessionStats {
@@ -36,6 +63,9 @@ export function freshStats(): SessionStats {
     eventsWon: 0,
     eventsLost: 0,
     survivalTime: 0,
+    milestoneBonus: 0,
+    daysSurvived: 0,
+    missionsCompleted: 0,
     memeMoment: '',
     priceHistory: [startPrice]
   };
@@ -46,7 +76,7 @@ export function freshStats(): SessionStats {
 export function computeScore(s: SessionStats): number {
   const delta = s.startPrice - s.oilPrice;
   // survival time is the backbone of the score in endless mode
-  return Math.max(0, Math.round(s.survivalTime * 2 + delta * 2 + s.tankersSafe * 6 - s.tankersLost * 8 + s.bestCombo));
+  return Math.max(0, Math.round(s.survivalTime * 2 + delta * 2 + s.tankersSafe * 6 - s.tankersLost * 8 + s.bestCombo + s.milestoneBonus));
 }
 
 // One global emitter for cross-scene events (HUD <-> gameplay).
@@ -58,10 +88,15 @@ export const EV = {
   PRICE: 'price-changed', // (newPrice, delta)
   CREDITS: 'credits-changed', // (credits, gain, x, y) world coords of source when gained
   COMBO: 'combo-changed', // (combo, milestone?)
-  HEADLINE: 'headline', // (text, tone: 'good'|'bad'|'event')
+  HEADLINE: 'headline', // (text, tone: 'good'|'bad'|'event', holdMs?)
   EVENT_PROB: 'event-prob', // (label, probability 0..1, active)
   EVENT_CARD: 'event-card', // (title, color)
-  THRESHOLD: 'price-threshold', // (label, tone)
+  MISSION: 'day-mission', // (DayMission) — assigned at day start, updated on progress
+  DAY_START: 'day-start', // (day, missionText, revealedUpgradeKeys)
+  DAY_END: 'day-end', // (DaySummary) — shown in the news band during the break
+  DAY_BREAK: 'day-break', // (secondsRemaining | null) — ticks during the frozen recap
+  UPGRADE_REVEAL: 'upgrade-reveal', // (upgradeKey) — button unlocks in the shop
+  MARKET_NUDGE: 'market-nudge', // (delta) — silent prediction-market push, no headline
   TIMER: 'timer', // (elapsedSeconds — survival time counts UP)
   DANGER: 'danger', // (secondsUntilMeltdown | null when cleared)
   GAME_OVER: 'game-over', // (stats)
@@ -76,20 +111,5 @@ export const COMBO_MILESTONES: Record<number, string> = {
   50: 'HORMUZ HAS ENTERED EASY MODE'
 };
 
-export const SAFE_HEADLINES = [
-  'GLOBAL COMMUTE SAVED, FOR NOW',
-  'TANKER ARRIVES; INTERNET CLAIMS CREDIT',
-  'OIL DROPS; ECONOMISTS BEGIN EXPLAINING WHY',
-  'THREE SHIPS SAFE: DIPLOMACY SOMEHOW WORKING',
-  'CAPTAIN SHRUGS, MARKETS SOAR',
-  'ANALYSTS STUNNED BY BOAT DOING ITS JOB',
-  'SHIPPING LANE DECLARED "FINE, PROBABLY"'
-];
-
-export const BAD_HEADLINES = [
-  'GROUP CHAT DEMANDS ANSWERS',
-  'SPOKESPERSON DENIES EVERYTHING, TWICE',
-  'MARKETS PANIC POLITELY',
-  'OIL SPIKES; BICYCLE SALES SURGE',
-  'EXPERTS AGREE: SOMETHING HAPPENED'
-];
+// The breaking-news band is reserved for the day system (summaries, intel
+// warnings, unlock reveals) — the old per-event headline pools are gone.

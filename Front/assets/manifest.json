@@ -282,6 +282,32 @@
         "meme_changemind_civilian": { "x": 0, "y": 1025, "w": 1024, "h": 694 },
         "meme_changemind_exec": { "x": 1024, "y": 1025, "w": 1024, "h": 694 }
       }
+    },
+    {
+      "name": "trump_gunner",
+      "file": "turret.png",
+      "kind": "atlas",
+      "size": [1448, 1086],
+      "alpha": true,
+      "chromaKey": "green",
+      "trim": false,
+      "pivot": "center",
+      "targetWidth": 220,
+      "use": "Player machine-gun turret at bottom-center: Trump caricature from behind. Delivered on a green screen (chromaKey strips it). 12 cells of 362x362, rows = aim direction (right/mid/left), cols = idle 1-2 then fire 1-2. trim:false on purpose — frames must keep identical geometry so pose swaps don't jitter.",
+      "frames": {
+        "trump_right_idle_1": { "x": 0, "y": 0, "w": 362, "h": 362 },
+        "trump_right_idle_2": { "x": 362, "y": 0, "w": 362, "h": 362 },
+        "trump_right_fire_1": { "x": 724, "y": 0, "w": 362, "h": 362 },
+        "trump_right_fire_2": { "x": 1086, "y": 0, "w": 362, "h": 362 },
+        "trump_mid_idle_1": { "x": 0, "y": 362, "w": 362, "h": 362 },
+        "trump_mid_idle_2": { "x": 362, "y": 362, "w": 362, "h": 362 },
+        "trump_mid_fire_1": { "x": 724, "y": 362, "w": 362, "h": 362 },
+        "trump_mid_fire_2": { "x": 1086, "y": 362, "w": 362, "h": 362 },
+        "trump_left_idle_1": { "x": 0, "y": 724, "w": 362, "h": 362 },
+        "trump_left_idle_2": { "x": 362, "y": 724, "w": 362, "h": 362 },
+        "trump_left_fire_1": { "x": 724, "y": 724, "w": 362, "h": 362 },
+        "trump_left_fire_2": { "x": 1086, "y": 724, "w": 362, "h": 362 }
+      }
     }
   ],
   "rejected": [

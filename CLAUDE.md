@@ -11,8 +11,16 @@ server.
   - `src/main.ts` — Phaser game bootstrap and scene registration.
   - `src/scenes/` — Boot, Menu, Game, UI, Results, Leaderboard scenes.
   - `src/core/` — game-side systems: `state.ts` (run state + `computeScore()`,
-    the canonical submitted score), `art.ts`, `juice.ts`, `sfx.ts`,
-    `palette.ts`, `settings.ts`.
+    the canonical submitted score, plus the `DayMission`/`DaySummary` types and
+    day-system bus events), `art.ts`, `juice.ts`, `sfx.ts`, `palette.ts`,
+    `settings.ts`.
+  - **Day/mission system**: each 45s "day" (`tuning.json` → `dayNight.dayLengthSec`)
+    is a mini-level with one rolled mission (price / escort / intercept / combo /
+    perfect). `GameScene.startDay/endDay` drive it; between days the world
+    freezes (`dayBreakT`) while the breaking-news band plays the recap + intel
+    warnings. Threats and upgrades unlock by day (`tuning.json` → `days`).
+    The news band is **reserved for day-system news** — per-event gameplay
+    headlines were removed; silent market nudges use `EV.MARKET_NUDGE`.
   - `src/config/` — `tuning.ts` + `tuning.json` (gameplay values),
     `layout.json` (UI layout), `memes.json` (meme reaction library: templates,
     slot geometry, per-trigger caption variants — picked/rendered by
