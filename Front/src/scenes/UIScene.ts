@@ -4,6 +4,7 @@ import { settings } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { MemeContext, MEMES, pickMeme, renderMeme } from '../core/memes';
 import { hasArt } from '../core/art';
+import { getUnlockedTemplates } from '../core/memeUnlocks';
 import { EASE, confetti, countTo, floatText, popIn, pressPulse } from '../core/juice';
 import { DayMission, DaySummary, EV, SessionStats, bus } from '../core/state';
 import { TUNING } from '../config/tuning';
@@ -675,8 +676,8 @@ export class UIScene extends Phaser.Scene {
           targets: coin,
           x: m.tx - 30,
           y: m.ty,
-          delay: i * 60,
-          duration: 420,
+          delay: i * 100,
+          duration: 750,
           ease: 'Cubic.easeIn',
           onComplete: () => {
             coin.destroy();
@@ -884,11 +885,76 @@ export class UIScene extends Phaser.Scene {
     );
     for (const warn of s.warnings) this.onHeadline(warn, 'event', 2600);
     if (!s.missionDone) this.graphFlash = 1;
-    if (s.newMemesUnlocked.length) {
-      this.showNewUnlocksPopup(s.newMemesUnlocked, () => this.showDaySummaryPanel(s, delta));
-    } else {
-      this.showDaySummaryPanel(s, delta);
+    this.showDayCompletePanel(s.day, () => {
+      if (s.newMemesUnlocked.length) {
+        this.showNewUnlocksPopup(s.newMemesUnlocked, () => this.showDaySummaryPanel(s, delta));
+      } else {
+        this.showDaySummaryPanel(s, delta);
+      }
+    });
+  }
+
+  /** Fades a modal container out (quick shrink + alpha), destroys it, then
+   *  chains into the next step of the day-end flow. Instant under reduced motion. */
+  private fadeOutModal(c: Phaser.GameObjects.Container, onDone: () => void): void {
+    if (settings.reducedMotion) {
+      c.destroy();
+      onDone();
+      return;
     }
+    this.tweens.add({
+      targets: c,
+      alpha: 0,
+      scaleX: 0.92,
+      scaleY: 0.92,
+      duration: 180,
+      ease: EASE.pop,
+      onComplete: () => {
+        c.destroy();
+        onDone();
+      }
+    });
+  }
+
+  /** Brief "DAY X COMPLETED!" splash shown the moment a day ends, before the
+   *  meme-unlocks popup / recap+shop panel. Auto-advances; tap to skip early. */
+  private showDayCompletePanel(day: number, onDone: () => void): void {
+    this.registry.set('ui-modal', true);
+    const cx = GAME_W / 2;
+    const cy = GAME_H / 2;
+    const c = this.add.container(cx, cy).setDepth(1800);
+    c.add(this.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.7));
+    const panel = this.add.container(0, 0);
+    c.add(panel);
+    panel.add(this.add.rectangle(0, 0, 560, 200, PAL.ink, 0.97).setStrokeStyle(4, PAL.gold, 0.9));
+    panel.add(
+      this.add
+        .text(0, -30, `DAY ${day} COMPLETED!`, { fontFamily: FONT_DISPLAY, fontSize: '40px', color: HEX.gold })
+        .setOrigin(0.5)
+    );
+    panel.add(
+      this.add
+        .text(0, 30, 'WELL DONE', { fontFamily: FONT_DISPLAY, fontSize: '24px', color: HEX.cream })
+        .setOrigin(0.5)
+    );
+    popIn(this, panel, 250);
+    sfx.fanfare();
+
+    c.setSize(GAME_W, GAME_H);
+    c.setInteractive({ useHandCursor: true });
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
+      this.fadeOutModal(c, onDone);
+    };
+    c.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+      ev.stopPropagation();
+      sfx.tap();
+      dismiss();
+    });
+    const holdMs = import.meta.env.DEV && devState.autoPlay === 'full' ? 900 / devState.speedMultiplier : 1600;
+    this.time.delayedCall(holdMs, dismiss);
   }
 
   /** Interstitial shown before the day-end shop panel when at least one meme
@@ -960,8 +1026,7 @@ export class UIScene extends Phaser.Scene {
       if (dismissed) return;
       dismissed = true;
       sfx.tap();
-      c.destroy();
-      onDone();
+      this.fadeOutModal(c, onDone);
     };
     c.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
       ev.stopPropagation();
@@ -1018,6 +1083,69 @@ export class UIScene extends Phaser.Scene {
     return h;
   }
 
+  /** Day-end recap card for the meme collection: thumbnails of every template
+   *  unlocked today plus the overall gallery tally. Returns the card's height. */
+  private buildMemesCard(
+    parent: Phaser.GameObjects.Container,
+    y: number,
+    width: number,
+    newIds: string[]
+  ): number {
+    const shown = newIds.filter(id => MEMES.templates[id]).slice(0, 8);
+    const thumbH = shown.length ? 64 : 0;
+    const h = 20 + thumbH + (shown.length ? 8 : 0) + 20 + 8;
+    const card = this.add.container(0, y + h / 2);
+    card.add(this.add.rectangle(0, 0, width, h, 0x22303e, 0.9).setStrokeStyle(3, PAL.gold, 0.85));
+    card.add(
+      this.add
+        .text(-width / 2 + 18, -h / 2 + 15, 'MEMES', {
+          fontFamily: FONT_SANS,
+          fontSize: '12px',
+          fontStyle: 'bold',
+          color: '#AAB4BD'
+        })
+        .setOrigin(0, 0.5)
+    );
+    if (shown.length) {
+      const gap = 12;
+      const widths = shown.map(id => Math.max(36, Math.round(thumbH / MEMES.templates[id].aspect)));
+      const rowW = widths.reduce((a, b) => a + b + gap, -gap);
+      let x = -rowW / 2;
+      const rowY = -h / 2 + 20 + thumbH / 2;
+      shown.forEach((id, i) => {
+        const tpl = MEMES.templates[id];
+        const w = widths[i];
+        const thumb = this.add.container(x + w / 2, rowY);
+        if (hasArt(this, tpl.artKey)) {
+          thumb.add(this.add.image(0, 0, tpl.artKey).setDisplaySize(w, thumbH));
+        } else {
+          thumb.add(this.add.rectangle(0, 0, w, thumbH, 0x39424e));
+        }
+        thumb.add(this.add.rectangle(0, 0, w, thumbH).setStrokeStyle(2, PAL.gold));
+        card.add(thumb);
+        x += w + gap;
+      });
+    }
+    const total = Object.keys(MEMES.templates).length;
+    const unlocked = getUnlockedTemplates().size;
+    const tallyText = shown.length
+      ? `+${newIds.length} NEW TODAY · COLLECTION: ${unlocked}/${total}`
+      : `NO NEW MEMES TODAY · COLLECTION: ${unlocked}/${total}`;
+    card.add(
+      this.add
+        .text(0, h / 2 - 16, tallyText, {
+          fontFamily: FONT_SANS,
+          fontSize: '14px',
+          fontStyle: 'bold',
+          color: shown.length ? HEX.gold : HEX.cream
+        })
+        .setOrigin(0.5)
+    );
+    parent.add(card);
+    popIn(this, card, 220);
+    return h;
+  }
+
   /** Frozen-world recap + shop screen, covering 80% of the game window; the only
    *  time upgrades are purchasable. Waits for the player to click NEXT DAY. */
   private showDaySummaryPanel(s: DaySummary, delta: string): void {
@@ -1061,19 +1189,16 @@ export class UIScene extends Phaser.Scene {
     ], PAL.gold);
     y += 8;
 
-    // section 3 — intel (warnings + unlocks), only when there's something to show
-    const intelLines: { text: string; color: string; size?: string }[] = [
-      ...s.warnings.map(w => ({ text: `⚠ ${w}`, color: '#F2D8FF', size: '13px' })),
-      ...(s.newMemesUnlocked.length
-        ? [
-            {
-              text: `🎉 ${s.newMemesUnlocked.length} NEW MEME${s.newMemesUnlocked.length > 1 ? 'S' : ''} UNLOCKED TODAY`,
-              color: HEX.gold,
-              size: '13px'
-            }
-          ]
-        : [])
-    ];
+    // section 3 — memes: today's newly collected templates + overall collection tally
+    y += this.buildMemesCard(panel, y, cardW, s.newMemesUnlocked);
+    y += 8;
+
+    // section 4 — intel (warnings), only when there's something to show
+    const intelLines: { text: string; color: string; size?: string }[] = s.warnings.map(w => ({
+      text: `⚠ ${w}`,
+      color: '#F2D8FF',
+      size: '13px'
+    }));
     if (intelLines.length) {
       y += this.buildSummaryCard(panel, y, cardW, 'INTEL', intelLines, PAL.purple);
     }
