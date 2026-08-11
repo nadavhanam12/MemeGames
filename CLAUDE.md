@@ -9,11 +9,11 @@ server.
 
 - `Front/` — Hormuz Hold'em client (the only game so far).
   - `src/main.ts` — Phaser game bootstrap and scene registration.
-  - `src/scenes/` — Boot, Menu, Game, UI, Results, Leaderboard scenes.
+  - `src/scenes/` — Boot, Menu, Game, UI, Results, Leaderboard, Gallery scenes.
   - `src/core/` — game-side systems: `state.ts` (run state + `computeScore()`,
     the canonical submitted score, plus the `DayMission`/`DaySummary` types and
     day-system bus events), `art.ts`, `juice.ts`, `sfx.ts`, `palette.ts`,
-    `settings.ts`.
+    `settings.ts`, `memeUnlocks.ts` (persisted meme-collection progress).
   - **Day/mission system**: each 45s "day" (`tuning.json` → `dayNight.dayLengthSec`)
     is a mini-level with one rolled mission (price / escort / intercept / combo /
     perfect). `GameScene.startDay/endDay` drive it; between days the world
@@ -21,6 +21,21 @@ server.
     warnings. Threats and upgrades unlock by day (`tuning.json` → `days`).
     The news band is **reserved for day-system news** — per-event gameplay
     headlines were removed; silent market nudges use `EV.MARKET_NUDGE`.
+  - **Meme collection system**: `src/core/memeUnlocks.ts` persists which meme
+    templates have ever fired (localStorage `hormuz-memes-v1`, per-account like
+    `src/backend/`), populated by `pickMeme()` in `src/core/memes.ts`.
+    `GameScene.startDay/endDay` track same-day unlocks (`resetDayUnlocks`/
+    `getDayUnlocks`) and attach them to `DaySummary.newMemesUnlocked`;
+    `UIScene.showNewUnlocksPopup` shows them as an interstitial before the
+    day-end shop panel. `src/scenes/GalleryScene.ts` ('Gallery') is a paged
+    grid of every template in `memes.json` — full color once unlocked, grey
+    while locked — reachable from the Menu and from Results (`GALLERY x/y`
+    button). Results (`src/scenes/ResultsScene.ts`) is a minimal recap:
+    score + days survived + this run's new unlocks (`getRunUnlocks()` in
+    `memeUnlocks.ts`, reset at run start next to `resetMemeLog()`), with
+    slide-in entrance and a shared slide-out exit before every scene change;
+    score submission auto-flows into the leaderboard once per run. The tile list is read live from `MEMES.templates`, so adding or
+    removing a meme in `memes.json` needs no code change to the gallery.
   - `src/config/` — `tuning.ts` + `tuning.json` (gameplay values),
     `layout.json` (UI layout), `memes.json` (meme reaction library: templates,
     slot geometry, per-trigger caption variants — picked/rendered by

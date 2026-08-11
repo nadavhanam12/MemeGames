@@ -17,11 +17,13 @@
     "speedRampMax": 1.2,
     "firstHitSlowMult": 0.55,
     "patrolEntryClearance": 200,
-    "patrolGraceSec": 1
+    "patrolGraceSec": 1,
+    "targetableEdgeFrac": 0.05,
+    "mineMinReactSec": 3
   },
   "speeds": {
     "missile": 51,
-    "drone": 27,
+    "drone": 42,
     "mine": 32,
     "patrol": 45,
     "tankerMin": 20,
@@ -48,6 +50,7 @@
   "upgrades": {
     "airCooldownBase": 7.5,
     "airCooldownStep": 1.2,
+    "airCooldownMin": 0.8,
     "airSpeedBase": 130,
     "airSpeedPerLevel": 40,
     "airFireDist": 190,
@@ -60,21 +63,36 @@
       120,
       210,
       340,
-      520
+      520,
+      760,
+      1070,
+      1460,
+      1940,
+      2520
     ],
     "hullCosts": [
       50,
       100,
       180,
       300,
-      470
+      470,
+      700,
+      1000,
+      1380,
+      1850,
+      2420
     ],
     "goldCosts": [
       40,
       90,
       160,
       270,
-      430
+      430,
+      650,
+      940,
+      1310,
+      1770,
+      2330
     ]
   },
   "market": {

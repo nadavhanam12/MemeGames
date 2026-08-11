@@ -119,19 +119,35 @@ export class MenuScene extends Phaser.Scene {
       });
 
     // global leaderboard (backend-driven)
-    const lb = this.add.container(cx, 600);
-    const lbBg = this.add.rectangle(0, 0, 260, 70, PAL.ocean).setStrokeStyle(6, PAL.ink);
+    const lb = this.add.container(cx - 140, 600);
+    const lbBg = this.add.rectangle(0, 0, 250, 70, PAL.ocean).setStrokeStyle(6, PAL.ink);
     const lbTxt = this.add
-      .text(0, 0, 'LEADERBOARD', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.cream })
+      .text(0, 0, 'LEADERBOARD', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.cream })
       .setOrigin(0.5);
     lb.add([lbBg, lbTxt]);
-    lb.setSize(260, 70);
+    lb.setSize(250, 70);
     lb.setInteractive({ useHandCursor: true });
     lb.on('pointerdown', () => {
       sfx.unlock();
       sfx.tap();
       pressPulse(this, lb);
       this.scene.start('Leaderboard', { from: 'Menu' });
+    });
+
+    // meme collection gallery
+    const gallery = this.add.container(cx + 140, 600);
+    const galleryBg = this.add.rectangle(0, 0, 250, 70, PAL.purple).setStrokeStyle(6, PAL.ink);
+    const galleryTxt = this.add
+      .text(0, 0, 'MEME GALLERY', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.cream })
+      .setOrigin(0.5);
+    gallery.add([galleryBg, galleryTxt]);
+    gallery.setSize(250, 70);
+    gallery.setInteractive({ useHandCursor: true });
+    gallery.on('pointerdown', () => {
+      sfx.unlock();
+      sfx.tap();
+      pressPulse(this, gallery);
+      this.scene.start('Gallery', { from: 'Menu' });
     });
 
     start.on('pointerdown', () => {

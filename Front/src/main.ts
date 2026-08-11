@@ -6,6 +6,7 @@ import { GameScene } from './scenes/GameScene';
 import { UIScene } from './scenes/UIScene';
 import { ResultsScene } from './scenes/ResultsScene';
 import { LeaderboardScene } from './scenes/LeaderboardScene';
+import { GalleryScene } from './scenes/GalleryScene';
 import { initDevtools } from './dev/devtools';
 
 const game = new Phaser.Game({
@@ -21,7 +22,7 @@ const game = new Phaser.Game({
   input: {
     activePointers: 3
   },
-  scene: [BootScene, MenuScene, GameScene, UIScene, ResultsScene, LeaderboardScene]
+  scene: [BootScene, MenuScene, GameScene, UIScene, ResultsScene, LeaderboardScene, GalleryScene]
 });
 
 initDevtools(game);

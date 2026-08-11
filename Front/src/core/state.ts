@@ -45,6 +45,7 @@ export interface DaySummary {
   price: number;
   priceDelta: number;
   warnings: string[]; // pre-announcements for tomorrow's escalations
+  newMemesUnlocked: string[]; // template ids seen for the first time ever, today
 }
 
 export function freshStats(): SessionStats {

@@ -4,6 +4,7 @@ import { settings, vibrate } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
 import { MemeContext, MEMES, resetMemeLog } from '../core/memes';
+import { getDayUnlocks, resetDayUnlocks, resetRunUnlocks } from '../core/memeUnlocks';
 import { TUNING, persistTuningLocal } from '../config/tuning';
 import { devState } from '../dev/state';
 import { leaderboard } from '../backend/leaderboard';
@@ -80,6 +81,7 @@ export class GameScene extends Phaser.Scene {
   private threats: Threat[] = [];
   private routes: Phaser.Curves.Spline[] = [];
   private routeLengths: number[] = [];
+  private targetWindows: Array<{ min: number; max: number }> = [];
   private elapsed = 0;
   private worldScale = 1;
   private spawnTimer = 0;
@@ -162,6 +164,7 @@ export class GameScene extends Phaser.Scene {
     leaderboard.beginRun();
     analytics.startRun();
     resetMemeLog();
+    resetRunUnlocks();
     this.stats = freshStats();
     this.tankers = [];
     this.threats = [];
@@ -258,6 +261,32 @@ export class GameScene extends Phaser.Scene {
     const sets = this.routeSets();
     this.routes = sets.map(set => new Phaser.Curves.Spline(set.map(([x, y]) => new Phaser.Math.Vector2(x, y))));
     this.routeLengths = this.routes.map(r => r.getLength());
+    // targetable window per route: routes extend past the visible world on
+    // both ends (ships enter/exit off-screen), and a tanker is fair game only
+    // while the player can see it and react — inside the on-screen stretch of
+    // its route, minus targetableEdgeFrac at each visible end
+    this.targetWindows = this.routes.map((r, i) => {
+      const len = this.routeLengths[i];
+      const n = 200;
+      let first = -1;
+      let last = -1;
+      for (let s = 0; s <= n; s++) {
+        const p = r.getPoint(s / n);
+        if (p.x >= 0 && p.x <= GAME_W && p.y >= 0 && p.y <= GAME_H) {
+          if (first < 0) first = (s / n) * len;
+          last = (s / n) * len;
+        }
+      }
+      if (first < 0) return { min: 0, max: len };
+      const margin = (last - first) * TUNING.spawn.targetableEdgeFrac;
+      return { min: first + margin, max: last - margin };
+    });
+  }
+
+  /** True while a tanker is inside its route's targetable window. */
+  private targetable(tk: Tanker): boolean {
+    const w = this.targetWindows[tk.routeIdx];
+    return tk.dist >= w.min && tk.dist <= w.max;
   }
 
   /** Rebuild the spline and redraw its overlay (used live by the route editor). */
@@ -422,16 +451,21 @@ export class GameScene extends Phaser.Scene {
     const routeIdx = Phaser.Math.Between(0, this.routes.length - 1);
     const start = this.routePoint(0, routeIdx);
     const sprite = this.add.image(start.x, start.y, key).setDepth(20);
+    // slow omnidirectional foam emitted at the stern — the ship's own motion
+    // draws the trail; followOffset is re-aimed astern every frame in the
+    // tanker update loop (a fixed offset drifts to the ship's side once the
+    // route curves)
+    const tan0 = this.routes[routeIdx].getTangent(0).normalize();
     const wake = this.add.particles(0, 0, 'dot', {
-      speed: { min: 10, max: 30 },
-      angle: { min: 160, max: 200 },
+      speed: { min: 4, max: 14 },
+      angle: { min: 0, max: 360 },
       scale: { start: 0.7, end: 0 },
       alpha: { start: 0.5, end: 0 },
       lifespan: 700,
       frequency: 70,
       tint: 0xffffff,
       follow: sprite,
-      followOffset: { x: this.routes[routeIdx].getTangent(0).x < 0 ? sprite.width / 2 : -sprite.width / 2, y: 8 }
+      followOffset: { x: -tan0.x * sprite.width * 0.5, y: -tan0.y * sprite.width * 0.5 }
     }).setDepth(15);
     const sp = TUNING.speeds;
     // VIP sails at normal tanker speed — same random range as everyone else
@@ -467,7 +501,11 @@ export class GameScene extends Phaser.Scene {
     if (this.day >= unlock.mine) pool.push('mine');
     if (this.day >= unlock.patrol) pool.push('patrol');
     const t = type ?? Phaser.Math.RND.pick(pool);
-    const target = this.aliveTankers()[0] ?? null;
+    // only tankers inside the targetable window are fair game — off-screen
+    // ships (entering or leaving) and the 5% edges of the visible stretch
+    // can't be locked, so every attack is one the player can see and answer
+    const viable = this.aliveTankers().filter(tk => this.targetable(tk));
+    const target = viable[0] ?? null;
 
     let sprite: Phaser.GameObjects.Image;
     let speed = 60;
@@ -500,11 +538,20 @@ export class GameScene extends Phaser.Scene {
           const p = this.routes[ri].getPoint(tt);
           const tan = this.routes[ri].getTangent(tt).normalize();
           const off = Phaser.Math.Between(-75, 75);
-          x = p.x - tan.y * off;
-          y = p.y + tan.x * off;
-          placed = !this.aliveTankers().some(
-            tk => Phaser.Math.Distance.Between(x, y, tk.sprite.x, tk.sprite.y) < TUNING.juice.mineActivateDist
-          );
+          x = Phaser.Math.Clamp(p.x - tan.y * off, 60, GAME_W - 60);
+          y = Phaser.Math.Clamp(p.y + tan.x * off, 60, GAME_H - 60);
+          const mineDist = tt * this.routeLengths[ri];
+          placed = !this.aliveTankers().some(tk => {
+            // radius check: never surface within arming range of anyone
+            if (Phaser.Math.Distance.Between(x, y, tk.sprite.x, tk.sprite.y) < TUNING.juice.mineActivateDist) {
+              return true;
+            }
+            // path check: a same-lane tanker sailing toward the mine must have
+            // at least mineMinReactSec of sailing time before it arms
+            if (tk.routeIdx !== ri) return false;
+            const ahead = mineDist - tk.dist;
+            return ahead > 0 && ahead < tk.speed * TUNING.spawn.mineMinReactSec + TUNING.juice.mineActivateDist;
+          });
         }
         if (!placed) return; // no safe water this tick — skip the spawn
         sprite = this.add.image(x, y, 'mine');
@@ -553,7 +600,7 @@ export class GameScene extends Phaser.Scene {
       threat.dist = this.routeLengths[patrolRoute] - 1;
       threat.spawnGrace = TUNING.spawn.patrolGraceSec;
       // only tankers on its own lane are reachable
-      threat.target = this.aliveTankers().find(tk => tk.routeIdx === patrolRoute) ?? null;
+      threat.target = this.aliveTankers().find(tk => tk.routeIdx === patrolRoute && this.targetable(tk)) ?? null;
     }
     if (t === 'missile') {
       // ballistic launch: lock an impact point NOW — the predicted tanker
@@ -1122,6 +1169,7 @@ export class GameScene extends Phaser.Scene {
   private startDay(n: number): void {
     if (this.over) return;
     this.day = n;
+    resetDayUnlocks();
     this.dayCounters = { priceAtStart: this.stats.oilPrice, safe: 0, lost: 0, intercepts: 0, bestCombo: 0 };
     const reveals: Array<'air' | 'hull' | 'gold'> = [];
     for (const key of ['air', 'hull', 'gold'] as const) {
@@ -1212,7 +1260,8 @@ export class GameScene extends Phaser.Scene {
       lost: this.dayCounters.lost,
       price: Math.round(this.stats.oilPrice),
       priceDelta: Math.round(this.stats.oilPrice - this.dayCounters.priceAtStart),
-      warnings: this.warningsFor(this.day + 1)
+      warnings: this.warningsFor(this.day + 1),
+      newMemesUnlocked: getDayUnlocks()
     });
     analytics.track('day_end', {
       day: this.day,
@@ -1442,6 +1491,29 @@ export class GameScene extends Phaser.Scene {
     g.strokeRoundedRect(x - 2, y - h - 2, w + 4, h + 4, 4);
   }
 
+  // ------------------------------------------------------------- dev autoplay
+  /** Dev-only bot: fires at whichever live threat is closest to hitting its
+   *  target (or the turret, if it has none), on the normal fire cooldown. */
+  private devAutoPlayFire(): void {
+    if (this.over || this.awaitingNextDay || this.overheated || this.fireTimer > 0) return;
+    const tu = TUNING.turret;
+    let best: Threat | null = null;
+    let bestScore = Infinity;
+    for (const th of this.threats) {
+      if (th.dead) continue;
+      const score = th.target
+        ? Phaser.Math.Distance.Between(th.sprite.x, th.sprite.y, th.target.sprite.x, th.target.sprite.y)
+        : Phaser.Math.Distance.Between(th.sprite.x, th.sprite.y, tu.x, tu.y) + 400; // deprioritize idle threats
+      if (score < bestScore) {
+        bestScore = score;
+        best = th;
+      }
+    }
+    if (!best) return;
+    this.fireTimer = tu.fireInterval;
+    this.fireShot(best.sprite.x, best.sprite.y);
+  }
+
   // ------------------------------------------------------------- slow motion
   private slowMo(scale: number, ms: number): void {
     if (settings.reducedMotion) return;
@@ -1453,7 +1525,8 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, deltaMs: number): void {
     this.drawWaves();
     if (this.over) return;
-    const rawDt = Math.min(deltaMs / 1000, 0.05);
+    const speed = import.meta.env.DEV ? devState.speedMultiplier : 1;
+    const rawDt = Math.min(deltaMs / 1000, 0.05) * speed;
     const dt = rawDt * this.worldScale;
 
     // end-of-day break: the whole world freezes (ships, threats, prices, gun)
@@ -1554,6 +1627,7 @@ export class GameScene extends Phaser.Scene {
 
     if (!overtime) this.updateEvents(rawDt);
     this.updateTurret(rawDt, dt);
+    if (import.meta.env.DEV && devState.autoPlay !== 'off') this.devAutoPlayFire();
 
     // AIR ASSISTANCE: the jet chases the nearest threat and intercepts on
     // contact (rate-limited); with no threats up it loiters over the strait
@@ -1587,7 +1661,7 @@ export class GameScene extends Phaser.Scene {
         this.jet.setRotation(ang);
       }
       if (target && dist < up.airFireDist && this.airTimer === 0) {
-        this.airTimer = up.airCooldownBase - this.upgrades.air * up.airCooldownStep;
+        this.airTimer = Math.max(up.airCooldownMin, up.airCooldownBase - this.upgrades.air * up.airCooldownStep);
         floatText(this, target.sprite.x, target.sprite.y - 50, 'AIR INTERCEPT', HEX.orange, 20);
         const spr = this.add.image(this.jet.x, this.jet.y, 'tracerGen').setDepth(55);
         spr.setRotation(Math.atan2(target.sprite.y - this.jet.y, target.sprite.x - this.jet.x));
@@ -1619,6 +1693,8 @@ export class GameScene extends Phaser.Scene {
       const heading = Math.atan2(tan.y, tan.x);
       t.sprite.setPosition(p.x, p.y + Math.sin(this.waveT * 2 + t.dist / 90) * 2);
       t.sprite.rotation = heading + Math.sin(this.waveT * 2 + t.dist / 90) * 0.02;
+      // keep the foam at the stern as the route curves
+      t.wake.followOffset.set(-tan.x * t.sprite.width * 0.5, -tan.y * t.sprite.width * 0.5);
       // keep the hull upright when sailing right -> left
       t.sprite.setFlipY(Math.abs(Phaser.Math.Angle.Wrap(heading)) > Math.PI / 2);
     }
@@ -1659,8 +1735,8 @@ export class GameScene extends Phaser.Scene {
         // lane-bound: slides along its route spline, chasing the nearest
         // tanker on the same lane; never cuts across open water or land
         const ri = th.routeIdx!;
-        if (!th.target || th.target.dead || th.target.routeIdx !== ri) {
-          th.target = this.aliveTankers().find(tk => tk.routeIdx === ri) ?? null;
+        if (!th.target || th.target.dead || th.target.routeIdx !== ri || !this.targetable(th.target)) {
+          th.target = this.aliveTankers().find(tk => tk.routeIdx === ri && this.targetable(tk)) ?? null;
         }
         const dir = th.target ? Math.sign(th.target.dist - th.dist!) || -1 : -1;
         th.dist = Phaser.Math.Clamp(th.dist! + dir * th.speed * dt, 0, this.routeLengths[ri]);
@@ -1722,12 +1798,13 @@ export class GameScene extends Phaser.Scene {
           }
           continue;
         }
-      } else if (th.target && !th.target.dead) {
+      } else if (th.target && !th.target.dead && this.targetable(th.target)) {
         tx = th.target.sprite.x;
         ty = th.target.sprite.y;
       } else {
-        // other threats hunt for a new tanker
-        th.target = this.aliveTankers()[0] ?? null;
+        // other threats hunt for a new tanker (drop locks that sailed out of
+        // the targetable window — no chasing ships off-screen)
+        th.target = this.aliveTankers().find(tk => this.targetable(tk)) ?? null;
         const fb = this.routes[0].getPoint(0.5);
         tx = th.target ? th.target.sprite.x : fb.x;
         ty = th.target ? th.target.sprite.y : fb.y;

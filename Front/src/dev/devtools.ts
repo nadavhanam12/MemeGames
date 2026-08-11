@@ -68,6 +68,9 @@ const TIPS: Record<string, string> = {
   'Editors.pauseGame': 'Freeze the gameplay scene (timer, threats, tankers). HUD stays live. Toggle off to resume.',
   'Editors.layoutEdit': 'Drag HUD groups to move them; mouse-wheel over one to scale. Gameplay taps are disabled while on.',
   'Editors.routeEdit': 'Drag the purple waypoints to reshape the tanker shipping route live.',
+  'Editors.speedX2': 'Doubles the gameplay simulation speed (spawns, movement, day timer). Visual FX stay normal speed.',
+  'Editors.autoPlay':
+    'off = manual play. gameplay = bot auto-fires at threats but leaves each day-summary screen (shop, next day) to you. full = bot also buys upgrades and clicks through days on its own.',
   '_.saveToDisk': 'Write current tuning + layout into src/config/*.json — makes tweaks permanent project defaults.',
   '_.restartGame': 'Restart the current run to feel tuning changes from t=0.',
   '_.forceLoss': 'Instantly end the run (market meltdown) to test the Results screen and leaderboard submit flow.',
@@ -221,7 +224,9 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
   const editorState = {
     pauseGame: false,
     layoutEdit: devState.layoutEdit,
-    routeEdit: devState.routeEdit
+    routeEdit: devState.routeEdit,
+    speedX2: devState.speedMultiplier === 2,
+    autoPlay: devState.autoPlay
   };
   tipped(
     editors
@@ -249,6 +254,26 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
     }),
     'Editors',
     'routeEdit'
+  );
+  tipped(
+    editors
+      .add(editorState, 'speedX2')
+      .name('⏩ 2x speed')
+      .onChange((v: boolean) => {
+        devState.speedMultiplier = v ? 2 : 1;
+      }),
+    'Editors',
+    'speedX2'
+  );
+  tipped(
+    editors
+      .add(editorState, 'autoPlay', ['off', 'gameplay', 'full'])
+      .name('🤖 Autoplay')
+      .onChange((v: 'off' | 'gameplay' | 'full') => {
+        devState.autoPlay = v;
+      }),
+    'Editors',
+    'autoPlay'
   );
 
   const actions = {

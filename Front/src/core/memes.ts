@@ -5,6 +5,7 @@
 import Phaser from 'phaser';
 import { hasArt } from './art';
 import { FONT_SANS } from './palette';
+import { recordMemeShown } from './memeUnlocks';
 import DATA from '../config/memes.json';
 
 export interface MemeSlot {
@@ -232,6 +233,7 @@ export function pickMeme(label: string, ctx?: MemeContext): MemePick {
 
   const v = weightedPick(eligible, ctx) ?? MEMES.fallback[0];
   lastTemplate = v.t;
+  recordMemeShown(v.t);
   const captions = v.c.map(c => substituteTokens(c, ctx));
   memeLog.push({ t: v.t, c: captions });
   if (memeLog.length > 30) memeLog.shift();

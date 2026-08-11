@@ -3,10 +3,12 @@ import { FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL, VIEW } from '../core
 import { settings } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { MemeContext, MEMES, pickMeme, renderMeme } from '../core/memes';
-import { EASE, countTo, floatText, popIn, pressPulse } from '../core/juice';
+import { hasArt } from '../core/art';
+import { EASE, confetti, countTo, floatText, popIn, pressPulse } from '../core/juice';
 import { DayMission, DaySummary, EV, SessionStats, bus } from '../core/state';
 import { TUNING } from '../config/tuning';
 import { registerLayout } from '../dev/layout';
+import { devState } from '../dev/state';
 
 interface UpgradeDef {
   key: 'air' | 'hull' | 'gold';
@@ -534,17 +536,24 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** Builds one upgrade card inside the day-end recap/shop screen. */
-  private buildUpgradeCard(parent: Phaser.GameObjects.Container, u: UpgradeDef, x: number, y: number): void {
+  private buildUpgradeCard(
+    parent: Phaser.GameObjects.Container,
+    u: UpgradeDef,
+    x: number,
+    y: number,
+    h = 170
+  ): void {
     const c = this.add.container(x, y);
     parent.add(c);
-    const bg = this.add.rectangle(0, 0, 260, 170, 0x22303e, 0.95).setStrokeStyle(4, PAL.gold, 0.9);
+    const s = h / 170; // scales interior offsets when the card is shrunk to fit
+    const bg = this.add.rectangle(0, 0, 260, h, 0x22303e, 0.95).setStrokeStyle(4, PAL.gold, 0.9);
     const name = this.add
-      .text(0, -60, u.name, { fontFamily: FONT_SANS, fontSize: '19px', fontStyle: 'bold', color: HEX.cream })
+      .text(0, -60 * s, u.name, { fontFamily: FONT_SANS, fontSize: '19px', fontStyle: 'bold', color: HEX.cream })
       .setOrigin(0.5);
-    const icon = this.add.image(0, -16, u.icon);
+    const icon = this.add.image(0, -16 * s, u.icon);
     icon.setScale(Math.min(64 / icon.width, 44 / icon.height));
     const caption = this.add
-      .text(0, 20, u.caption, {
+      .text(0, 20 * s, u.caption, {
         fontFamily: FONT_SANS,
         fontSize: '13px',
         fontStyle: 'bold',
@@ -553,24 +562,36 @@ export class UIScene extends Phaser.Scene {
         wordWrap: { width: 240 }
       })
       .setOrigin(0.5);
+    // the shop panel is rebuilt every day-end — seed cost + pips from the
+    // current level, not level 0 (only onUpgradeBought updates them after)
+    const costs = costsOf(u.key);
+    const lvl = this.upgradeLevels[u.key];
     const cost = this.add
-      .text(-56, 52, `$${costsOf(u.key)[0]}`, { fontFamily: FONT_DISPLAY, fontSize: '24px', color: HEX.green })
+      .text(-56, 52 * s, lvl >= costs.length ? 'MAX' : `$${costs[lvl]}`, {
+        fontFamily: FONT_DISPLAY,
+        fontSize: '24px',
+        color: HEX.green
+      })
       .setOrigin(0.5);
     const pips = this.add
-      .text(70, 52, '○'.repeat(costsOf(u.key).length), { fontFamily: FONT_SANS, fontSize: '18px', color: HEX.green })
+      .text(64, 52 * s, '●'.repeat(lvl) + '○'.repeat(Math.max(0, costs.length - lvl)), {
+        fontFamily: FONT_SANS,
+        fontSize: '12px',
+        color: HEX.green
+      })
       .setOrigin(0.5);
     c.add([bg, name, icon, caption, cost, pips]);
     // locked shroud until the upgrade's reveal day (news announces the unlock)
     const lock = this.add.container(0, 0);
-    lock.add(this.add.rectangle(0, 0, 260, 170, PAL.ink, 0.82));
+    lock.add(this.add.rectangle(0, 0, 260, h, PAL.ink, 0.82));
     lock.add(
       this.add
-        .text(0, -10, '🔒 CLASSIFIED', { fontFamily: FONT_SANS, fontSize: '18px', fontStyle: 'bold', color: '#AAB4BD' })
+        .text(0, -10 * s, '🔒 CLASSIFIED', { fontFamily: FONT_SANS, fontSize: '18px', fontStyle: 'bold', color: '#AAB4BD' })
         .setOrigin(0.5)
     );
     lock.add(
       this.add
-        .text(0, 18, `UNLOCKS DAY ${TUNING.days.upgradeRevealDays[u.key]}`, {
+        .text(0, 18 * s, `UNLOCKS DAY ${TUNING.days.upgradeRevealDays[u.key]}`, {
           fontFamily: FONT_SANS,
           fontSize: '13px',
           fontStyle: 'bold',
@@ -580,7 +601,7 @@ export class UIScene extends Phaser.Scene {
     );
     lock.setVisible(this.upgradeLocked[u.key]);
     c.add(lock);
-    c.setSize(260, 170);
+    c.setSize(260, h);
     c.setInteractive({ useHandCursor: true });
     c.setData({ bg, cost, pips, def: u, baseScale: 1, lock });
     c.on('pointerover', () => this.tweens.add({ targets: c, scale: 1.05, duration: 100 }));
@@ -863,7 +884,138 @@ export class UIScene extends Phaser.Scene {
     );
     for (const warn of s.warnings) this.onHeadline(warn, 'event', 2600);
     if (!s.missionDone) this.graphFlash = 1;
-    this.showDaySummaryPanel(s, delta);
+    if (s.newMemesUnlocked.length) {
+      this.showNewUnlocksPopup(s.newMemesUnlocked, () => this.showDaySummaryPanel(s, delta));
+    } else {
+      this.showDaySummaryPanel(s, delta);
+    }
+  }
+
+  /** Interstitial shown before the day-end shop panel when at least one meme
+   *  template fired for the first time ever today. Tap anywhere to continue. */
+  private showNewUnlocksPopup(ids: string[], onDone: () => void): void {
+    this.registry.set('ui-modal', true);
+    const cx = GAME_W / 2;
+    const cy = GAME_H / 2;
+    const c = this.add.container(cx, cy).setDepth(1800);
+    c.add(this.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.8));
+    const panel = this.add.container(0, 0);
+    c.add(panel);
+    panel.add(this.add.rectangle(0, 0, 760, 300, PAL.ink, 0.97).setStrokeStyle(4, PAL.gold, 0.9));
+    panel.add(
+      this.add
+        .text(0, -110, '🎉 NEW MEMES UNLOCKED', { fontFamily: FONT_DISPLAY, fontSize: '30px', color: HEX.gold })
+        .setOrigin(0.5)
+    );
+
+    const shown = ids.slice(0, 6);
+    const H = 130;
+    const gap = 16;
+    const widths = shown.map(id => {
+      const tpl = MEMES.templates[id];
+      return tpl ? Math.max(60, Math.round(H / tpl.aspect)) : 90;
+    });
+    const rowW = widths.reduce((a, b) => a + b + gap, -gap);
+    let x = -rowW / 2;
+    shown.forEach((id, i) => {
+      const tpl = MEMES.templates[id];
+      if (!tpl) return;
+      const w = widths[i];
+      const thumb = this.add.container(x + w / 2, -10);
+      if (hasArt(this, tpl.artKey)) {
+        thumb.add(this.add.image(0, 0, tpl.artKey).setDisplaySize(w, H));
+      } else {
+        thumb.add(this.add.rectangle(0, 0, w, H, 0x39424e));
+      }
+      thumb.add(this.add.rectangle(0, 0, w, H).setStrokeStyle(3, PAL.gold));
+      panel.add(thumb);
+      x += w + gap;
+    });
+    if (ids.length > shown.length) {
+      panel.add(
+        this.add
+          .text(0, 90, `+${ids.length - shown.length} MORE`, {
+            fontFamily: FONT_SANS,
+            fontSize: '16px',
+            fontStyle: 'bold',
+            color: HEX.cream
+          })
+          .setOrigin(0.5)
+      );
+    }
+    panel.add(
+      this.add
+        .text(0, 118, 'TAP TO CONTINUE', { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: '#AAB4BD' })
+        .setOrigin(0.5)
+    );
+
+    popIn(this, panel, 250);
+    sfx.fanfare();
+    confetti(this, cx, cy - 60, 20);
+
+    c.setSize(GAME_W, GAME_H);
+    c.setInteractive({ useHandCursor: true });
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
+      sfx.tap();
+      c.destroy();
+      onDone();
+    };
+    c.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+      ev.stopPropagation();
+      dismiss();
+    });
+    // full autoplay reads the popup like a player would, then moves on itself
+    if (import.meta.env.DEV && devState.autoPlay === 'full') {
+      this.time.delayedCall(900 / devState.speedMultiplier, dismiss);
+    }
+  }
+
+  /** One bordered, labeled group inside the day-end recap (mission / report / intel).
+   *  Renders a header + stacked lines sized to their content and returns the group's height. */
+  private buildSummaryCard(
+    parent: Phaser.GameObjects.Container,
+    y: number,
+    width: number,
+    header: string,
+    lines: { text: string; color: string; size?: string }[],
+    accent: number
+  ): number {
+    const padTop = 20;
+    const lineH = 18;
+    const padBottom = 8;
+    const h = padTop + lines.length * lineH + padBottom;
+    const card = this.add.container(0, y + h / 2);
+    card.add(this.add.rectangle(0, 0, width, h, 0x22303e, 0.9).setStrokeStyle(3, accent, 0.85));
+    card.add(
+      this.add
+        .text(-width / 2 + 18, -h / 2 + 15, header, {
+          fontFamily: FONT_SANS,
+          fontSize: '12px',
+          fontStyle: 'bold',
+          color: '#AAB4BD'
+        })
+        .setOrigin(0, 0.5)
+    );
+    lines.forEach((ln, i) => {
+      card.add(
+        this.add
+          .text(0, -h / 2 + padTop + i * lineH, ln.text, {
+            fontFamily: FONT_SANS,
+            fontSize: ln.size ?? '15px',
+            fontStyle: 'bold',
+            color: ln.color,
+            align: 'center',
+            wordWrap: { width: width - 40 }
+          })
+          .setOrigin(0.5)
+      );
+    });
+    parent.add(card);
+    popIn(this, card, 220);
+    return h;
   }
 
   /** Frozen-world recap + shop screen, covering 80% of the game window; the only
@@ -878,75 +1030,69 @@ export class UIScene extends Phaser.Scene {
     this.summaryPanel = panel;
     this.registry.set('ui-modal', true);
     panel.add(this.add.rectangle(0, 0, W, H, PAL.ink, 0.97).setStrokeStyle(4, PAL.gold, 0.9));
-    let y = -H / 2 + 42;
+    let y = -H / 2 + 20;
     panel.add(
       this.add
-        .text(0, y, `DAY ${s.day} COMPLETE`, { fontFamily: FONT_DISPLAY, fontSize: '36px', color: HEX.gold })
+        .text(0, y + 24, `DAY ${s.day} COMPLETE`, { fontFamily: FONT_DISPLAY, fontSize: '32px', color: HEX.gold })
         .setOrigin(0.5)
     );
-    y += 42;
-    panel.add(
-      this.add
-        .text(0, y, s.missionDone ? `✓ ${s.missionText}` : `✗ ${s.missionText}`, {
-          fontFamily: FONT_SANS,
-          fontSize: '20px',
-          fontStyle: 'bold',
-          color: s.missionDone ? HEX.green : HEX.red
-        })
-        .setOrigin(0.5)
-    );
-    y += 28;
-    panel.add(
-      this.add
-        .text(0, y, s.missionDone ? `BONUS PAID: +$${s.rewardCredits}` : 'NO BONUS TODAY', {
-          fontFamily: FONT_SANS,
-          fontSize: '15px',
-          fontStyle: 'bold',
-          color: s.missionDone ? HEX.green : '#AAB4BD'
-        })
-        .setOrigin(0.5)
-    );
-    y += 28;
-    panel.add(
-      this.add
-        .text(0, y, `CASH ON HAND: $${Math.round(this.displayedCredits)}`, {
-          fontFamily: FONT_SANS,
-          fontSize: '15px',
-          fontStyle: 'bold',
-          color: HEX.gold
-        })
-        .setOrigin(0.5)
-    );
-    y += 28;
-    panel.add(
-      this.add
-        .text(0, y, `${s.safe} TANKERS SAFE · ${s.lost} LOST · OIL $${s.price} (${delta})`, {
-          fontFamily: FONT_SANS,
-          fontSize: '15px',
-          fontStyle: 'bold',
-          color: HEX.cream
-        })
-        .setOrigin(0.5)
-    );
-    y += 28;
-    for (const warn of s.warnings) {
-      panel.add(
-        this.add
-          .text(0, y, `⚠ ${warn}`, { fontFamily: FONT_SANS, fontSize: '13px', fontStyle: 'bold', color: '#F2D8FF' })
-          .setOrigin(0.5)
-      );
-      y += 24;
+    y += 56;
+
+    const cardW = W - 80;
+    // section 1 — mission outcome
+    y += this.buildSummaryCard(panel, y, cardW, 'MISSION', [
+      {
+        text: s.missionDone ? `✓ ${s.missionText}` : `✗ ${s.missionText}`,
+        color: s.missionDone ? HEX.green : HEX.red,
+        size: '18px'
+      },
+      {
+        text: s.missionDone ? `BONUS PAID: +$${s.rewardCredits}` : 'NO BONUS TODAY',
+        color: s.missionDone ? HEX.green : '#AAB4BD',
+        size: '14px'
+      }
+    ], s.missionDone ? PAL.green : PAL.red);
+    y += 8;
+
+    // section 2 — end-of-day report
+    y += this.buildSummaryCard(panel, y, cardW, 'REPORT', [
+      { text: `CASH ON HAND: $${Math.round(this.displayedCredits)}`, color: HEX.gold },
+      { text: `${s.safe} TANKERS SAFE · ${s.lost} LOST · OIL $${s.price} (${delta})`, color: HEX.cream }
+    ], PAL.gold);
+    y += 8;
+
+    // section 3 — intel (warnings + unlocks), only when there's something to show
+    const intelLines: { text: string; color: string; size?: string }[] = [
+      ...s.warnings.map(w => ({ text: `⚠ ${w}`, color: '#F2D8FF', size: '13px' })),
+      ...(s.newMemesUnlocked.length
+        ? [
+            {
+              text: `🎉 ${s.newMemesUnlocked.length} NEW MEME${s.newMemesUnlocked.length > 1 ? 'S' : ''} UNLOCKED TODAY`,
+              color: HEX.gold,
+              size: '13px'
+            }
+          ]
+        : [])
+    ];
+    if (intelLines.length) {
+      y += this.buildSummaryCard(panel, y, cardW, 'INTEL', intelLines, PAL.purple);
     }
+    y += 10;
 
-    // shop — the only window in which upgrades can be bought
+    // shop — the only window in which upgrades can be bought; sits below whatever
+    // the recap cards above needed, so a long warnings list can never overlap it
+    const upgradeCardH = 150;
+    const upgradesHeaderY = y + 10;
     panel.add(
       this.add
-        .text(0, 24, 'UPGRADES', { fontFamily: FONT_DISPLAY, fontSize: '24px', color: HEX.gold })
+        .text(0, upgradesHeaderY, 'UPGRADES', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.gold })
         .setOrigin(0.5)
     );
-    UPGRADES.forEach((u, i) => this.buildUpgradeCard(panel, u, (i - 1) * 280, 128));
+    const upgradeCardsY = upgradesHeaderY + 20 + upgradeCardH / 2;
+    UPGRADES.forEach((u, i) => this.buildUpgradeCard(panel, u, (i - 1) * 280, upgradeCardsY, upgradeCardH));
 
-    const nextBtn = this.add.container(0, H / 2 - 40);
+    const nextBtnY = Math.max(H / 2 - 40, upgradeCardsY + upgradeCardH / 2 + 30);
+    const nextBtn = this.add.container(0, nextBtnY);
     const nextBtnBg = this.add.rectangle(0, 0, 300, 58, PAL.green).setStrokeStyle(4, PAL.ink);
     const nextBtnText = this.add
       .text(0, 0, `NEXT DAY — DAY ${this.summaryNextDay} ▶`, {
@@ -960,11 +1106,15 @@ export class UIScene extends Phaser.Scene {
     nextBtn.setInteractive({ useHandCursor: true });
     nextBtn.on('pointerover', () => this.tweens.add({ targets: nextBtn, scale: 1.05, duration: 100 }));
     nextBtn.on('pointerout', () => this.tweens.add({ targets: nextBtn, scale: 1, duration: 100 }));
-    nextBtn.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
-      ev.stopPropagation();
+    const advanceToNextDay = () => {
+      nextBtn.disableInteractive();
       pressPulse(this, nextBtn);
       sfx.tap();
       bus.emit(EV.NEXT_DAY_REQUEST);
+    };
+    nextBtn.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+      ev.stopPropagation();
+      advanceToNextDay();
     });
     if (!settings.reducedMotion) {
       this.tweens.add({ targets: nextBtn, scale: 1.04, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -972,13 +1122,53 @@ export class UIScene extends Phaser.Scene {
     panel.add(nextBtn);
     popIn(this, panel, 250);
     this.refreshUpgradeAffordability();
+
+    // full autoplay: spend whatever's affordable, then click through itself
+    if (import.meta.env.DEV && devState.autoPlay === 'full') {
+      this.time.delayedCall(500 / devState.speedMultiplier, () => {
+        if (this.summaryPanel !== panel) return; // already advanced elsewhere
+        this.devAutoSpendCredits();
+        advanceToNextDay();
+      });
+    }
+  }
+
+  /** Full autoplay: buys the cheapest affordable unlocked upgrade, repeatedly,
+   *  until nothing is left to afford — mirrors tapping the shop cards by hand. */
+  private devAutoSpendCredits(): void {
+    for (let guard = 0; guard < 20; guard++) {
+      const affordable = UPGRADES.filter(u => {
+        if (this.upgradeLocked[u.key]) return false;
+        const costs = costsOf(u.key);
+        const lvl = this.upgradeLevels[u.key];
+        return lvl < costs.length && this.displayedCredits >= costs[lvl];
+      }).sort((a, b) => costsOf(a.key)[this.upgradeLevels[a.key]] - costsOf(b.key)[this.upgradeLevels[b.key]]);
+      if (!affordable.length) return;
+      const u = affordable[0];
+      const price = costsOf(u.key)[this.upgradeLevels[u.key]];
+      bus.emit('buy-upgrade', u.key, price);
+    }
   }
 
   private onDayBreak(_remaining: null): void {
-    this.summaryPanel?.destroy();
+    const panel = this.summaryPanel;
     this.summaryPanel = undefined;
     this.upgradeButtons = {};
     this.registry.set('ui-modal', false);
+    if (!panel) return;
+    if (settings.reducedMotion) {
+      panel.destroy();
+      return;
+    }
+    this.tweens.add({
+      targets: panel,
+      scaleX: 0.85,
+      scaleY: 0.85,
+      alpha: 0,
+      duration: 200,
+      ease: EASE.pop,
+      onComplete: () => panel.destroy()
+    });
   }
 
   private onUpgradeReveal(key: string): void {
