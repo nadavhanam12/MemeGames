@@ -3,7 +3,26 @@
     "durationMs": 4000,
     "streakCombo": 10,
     "countdownTickMs": 500,
-    "minGapMs": 15000
+    "minGapMs": 15000,
+    "trendWindowSec": 8,
+    "trendBand": 5,
+    "watchers": {
+      "dissonance": {
+        "cooldownSec": 45,
+        "rearmSec": 10,
+        "comboMin": 5,
+        "priceHigh": 150,
+        "priceLow": 90,
+        "lostMin": 2
+      },
+      "quiet": {
+        "cooldownSec": 60,
+        "rearmSec": 10,
+        "quietSec": 25,
+        "maxThreats": 1,
+        "graceSec": 15
+      }
+    }
   },
   "templates": {
     "twoButtons": {
@@ -11,562 +30,2647 @@
       "artFile": "meme_twobuttons_blank.png",
       "label": "TWO BUTTONS",
       "aspect": 1.5,
-      "boxes": [[-0.19, -0.21, 0.3, 0.15], [0.2, -0.21, 0.3, 0.15]],
+      "boxes": [
+        [
+          -0.19,
+          -0.21,
+          0.3,
+          0.15
+        ],
+        [
+          0.2,
+          -0.21,
+          0.3,
+          0.15
+        ]
+      ],
       "slots": [
-        { "x": -0.19, "y": -0.29, "w": 0.3 },
-        { "x": 0.2, "y": -0.29, "w": 0.3 }
+        {
+          "x": -0.19,
+          "y": -0.29,
+          "w": 0.3
+        },
+        {
+          "x": 0.2,
+          "y": -0.29,
+          "w": 0.3
+        }
       ]
     },
-    "thisIsFine": {
-      "artKey": "memeThisIsFine",
-      "artFile": "meme_thisisfine_blank.png",
-      "label": "THIS IS FINE",
-      "aspect": 1.0,
-      "boxes": [[0, 0.08, 0.85, 0.6]],
-      "slots": [{ "x": 0, "y": -0.38, "w": 0.9, "size": 16, "stroke": true }]
-    },
-
     "squintCaptain": {
       "artKey": "memeSquintCaptain",
       "artFile": "meme_squint_captain.png",
       "label": "SQUINT: CAPTAIN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "squintAnalyst": {
       "artKey": "memeSquintAnalyst",
       "artFile": "meme_squint_analyst.png",
       "label": "SQUINT: ANALYST",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "squintTrump": {
       "artKey": "memeSquintTrump",
       "artFile": "meme_squint_trump.png",
       "label": "SQUINT: POTUS",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "squintIran": {
       "artKey": "memeSquintIran",
       "artFile": "meme_squint_iran.png",
       "label": "SQUINT: IRAN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
-      ]
-    },
-
-    "templeCaptain": {
-      "artKey": "memeTempleCaptain",
-      "artFile": "meme_temple_captain.png",
-      "label": "TEMPLE TAP: CAPTAIN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
-      "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
-      ]
-    },
-    "templeAnalyst": {
-      "artKey": "memeTempleAnalyst",
-      "artFile": "meme_temple_analyst.png",
-      "label": "TEMPLE TAP: ANALYST",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
-      "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "templeTrump": {
       "artKey": "memeTempleTrump",
       "artFile": "meme_temple_trump.png",
       "label": "TEMPLE TAP: POTUS",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "templeIran": {
       "artKey": "memeTempleIran",
       "artFile": "meme_temple_iran.png",
       "label": "TEMPLE TAP: IRAN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
-
-    "distractedCaptain": {
-      "artKey": "memeDistractedCaptain",
-      "artFile": "meme_distracted_captain.png",
-      "label": "DISTRACTED: CAPTAIN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.8]],
-      "slots": [
-        { "x": -0.3, "y": 0.06, "w": 0.28, "size": 12, "stroke": true },
-        { "x": 0.02, "y": -0.04, "w": 0.26, "size": 12, "stroke": true },
-        { "x": 0.31, "y": 0.02, "w": 0.26, "size": 12, "stroke": true }
-      ]
-    },
-    "distractedTrump": {
-      "artKey": "memeDistractedTrump",
-      "artFile": "meme_distracted_trump.png",
-      "label": "DISTRACTED: POTUS",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.8]],
-      "slots": [
-        { "x": -0.3, "y": 0.06, "w": 0.28, "size": 12, "stroke": true },
-        { "x": 0.02, "y": -0.04, "w": 0.26, "size": 12, "stroke": true },
-        { "x": 0.31, "y": 0.02, "w": 0.26, "size": 12, "stroke": true }
-      ]
-    },
-    "distractedSoldier": {
-      "artKey": "memeDistractedSoldier",
-      "artFile": "meme_distracted_soldier.png",
-      "label": "DISTRACTED: SOLDIER",
-      "aspect": 0.78,
-      "boxes": [[0, 0, 0.9, 0.8]],
-      "slots": [
-        { "x": -0.3, "y": 0.06, "w": 0.28, "size": 12, "stroke": true },
-        { "x": 0.02, "y": -0.04, "w": 0.26, "size": 12, "stroke": true },
-        { "x": 0.31, "y": 0.02, "w": 0.26, "size": 12, "stroke": true }
-      ]
-    },
-    "distractedAnalyst": {
-      "artKey": "memeDistractedAnalyst",
-      "artFile": "meme_distracted_analyst.png",
-      "label": "DISTRACTED: ANALYST",
-      "aspect": 0.78,
-      "boxes": [[0, 0, 0.9, 0.8]],
-      "slots": [
-        { "x": -0.3, "y": 0.06, "w": 0.28, "size": 12, "stroke": true },
-        { "x": 0.02, "y": -0.04, "w": 0.26, "size": 12, "stroke": true },
-        { "x": 0.31, "y": 0.02, "w": 0.26, "size": 12, "stroke": true }
-      ]
-    },
-
     "podcastCaptain": {
       "artKey": "memePodcastCaptain",
       "artFile": "meme_podcast_captain.png",
       "label": "PODCAST: CAPTAIN",
-      "aspect": 1.0,
-      "boxes": [[0, 0.1, 0.9, 0.7]],
-      "slots": [{ "x": 0, "y": -0.4, "w": 0.88, "size": 13 }]
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
     },
     "podcastAnalyst": {
       "artKey": "memePodcastAnalyst",
       "artFile": "meme_podcast_analyst.png",
       "label": "PODCAST: ANALYST",
-      "aspect": 1.0,
-      "boxes": [[0, 0.1, 0.9, 0.7]],
-      "slots": [{ "x": 0, "y": -0.4, "w": 0.88, "size": 13 }]
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
     },
     "podcastKhamenei": {
       "artKey": "memePodcastKhamenei",
       "artFile": "meme_podcast_khamenei.png",
       "label": "PODCAST: IRAN",
-      "aspect": 1.0,
-      "boxes": [[0, 0.1, 0.9, 0.7]],
-      "slots": [{ "x": 0, "y": -0.4, "w": 0.88, "size": 13 }]
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
     },
     "podcastCommander": {
       "artKey": "memePodcastCommander",
       "artFile": "meme_podcast_commander.png",
       "label": "PODCAST: COMMANDER",
-      "aspect": 1.0,
-      "boxes": [[0, 0.1, 0.9, 0.7]],
-      "slots": [{ "x": 0, "y": -0.4, "w": 0.88, "size": 13 }]
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
     },
-
     "condescendingAnchor": {
       "artKey": "memeCondescendingAnchor",
       "artFile": "meme_condescending_anchor.png",
       "label": "SMUG: ANCHOR",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "condescendingTrump": {
       "artKey": "memeCondescendingTrump",
       "artFile": "meme_condescending_trump.png",
       "label": "SMUG: POTUS",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "condescendingKhamenei": {
       "artKey": "memeCondescendingKhamenei",
       "artFile": "meme_condescending_khamenei.png",
       "label": "SMUG: IRAN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "condescendingExec": {
       "artKey": "memeCondescendingExec",
       "artFile": "meme_condescending_exec.png",
       "label": "SMUG: OIL EXEC",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
-
     "disasterCaptain": {
       "artKey": "memeDisasterCaptain",
       "artFile": "meme_disaster_captain.png",
       "label": "SMIRK: CAPTAIN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "disasterTrump": {
       "artKey": "memeDisasterTrump",
       "artFile": "meme_disaster_trump.png",
       "label": "SMIRK: POTUS",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "disasterKhamenei": {
       "artKey": "memeDisasterKhamenei",
       "artFile": "meme_disaster_khamenei.png",
       "label": "SMIRK: IRAN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "disasterAnchor": {
       "artKey": "memeDisasterAnchor",
       "artFile": "meme_disaster_anchor.png",
       "label": "SMIRK: ANCHOR",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
-
     "cryingAnalyst": {
       "artKey": "memeCryingAnalyst",
       "artFile": "meme_crying_analyst.png",
       "label": "CRYING: ANALYST",
-      "aspect": 1.0,
-      "boxes": [[0, 0.1, 0.9, 0.7]],
-      "slots": [{ "x": 0, "y": -0.4, "w": 0.88, "size": 13 }]
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
     },
     "cryingCaptain": {
       "artKey": "memeCryingCaptain",
       "artFile": "meme_crying_captain.png",
       "label": "CRYING: CAPTAIN",
-      "aspect": 1.0,
-      "boxes": [[0, 0.1, 0.9, 0.7]],
-      "slots": [{ "x": 0, "y": -0.4, "w": 0.88, "size": 13 }]
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
     },
     "cryingAnchor": {
       "artKey": "memeCryingAnchor",
       "artFile": "meme_crying_anchor.png",
       "label": "CRYING: ANCHOR",
-      "aspect": 1.0,
-      "boxes": [[0, 0.1, 0.9, 0.7]],
-      "slots": [{ "x": 0, "y": -0.4, "w": 0.88, "size": 13 }]
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
     },
     "cryingSoldier": {
       "artKey": "memeCryingSoldier",
       "artFile": "meme_crying_soldier.png",
       "label": "CRYING: SOLDIER",
-      "aspect": 1.0,
-      "boxes": [[0, 0.1, 0.9, 0.7]],
-      "slots": [{ "x": 0, "y": -0.4, "w": 0.88, "size": 13 }]
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
     },
-
     "vehicleAnchor": {
       "artKey": "memeVehicleAnchor",
       "artFile": "meme_vehicle_anchor.png",
       "label": "SIDE-EYE: ANCHOR",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "vehicleAnalyst": {
       "artKey": "memeVehicleAnalyst",
       "artFile": "meme_vehicle_analyst.png",
       "label": "SIDE-EYE: ANALYST",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "vehicleCivilian": {
       "artKey": "memeVehicleCivilian",
       "artFile": "meme_vehicle_civilian.png",
       "label": "SIDE-EYE: CIVILIAN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "vehicleDiplomat": {
       "artKey": "memeVehicleDiplomat",
       "artFile": "meme_vehicle_diplomat.png",
       "label": "SIDE-EYE: DIPLOMAT",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
-
     "successCaptain": {
       "artKey": "memeSuccessCaptain",
       "artFile": "meme_success_captain.png",
       "label": "SUCCESS: CAPTAIN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "successTrump": {
       "artKey": "memeSuccessTrump",
       "artFile": "meme_success_trump.png",
       "label": "SUCCESS: POTUS",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "successSoldier": {
       "artKey": "memeSuccessSoldier",
       "artFile": "meme_success_soldier.png",
       "label": "SUCCESS: SOLDIER",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "successResponder": {
       "artKey": "memeSuccessResponder",
       "artFile": "meme_success_responder.png",
       "label": "SUCCESS: RESPONDER",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
-
     "calmFireAnchor": {
       "artKey": "memeCalmFireAnchor",
       "artFile": "meme_calmfire_anchor.png",
       "label": "CALM FIRE: ANCHOR",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "calmFireTrump": {
       "artKey": "memeCalmFireTrump",
       "artFile": "meme_calmfire_trump.png",
       "label": "CALM FIRE: POTUS",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "calmFireKhamenei": {
       "artKey": "memeCalmFireKhamenei",
       "artFile": "meme_calmfire_khamenei.png",
       "label": "CALM FIRE: IRAN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
     "calmFireCaptain": {
       "artKey": "memeCalmFireCaptain",
       "artFile": "meme_calmfire_captain.png",
       "label": "CALM FIRE: CAPTAIN",
-      "aspect": 1.0,
-      "boxes": [[0, 0, 0.9, 0.75]],
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
       "slots": [
-        { "x": 0, "y": -0.4, "w": 0.92, "size": 15, "stroke": true },
-        { "x": 0, "y": 0.4, "w": 0.92, "size": 15, "stroke": true }
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
       ]
     },
-
     "changeMindAnalyst": {
       "artKey": "memeChangeMindAnalyst",
       "artFile": "meme_changemind_analyst.png",
       "label": "CHANGE MY MIND: ANALYST",
-      "aspect": 1.0,
-      "boxes": [[0, 0.25, 0.6, 0.35]],
-      "slots": [{ "x": 0.17, "y": 0.22, "w": 0.5, "size": 13 }]
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.25,
+          0.6,
+          0.35
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0.17,
+          "y": 0.22,
+          "w": 0.5,
+          "size": 13
+        }
+      ]
     },
     "changeMindDiplomat": {
       "artKey": "memeChangeMindDiplomat",
       "artFile": "meme_changemind_diplomat.png",
       "label": "CHANGE MY MIND: DIPLOMAT",
-      "aspect": 1.0,
-      "boxes": [[0, 0.25, 0.6, 0.35]],
-      "slots": [{ "x": 0.17, "y": 0.22, "w": 0.5, "size": 13 }]
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.25,
+          0.6,
+          0.35
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0.17,
+          "y": 0.22,
+          "w": 0.5,
+          "size": 13
+        }
+      ]
     },
     "changeMindCivilian": {
       "artKey": "memeChangeMindCivilian",
       "artFile": "meme_changemind_civilian.png",
       "label": "CHANGE MY MIND: CIVILIAN",
       "aspect": 0.68,
-      "boxes": [[0, 0.25, 0.6, 0.35]],
-      "slots": [{ "x": 0.17, "y": 0.24, "w": 0.5, "size": 13 }]
+      "boxes": [
+        [
+          0,
+          0.25,
+          0.6,
+          0.35
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0.17,
+          "y": 0.24,
+          "w": 0.5,
+          "size": 13
+        }
+      ]
     },
     "changeMindExec": {
       "artKey": "memeChangeMindExec",
       "artFile": "meme_changemind_exec.png",
       "label": "CHANGE MY MIND: OIL EXEC",
       "aspect": 0.68,
-      "boxes": [[0, 0.25, 0.6, 0.35]],
-      "slots": [{ "x": 0.17, "y": 0.24, "w": 0.5, "size": 13 }]
+      "boxes": [
+        [
+          0,
+          0.25,
+          0.6,
+          0.35
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0.17,
+          "y": 0.24,
+          "w": 0.5,
+          "size": 13
+        }
+      ]
+    },
+    "twoButtons2Captain": {
+      "artKey": "memeTwoButtons2Captain",
+      "artFile": "meme_twobuttons2_captain.png",
+      "label": "TWO BUTTONS: CAPTAIN",
+      "aspect": 1,
+      "boxes": [
+        [
+          -0.28,
+          0.05,
+          0.26,
+          0.15
+        ],
+        [
+          0.12,
+          0.05,
+          0.26,
+          0.15
+        ]
+      ],
+      "slots": [
+        {
+          "x": -0.28,
+          "y": -0.03,
+          "w": 0.26,
+          "size": 10,
+          "stroke": true
+        },
+        {
+          "x": 0.12,
+          "y": -0.03,
+          "w": 0.26,
+          "size": 10,
+          "stroke": true
+        }
+      ]
+    },
+    "twoButtons2Trump": {
+      "artKey": "memeTwoButtons2Trump",
+      "artFile": "meme_twobuttons2_trump.png",
+      "label": "TWO BUTTONS: POTUS",
+      "aspect": 1,
+      "boxes": [
+        [
+          -0.28,
+          0.05,
+          0.26,
+          0.15
+        ],
+        [
+          0.12,
+          0.05,
+          0.26,
+          0.15
+        ]
+      ],
+      "slots": [
+        {
+          "x": -0.28,
+          "y": -0.03,
+          "w": 0.26,
+          "size": 10,
+          "stroke": true
+        },
+        {
+          "x": 0.12,
+          "y": -0.03,
+          "w": 0.26,
+          "size": 10,
+          "stroke": true
+        }
+      ]
+    },
+    "twoButtons2Khamenei": {
+      "artKey": "memeTwoButtons2Khamenei",
+      "artFile": "meme_twobuttons2_khamenei.png",
+      "label": "TWO BUTTONS: IRAN",
+      "aspect": 0.928,
+      "boxes": [
+        [
+          -0.28,
+          0.05,
+          0.26,
+          0.15
+        ],
+        [
+          0.12,
+          0.05,
+          0.26,
+          0.15
+        ]
+      ],
+      "slots": [
+        {
+          "x": -0.28,
+          "y": -0.03,
+          "w": 0.26,
+          "size": 10,
+          "stroke": true
+        },
+        {
+          "x": 0.12,
+          "y": -0.03,
+          "w": 0.26,
+          "size": 10,
+          "stroke": true
+        }
+      ]
+    },
+    "twoButtons2Trader": {
+      "artKey": "memeTwoButtons2Trader",
+      "artFile": "meme_twobuttons2_trader.png",
+      "label": "TWO BUTTONS: TRADER",
+      "aspect": 0.928,
+      "boxes": [
+        [
+          -0.28,
+          0.05,
+          0.26,
+          0.15
+        ],
+        [
+          0.12,
+          0.05,
+          0.26,
+          0.15
+        ]
+      ],
+      "slots": [
+        {
+          "x": -0.28,
+          "y": -0.03,
+          "w": 0.26,
+          "size": 10,
+          "stroke": true
+        },
+        {
+          "x": 0.12,
+          "y": -0.03,
+          "w": 0.26,
+          "size": 10,
+          "stroke": true
+        }
+      ]
+    },
+    "draw25Captain": {
+      "artKey": "memeDraw25Captain",
+      "artFile": "meme_draw25_captain.png",
+      "label": "DRAW 25: CAPTAIN",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "draw25Trump": {
+      "artKey": "memeDraw25Trump",
+      "artFile": "meme_draw25_trump.png",
+      "label": "DRAW 25: POTUS",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "draw25Khamenei": {
+      "artKey": "memeDraw25Khamenei",
+      "artFile": "meme_draw25_khamenei.png",
+      "label": "DRAW 25: IRAN",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "draw25Exec": {
+      "artKey": "memeDraw25Exec",
+      "artFile": "meme_draw25_exec.png",
+      "label": "DRAW 25: OIL EXEC",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "disasterEyeTrump": {
+      "artKey": "memeDisasterEyeTrump",
+      "artFile": "meme_disastereye_trump.png",
+      "label": "DISASTER SIDE-EYE: POTUS",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
+      ]
+    },
+    "rejectApproveTrump": {
+      "artKey": "memeRejectApproveTrump",
+      "artFile": "meme_rejectapprove_trump.png",
+      "label": "REJECT/APPROVE: POTUS",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 14,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 14,
+          "stroke": true
+        }
+      ]
+    },
+    "rejectApproveKhamenei": {
+      "artKey": "memeRejectApproveKhamenei",
+      "artFile": "meme_rejectapprove_khamenei.png",
+      "label": "REJECT/APPROVE: IRAN",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 14,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 14,
+          "stroke": true
+        }
+      ]
+    },
+    "rejectApproveCaptain": {
+      "artKey": "memeRejectApproveCaptain",
+      "artFile": "meme_rejectapprove_captain.png",
+      "label": "REJECT/APPROVE: CAPTAIN",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 14,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 14,
+          "stroke": true
+        }
+      ]
+    },
+    "rejectApproveTrader": {
+      "artKey": "memeRejectApproveTrader",
+      "artFile": "meme_rejectapprove_trader.png",
+      "label": "REJECT/APPROVE: TRADER",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 14,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 14,
+          "stroke": true
+        }
+      ]
+    },
+    "highwayExitTrump": {
+      "artKey": "memeHighwayExitTrump",
+      "artFile": "meme_highwayexit_trump.png",
+      "label": "HIGHWAY EXIT: POTUS",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "highwayExitKhamenei": {
+      "artKey": "memeHighwayExitKhamenei",
+      "artFile": "meme_highwayexit_khamenei.png",
+      "label": "HIGHWAY EXIT: IRAN",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "highwayExitTrader": {
+      "artKey": "memeHighwayExitTrader",
+      "artFile": "meme_highwayexit_trader.png",
+      "label": "HIGHWAY EXIT: TRADER",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "saltTrump": {
+      "artKey": "memeSaltTrump",
+      "artFile": "meme_salt_trump.png",
+      "label": "SALT SPRINKLE: POTUS",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "saltKhamenei": {
+      "artKey": "memeSaltKhamenei",
+      "artFile": "meme_salt_khamenei.png",
+      "label": "SALT SPRINKLE: IRAN",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "saltCommander": {
+      "artKey": "memeSaltCommander",
+      "artFile": "meme_salt_commander.png",
+      "label": "SALT SPRINKLE: COMMANDER",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "saltDiplomat": {
+      "artKey": "memeSaltDiplomat",
+      "artFile": "meme_salt_diplomat.png",
+      "label": "SALT SPRINKLE: DIPLOMAT",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.1,
+          0.9,
+          0.7
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.88,
+          "size": 13
+        }
+      ]
+    },
+    "success2Trump": {
+      "artKey": "memeSuccess2Trump",
+      "artFile": "meme_success2_trump.png",
+      "label": "SUCCESS FIST II: POTUS",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
+      ]
+    },
+    "changeMind2Analyst": {
+      "artKey": "memeChangeMind2Analyst",
+      "artFile": "meme_changemind2_analyst.png",
+      "label": "CHANGE MY MIND II: ANALYST",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.25,
+          0.6,
+          0.35
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0.17,
+          "y": 0.22,
+          "w": 0.5,
+          "size": 13
+        }
+      ]
+    },
+    "changeMind2Diplomat": {
+      "artKey": "memeChangeMind2Diplomat",
+      "artFile": "meme_changemind2_diplomat.png",
+      "label": "CHANGE MY MIND II: DIPLOMAT",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.25,
+          0.6,
+          0.35
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0.17,
+          "y": 0.22,
+          "w": 0.5,
+          "size": 13
+        }
+      ]
+    },
+    "changeMind2Civilian": {
+      "artKey": "memeChangeMind2Civilian",
+      "artFile": "meme_changemind2_civilian.png",
+      "label": "CHANGE MY MIND II: CIVILIAN",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.25,
+          0.6,
+          0.35
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0.17,
+          "y": 0.22,
+          "w": 0.5,
+          "size": 13
+        }
+      ]
+    },
+    "changeMind2Exec": {
+      "artKey": "memeChangeMind2Exec",
+      "artFile": "meme_changemind2_exec.png",
+      "label": "CHANGE MY MIND II: OIL EXEC",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0.25,
+          0.6,
+          0.35
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0.17,
+          "y": 0.22,
+          "w": 0.5,
+          "size": 13
+        }
+      ]
+    },
+    "distracted2Captain": {
+      "artKey": "memeDistracted2Captain",
+      "artFile": "meme_distracted2_captain.png",
+      "label": "DISTRACTED II: CAPTAIN",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.8
+        ]
+      ],
+      "slots": [
+        {
+          "x": -0.3,
+          "y": 0.06,
+          "w": 0.28,
+          "size": 12,
+          "stroke": true
+        },
+        {
+          "x": 0.02,
+          "y": -0.04,
+          "w": 0.26,
+          "size": 12,
+          "stroke": true
+        },
+        {
+          "x": 0.31,
+          "y": 0.02,
+          "w": 0.26,
+          "size": 12,
+          "stroke": true
+        }
+      ]
+    },
+    "distracted2Trump": {
+      "artKey": "memeDistracted2Trump",
+      "artFile": "meme_distracted2_trump.png",
+      "label": "DISTRACTED II: POTUS",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.8
+        ]
+      ],
+      "slots": [
+        {
+          "x": -0.3,
+          "y": 0.06,
+          "w": 0.28,
+          "size": 12,
+          "stroke": true
+        },
+        {
+          "x": 0.02,
+          "y": -0.04,
+          "w": 0.26,
+          "size": 12,
+          "stroke": true
+        },
+        {
+          "x": 0.31,
+          "y": 0.02,
+          "w": 0.26,
+          "size": 12,
+          "stroke": true
+        }
+      ]
+    },
+    "distracted2Khamenei": {
+      "artKey": "memeDistracted2Khamenei",
+      "artFile": "meme_distracted2_khamenei.png",
+      "label": "DISTRACTED II: IRAN",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.8
+        ]
+      ],
+      "slots": [
+        {
+          "x": -0.3,
+          "y": 0.06,
+          "w": 0.28,
+          "size": 12,
+          "stroke": true
+        },
+        {
+          "x": 0.02,
+          "y": -0.04,
+          "w": 0.26,
+          "size": 12,
+          "stroke": true
+        },
+        {
+          "x": 0.31,
+          "y": 0.02,
+          "w": 0.26,
+          "size": 12,
+          "stroke": true
+        }
+      ]
+    },
+    "distracted2Trader": {
+      "artKey": "memeDistracted2Trader",
+      "artFile": "meme_distracted2_trader.png",
+      "label": "DISTRACTED II: TRADER",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.8
+        ]
+      ],
+      "slots": [
+        {
+          "x": -0.3,
+          "y": 0.06,
+          "w": 0.28,
+          "size": 12,
+          "stroke": true
+        },
+        {
+          "x": 0.02,
+          "y": -0.04,
+          "w": 0.26,
+          "size": 12,
+          "stroke": true
+        },
+        {
+          "x": 0.31,
+          "y": 0.02,
+          "w": 0.26,
+          "size": 12,
+          "stroke": true
+        }
+      ]
+    },
+    "condescending2Anchor": {
+      "artKey": "memeCondescending2Anchor",
+      "artFile": "meme_condescending2_anchor.png",
+      "label": "CONDESCENDING II: ANCHOR",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
+      ]
+    },
+    "condescending2Trump": {
+      "artKey": "memeCondescending2Trump",
+      "artFile": "meme_condescending2_trump.png",
+      "label": "CONDESCENDING II: POTUS",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
+      ]
+    },
+    "condescending2Khamenei": {
+      "artKey": "memeCondescending2Khamenei",
+      "artFile": "meme_condescending2_khamenei.png",
+      "label": "CONDESCENDING II: IRAN",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
+      ]
+    },
+    "condescending2Exec": {
+      "artKey": "memeCondescending2Exec",
+      "artFile": "meme_condescending2_exec.png",
+      "label": "CONDESCENDING II: OIL EXEC",
+      "aspect": 1,
+      "boxes": [
+        [
+          0,
+          0,
+          0.9,
+          0.75
+        ]
+      ],
+      "slots": [
+        {
+          "x": 0,
+          "y": -0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        },
+        {
+          "x": 0,
+          "y": 0.4,
+          "w": 0.92,
+          "size": 15,
+          "stroke": true
+        }
+      ]
     }
   },
   "triggers": {
     "DRONE SWARM SURGE": [
-      { "t": "twoButtons", "c": ["INTERCEPT EVERYTHING", "BLAME THE INTERN"] },
-      { "t": "podcastKhamenei", "c": ["WHAT IF WE SEND ALL FIVE DRONES AT ONCE"] },
-      { "t": "distractedSoldier", "c": ["DRONE SWARMS", "IRAN", "GOOD OLD MISSILES"] },
-      { "t": "squintIran", "c": ["THE STRAIT LOOKS QUIET", "TOO QUIET"] }
+      {
+        "t": "twoButtons",
+        "c": [
+          "burn all 12 interceptors on wave one",
+          "save 3, hope wave two skips lunch"
+        ]
+      },
+      {
+        "t": "podcastKhamenei",
+        "c": [
+          "forty-one drones. one felt like an insult."
+        ]
+      },
+      {
+        "t": "squintIran",
+        "c": [
+          "radar's dead calm",
+          "his tea's gone cold, though"
+        ]
+      },
+      {
+        "t": "distracted2Khamenei",
+        "c": [
+          "the missile stockpile, tested",
+          "him",
+          "drone wave #2, still in beta"
+        ]
+      }
     ],
     "VIP TANKER TRANSIT": [
-      { "t": "twoButtons", "c": ["GUARD THE VIP", "GUARD EVERYONE ELSE"] },
-      { "t": "distractedCaptain", "c": ["THE VIP TANKER", "YOUR ATTENTION", "EVERY OTHER SHIP"] },
-      { "t": "squintCaptain", "c": ["IS THAT SHIP FRIENDLY?", "NO WAY TO TELL"] }
+      {
+        "t": "twoButtons",
+        "c": [
+          "personally escort tanker #1",
+          "tankers #2 through #41, good luck"
+        ]
+      },
+      {
+        "t": "squintCaptain",
+        "c": [
+          "that's the VIP tanker, correct?",
+          "sir, that's a jetski with a flag taped to it"
+        ]
+      },
+      {
+        "t": "distracted2Captain",
+        "c": [
+          "your entire fleet, forty ships strong",
+          "you",
+          "one boat with a bow on it"
+        ]
+      }
     ],
     "MARKET CALM-ISH": [
-      { "t": "squintAnalyst", "c": ["PRICES LOOK CALM", "TOO CALM"] },
-      { "t": "templeAnalyst", "c": ["CAN'T PANIC IF YOU DON'T READ THE CHART"] },
-      { "t": "vehicleAnalyst", "c": ["THE CHART SAYS CALM", "THE CHART HAS LIED BEFORE"] }
+      {
+        "t": "squintAnalyst",
+        "c": [
+          "market's calm",
+          "he's checked his phone six times"
+        ],
+        "when": {
+          "trend": "stable"
+        },
+        "weight": 2
+      },
+      {
+        "t": "vehicleAnalyst",
+        "c": [
+          "chart says chill",
+          "chart said that in March too"
+        ],
+        "when": {
+          "trend": "stable"
+        }
+      }
     ],
     "AFFORDABLE ROAD TRIP UNLOCKED": [
-      { "t": "successTrump", "c": ["CHEAP GAS", "YOU'RE WELCOME, AMERICA"] },
-      { "t": "twoButtons", "c": ["BUY GAS NOW", "WAIT, IT DROPS MORE"] },
-      { "t": "changeMindCivilian", "c": ["GAS IS BASICALLY FREE — CHANGE MY MIND"] }
+      {
+        "t": "successTrump",
+        "c": [
+          "fixed the entire energy crisis",
+          "so gas station slurpees are $1.09 again"
+        ]
+      },
+      {
+        "t": "twoButtons",
+        "c": [
+          "fill up now at ${price}",
+          "wait, it might hit $60"
+        ]
+      },
+      {
+        "t": "changeMindCivilian",
+        "c": [
+          "gas is ${price} now, i feel rich — change my mind"
+        ]
+      },
+      {
+        "t": "changeMind2Civilian",
+        "c": [
+          "i'd drive to Cleveland just to drive — change my mind"
+        ]
+      }
     ],
     "GROUP CHAT STARTING TO WORRY": [
-      { "t": "cryingAnalyst", "c": ["OPENED THE GROUP CHAT. SHOULDN'T HAVE."] },
-      { "t": "vehicleCivilian", "c": ["TV SAYS EVERYTHING IS FINE", "SURE IT IS"] },
-      { "t": "condescendingAnchor", "c": ["VIEWERS ARE PANICKING", "ADORABLE"] },
-      { "t": "changeMindDiplomat", "c": ["EVERYONE NEEDS TO CALM DOWN — CHANGE MY MIND"] }
+      {
+        "t": "cryingAnalyst",
+        "c": [
+          "47 unread in the group chat. shouldn't have looked."
+        ]
+      },
+      {
+        "t": "vehicleCivilian",
+        "c": [
+          "the news anchor: markets are stable",
+          "my cousin Dave: we are so back... or cooked"
+        ]
+      },
+      {
+        "t": "condescendingAnchor",
+        "c": [
+          "viewers are spiraling, all 2 million of them",
+          "cute. anyway, back to me."
+        ]
+      },
+      {
+        "t": "changeMindDiplomat",
+        "c": [
+          "the entire group chat needs to touch grass — change my mind"
+        ]
+      },
+      {
+        "t": "changeMind2Diplomat",
+        "c": [
+          "the alliance survives on group texts alone — change my mind"
+        ]
+      },
+      {
+        "t": "condescending2Anchor",
+        "c": [
+          "ratings up 400%",
+          "your blood pressure: not invited"
+        ]
+      }
     ],
     "EVERYONE BECOMES AN ENERGY EXPERT": [
-      { "t": "podcastAnalyst", "c": ["OIL GOES UP BECAUSE OF... VIBES"] },
-      { "t": "changeMindAnalyst", "c": ["OIL IS ACTUALLY CHEAP — CHANGE MY MIND"] },
-      { "t": "condescendingExec", "c": ["AMATEURS DISCOVERING", "SUPPLY AND DEMAND"] },
-      { "t": "distractedAnalyst", "c": ["PANIC TRADES", "THE MARKET", "BORING STABILITY"] }
+      {
+        "t": "podcastAnalyst",
+        "c": [
+          "oil's up because mercury's in retrograde, probably"
+        ]
+      },
+      {
+        "t": "changeMindAnalyst",
+        "c": [
+          "300 replies, 300 new barrel experts — change my mind"
+        ]
+      },
+      {
+        "t": "condescendingExec",
+        "c": [
+          "reddit just discovered supply and demand",
+          "i discovered it in 1987, on a yacht"
+        ]
+      },
+      {
+        "t": "distracted2Trader",
+        "c": [
+          "index funds, 6% a year, boring",
+          "me",
+          "oil futures at 3am, unhinged"
+        ]
+      },
+      {
+        "t": "condescending2Exec",
+        "c": [
+          "chaos for everyone else",
+          "a second yacht for me"
+        ]
+      },
+      {
+        "t": "changeMind2Analyst",
+        "c": [
+          "oil prices are a ouija board with extra steps — change my mind"
+        ]
+      }
     ],
     "BICYCLES NOW A LUXURY ASSET": [
-      { "t": "calmFireTrump", "c": ["PRICES ARE TREMENDOUS", "THE BEST PRICES"] },
-      { "t": "cryingAnchor", "c": ["TONIGHT: BIKES OFFICIALLY OUTPRICE CARS"] },
-      { "t": "changeMindExec", "c": ["$175 OIL IS GOOD FOR YOU — CHANGE MY MIND"] },
-      { "t": "distractedTrump", "c": ["OIL MONEY", "WASHINGTON", "THE PEACE DEAL"] }
+      {
+        "t": "calmFireTrump",
+        "c": [
+          "bike prices tripled overnight",
+          "my helmet game has never been stronger"
+        ]
+      },
+      {
+        "t": "cryingAnchor",
+        "c": [
+          "breaking: my bike is worth more than my Honda now"
+        ]
+      },
+      {
+        "t": "changeMindExec",
+        "c": [
+          "$175 oil is basically a gym membership — change my mind"
+        ]
+      },
+      {
+        "t": "changeMind2Exec",
+        "c": [
+          "nobody needs a car, everybody needs quads — change my mind"
+        ]
+      }
     ],
     "LAST-SECOND SAVE": [
-      { "t": "successResponder", "c": ["DISASTER CANCELLED", "AT THE LAST SECOND"] },
-      { "t": "templeCaptain", "c": ["CAN'T LOSE A TANKER IF YOU SAVE IT LAST-FRAME"] },
-      { "t": "twoButtons", "c": ["NERVES OF STEEL", "PURE LUCK"] }
+      {
+        "t": "successResponder",
+        "c": [
+          "disaster: cancelled",
+          "with 0.4 seconds on the clock"
+        ]
+      },
+      {
+        "t": "twoButtons",
+        "c": [
+          "nerves of actual steel",
+          "or the game just lagged, unclear"
+        ]
+      }
     ],
     "LOST A TANKER ON CAMERA": [
-      { "t": "thisIsFine", "c": ["THE TANKER IS FINE. PROBABLY."] },
-      { "t": "disasterCaptain", "c": ["LOST A TANKER", "ON LIVE TV"] },
-      { "t": "cryingCaptain", "c": ["THE SHIP STOPPED TEXTING BACK"] },
-      { "t": "successSoldier", "c": ["DIRECT HIT", "SOMEONE IS CELEBRATING"] }
+      {
+        "t": "disasterCaptain",
+        "c": [
+          "lost a tanker",
+          "live, on CNN, cool cool cool"
+        ]
+      },
+      {
+        "t": "cryingCaptain",
+        "c": [
+          "the ship left me on read, forever"
+        ]
+      },
+      {
+        "t": "successSoldier",
+        "c": [
+          "direct hit",
+          "somebody's LinkedIn post writes itself"
+        ]
+      }
     ],
     "ANOTHER TANKER DOWN": [
-      { "t": "calmFireCaptain", "c": ["STILL FINE", "STILL SIPPING"] },
-      { "t": "disasterAnchor", "c": ["BREAKING: ANOTHER ONE", "RATINGS SOAR"] },
-      { "t": "templeIran", "c": ["SINK THEM FASTER THAN THEY CAN SAIL"] }
+      {
+        "t": "calmFireCaptain",
+        "c": [
+          "still fine",
+          "coffee's still hot, priorities"
+        ]
+      },
+      {
+        "t": "disasterAnchor",
+        "c": [
+          "breaking: another one",
+          "ratings up 12%, we're thriving"
+        ]
+      },
+      {
+        "t": "templeIran",
+        "c": [
+          "sink them faster",
+          "than the insurance forms print"
+        ]
+      }
     ],
     "EVENT SURVIVED": [
-      { "t": "successCaptain", "c": ["EVENT SURVIVED", "CREW DEMANDS RAISES"] },
-      { "t": "templeTrump", "c": ["DECLARE VICTORY BEFORE IT'S OVER"] },
-      { "t": "disasterTrump", "c": ["THREAT ELIMINATED", "TREMENDOUS"] },
-      { "t": "cryingSoldier", "c": ["THE DRONES... ALL OF THEM... BONKED"] }
+      {
+        "t": "successCaptain",
+        "c": [
+          "event survived",
+          "crew wants a 20% raise now"
+        ]
+      },
+      {
+        "t": "templeTrump",
+        "c": [
+          "declare victory",
+          "before the paperwork's even filed"
+        ]
+      },
+      {
+        "t": "disasterTrump",
+        "c": [
+          "threat eliminated",
+          "commemorative coin's already in production"
+        ]
+      },
+      {
+        "t": "cryingSoldier",
+        "c": [
+          "all five drones bonked. i'm not crying, you're crying."
+        ]
+      },
+      {
+        "t": "success2Trump",
+        "c": [
+          "intercepted",
+          "already trademarked the highlight reel"
+        ]
+      },
+      {
+        "t": "disasterEyeTrump",
+        "c": [
+          "that launcher? gone",
+          "next question. no, a different one."
+        ]
+      }
     ],
     "EVENT LOST": [
-      { "t": "disasterKhamenei", "c": ["ALL PART OF THE PLAN"] },
-      { "t": "condescendingKhamenei", "c": ["PREDICTABLE", "THANK YOU"] },
-      { "t": "calmFireAnchor", "c": ["WE REMAIN", "COMPLETELY IN CONTROL"] }
+      {
+        "t": "disasterKhamenei",
+        "c": [
+          "all part of the plan",
+          "the plan has been updated to say so"
+        ]
+      },
+      {
+        "t": "condescendingKhamenei",
+        "c": [
+          "predictable",
+          "lesson's in the mail, you're welcome"
+        ]
+      },
+      {
+        "t": "calmFireAnchor",
+        "c": [
+          "we remain",
+          "the coffee machine, however, is down"
+        ]
+      },
+      {
+        "t": "condescending2Khamenei",
+        "c": [
+          "saw that coming",
+          "wrote it in a memo in March"
+        ]
+      }
     ],
     "ON A RAMPAGE": [
-      { "t": "podcastCommander", "c": ["WHAT IF WE JUST... INTERCEPT EVERYTHING"] },
-      { "t": "vehicleDiplomat", "c": ["THE AMERICANS ARE ENJOYING THIS", "VISIBLY"] },
-      { "t": "condescendingTrump", "c": ["TEN IN A ROW", "I TAUGHT HIM THAT"] }
+      {
+        "t": "podcastCommander",
+        "c": [
+          "what if we intercepted literally all 40 of them"
+        ]
+      },
+      {
+        "t": "vehicleDiplomat",
+        "c": [
+          "the Americans",
+          "are high-fiving in the situation room"
+        ]
+      },
+      {
+        "t": "condescendingTrump",
+        "c": [
+          "{combo} in a row",
+          "personally trained him, tuesdays only"
+        ],
+        "when": {
+          "combo": ">=10"
+        },
+        "weight": 2
+      },
+      {
+        "t": "distracted2Trump",
+        "c": [
+          "the actual diplomat, flown in specially",
+          "him",
+          "some guy with a 90% intercept rate"
+        ]
+      },
+      {
+        "t": "condescending2Trump",
+        "c": [
+          "ten in a row now",
+          "still counting, don't interrupt"
+        ]
+      }
+    ],
+    "IMPOSSIBLE CHOICE ON DECK": [
+      {
+        "t": "twoButtons2Captain",
+        "c": [
+          "guard the tanker",
+          "guard the yacht (it's mine)"
+        ]
+      },
+      {
+        "t": "twoButtons2Trump",
+        "c": [
+          "shake the hand, all four seconds of it",
+          "or hit the tariff button instead"
+        ]
+      },
+      {
+        "t": "twoButtons2Khamenei",
+        "c": [
+          "the mines",
+          "the drones — why not both"
+        ]
+      },
+      {
+        "t": "twoButtons2Trader",
+        "c": [
+          "stability, 2% gains, boring",
+          "chaos, 40% gains, a fire sale"
+        ]
+      }
+    ],
+    "STUBBORN TO THE LAST CARD": [
+      {
+        "t": "draw25Captain",
+        "c": [
+          "just steer around buoy 12 — draws 25 cards instead"
+        ]
+      },
+      {
+        "t": "draw25Trump",
+        "c": [
+          "just take the handshake, four seconds — draws 25 cards instead"
+        ]
+      },
+      {
+        "t": "draw25Khamenei",
+        "c": [
+          "just reopen lane 3 — draws 25 cards instead"
+        ]
+      },
+      {
+        "t": "draw25Exec",
+        "c": [
+          "just repair refinery #3 — draws 25 cards instead"
+        ]
+      }
+    ],
+    "RECKLESS CHOICE, ENTHUSIASTICALLY APPROVED": [
+      {
+        "t": "rejectApproveTrump",
+        "c": [
+          "a normal tanker, on time, insured",
+          "a gold one with his face on the hull"
+        ]
+      },
+      {
+        "t": "rejectApproveKhamenei",
+        "c": [
+          "the calm open lane, zero incidents",
+          "200 mines, freshly laid"
+        ]
+      },
+      {
+        "t": "rejectApproveCaptain",
+        "c": [
+          "the safe naval escort, boring, works",
+          "the mine-filled shortcut, saves 4 minutes"
+        ]
+      },
+      {
+        "t": "rejectApproveTrader",
+        "c": [
+          "a peaceful refinery, steady 2% returns",
+          "one that's on fire, line goes up"
+        ]
+      }
+    ],
+    "LAST-SECOND RECKLESS SWERVE": [
+      {
+        "t": "highwayExitTrump",
+        "c": [
+          "actual negotiations, going great — nah, missile strike exit"
+        ]
+      },
+      {
+        "t": "highwayExitKhamenei",
+        "c": [
+          "regroup the patrol boats, sensible — nah, drone wave 2 exit"
+        ]
+      },
+      {
+        "t": "highwayExitTrader",
+        "c": [
+          "the stable 2% route — nah, fire-sale profit exit"
+        ]
+      }
+    ],
+    "ESCALATES WITHOUT BREAKING A SWEAT": [
+      {
+        "t": "saltTrump",
+        "c": [
+          "sanction #62. this one's got a good feeling to it."
+        ]
+      },
+      {
+        "t": "saltKhamenei",
+        "c": [
+          "mine #340. round number, felt right."
+        ]
+      },
+      {
+        "t": "saltCommander",
+        "c": [
+          "drone wave #9. warranty's not even up yet."
+        ]
+      },
+      {
+        "t": "saltDiplomat",
+        "c": [
+          "statement #14, mostly copy-pasted, minor tweaks"
+        ]
+      }
+    ],
+    "WINNING BUT AT WHAT COST": [
+      {
+        "t": "vehicleAnalyst",
+        "c": [
+          "{combo} intercepts in a row",
+          "oil's at ${price} and climbing, neat"
+        ],
+        "when": {
+          "combo": ">=5",
+          "price": ">=150"
+        }
+      },
+      {
+        "t": "condescendingExec",
+        "c": [
+          "keep 'winning', kid",
+          "i get paid either way, ${price} or not"
+        ],
+        "when": {
+          "price": ">=150"
+        }
+      },
+      {
+        "t": "calmFireCaptain",
+        "c": [
+          "personal best, {combo} in a row",
+          "everything else is, factually, on fire"
+        ],
+        "when": {
+          "combo": ">=5"
+        }
+      },
+      {
+        "t": "condescendingKhamenei",
+        "c": [
+          "cheap oil, an empty sea",
+          "{lost} tankers would like a word"
+        ],
+        "when": {
+          "tankersLost": ">=2",
+          "price": "<=90"
+        }
+      },
+      {
+        "t": "vehicleDiplomat",
+        "c": [
+          "the market recovered nicely",
+          "the ships did not, tragically"
+        ]
+      }
+    ],
+    "SUSPICIOUSLY QUIET": [
+      {
+        "t": "squintCaptain",
+        "c": [
+          "no drones in 20 minutes",
+          "he's counted every one of them"
+        ],
+        "when": {
+          "trend": "stable"
+        }
+      },
+      {
+        "t": "squintIran",
+        "c": [
+          "why's nobody shooting",
+          "he's checked the radar four times now"
+        ],
+        "when": {
+          "trend": "stable"
+        }
+      },
+      {
+        "t": "squintAnalyst",
+        "c": [
+          "oil's flat at ${price}",
+          "flat like this costs somebody, somewhere"
+        ],
+        "when": {
+          "trend": "stable"
+        }
+      },
+      {
+        "t": "changeMindDiplomat",
+        "c": [
+          "day 3 with zero incidents, suspicious — change my mind"
+        ]
+      },
+      {
+        "t": "twoButtons",
+        "c": [
+          "actually enjoy the calm",
+          "assume it's a trap, obviously"
+        ]
+      }
     ]
   },
   "fallback": [
-    { "t": "twoButtons", "c": ["KEEP CALM", "PANIC ON AIR"] },
-    { "t": "thisIsFine", "c": ["THIS IS FINE"] },
-    { "t": "vehicleAnchor", "c": ["LIVE TELEVISION, EVERYONE"] },
-    { "t": "squintTrump", "c": ["SOMETHING'S GOING ON", "NOBODY KNOWS WHAT"] },
-    { "t": "podcastCaptain", "c": ["WHAT IF SHIPS JUST... STAYED HOME"] }
+    {
+      "t": "twoButtons",
+      "c": [
+        "stay visibly calm",
+        "scream, but only internally"
+      ]
+    },
+    {
+      "t": "vehicleAnchor",
+      "c": [
+        "live television",
+        "1.2 million people watching this go badly"
+      ]
+    },
+    {
+      "t": "squintTrump",
+      "c": [
+        "something's happening off-screen",
+        "he's the only one still smiling"
+      ]
+    },
+    {
+      "t": "podcastCaptain",
+      "c": [
+        "what if all 40 ships just stayed home today"
+      ]
+    }
   ]
 }

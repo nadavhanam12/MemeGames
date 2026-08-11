@@ -50,7 +50,8 @@
     "airCooldownStep": 1.2,
     "airSpeedBase": 130,
     "airSpeedPerLevel": 40,
-    "airInterceptDist": 55,
+    "airFireDist": 190,
+    "airStandoffDist": 110,
     "hullHpPerLevel": 1,
     "hullDamagedSpikeFactor": 0.5,
     "goldBonusPerLevel": 0.25,
@@ -98,7 +99,6 @@
     "nightMaxAlpha": 0
   },
   "days": {
-    "breakSec": 6,
     "threatUnlockDays": { "mine": 2, "patrol": 3, "armored": 5 },
     "upgradeRevealDays": { "hull": 1, "gold": 2, "air": 3 },
     "rewardCreditsBase": 15,

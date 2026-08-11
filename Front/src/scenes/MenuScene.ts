@@ -4,6 +4,7 @@ import { loadSettings, settings } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
 import { popIn, pressPulse } from '../core/juice';
+import { MEMES, renderMeme } from '../core/memes';
 import { fetchLeaderboard } from '../backend/api';
 
 export class MenuScene extends Phaser.Scene {
@@ -57,15 +58,16 @@ export class MenuScene extends Phaser.Scene {
 
     // the situation, in plain english
     const blurb = [
-      'Iran is threatening to shut the Strait of Hormuz, the narrow sea lane',
-      'that carries a fifth of the world’s oil. Tap a threat and your gunner',
-      'shoots it down — hold for a full burst, but don’t overheat the gun.',
-      'Keep the tankers safe and complete each day’s mission for bonus cash.'
+      'Iran is threatening to SHUT THE STRAIT OF HORMUZ —',
+      'the narrow sea lane that carries A FIFTH OF THE WORLD’S OIL!',
+      'TAP a threat and your gunner shoots it down.',
+      'HOLD for a full burst — but DON’T OVERHEAT the gun!',
+      'KEEP THE TANKERS SAFE and complete each day’s MISSION for bonus cash.'
     ];
     this.add.rectangle(cx, 319, 900, 200, PAL.ink, 0.75).setStrokeStyle(3, PAL.gold, 0.6);
     blurb.forEach((line, i) => {
       this.add
-        .text(cx, 262 + i * 38, line, {
+        .text(cx, 254 + i * 34, line, {
           fontFamily: FONT_SANS,
           fontSize: '22px',
           fontStyle: 'bold',
@@ -76,8 +78,14 @@ export class MenuScene extends Phaser.Scene {
         .setOrigin(0.5);
     });
 
+    // static menu memes, bottom corners (fixed picks — not part of the run's meme log)
+    const memeLeft = this.add.container(185, 560).setAngle(-4);
+    renderMeme(this, memeLeft, { tpl: MEMES.templates.rejectApproveKhamenei, captions: [] }, 280, 280);
+    const memeRight = this.add.container(GAME_W - 185, 560).setAngle(4);
+    renderMeme(this, memeRight, { tpl: MEMES.templates.twoButtons2Trump, captions: [] }, 280, 280);
+
     // start button
-    const start = this.add.container(cx, 460);
+    const start = this.add.container(cx, 485);
     const sb = this.add.rectangle(0, 0, 440, 100, PAL.green).setStrokeStyle(6, PAL.ink);
     const st = this.add
       .text(0, 0, 'DEFEND THE STRAIT', { fontFamily: FONT_DISPLAY, fontSize: '34px', color: HEX.ink })
@@ -90,7 +98,7 @@ export class MenuScene extends Phaser.Scene {
     }
     // player count (backend-driven; hidden until the fetch succeeds)
     const playersTxt = this.add
-      .text(cx, 645, '', {
+      .text(cx, 668, '', {
         fontFamily: FONT_SANS,
         fontSize: '20px',
         fontStyle: 'bold',
@@ -111,7 +119,7 @@ export class MenuScene extends Phaser.Scene {
       });
 
     // global leaderboard (backend-driven)
-    const lb = this.add.container(cx, 575);
+    const lb = this.add.container(cx, 600);
     const lbBg = this.add.rectangle(0, 0, 260, 70, PAL.ocean).setStrokeStyle(6, PAL.ink);
     const lbTxt = this.add
       .text(0, 0, 'LEADERBOARD', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.cream })

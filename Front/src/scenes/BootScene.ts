@@ -17,6 +17,7 @@ export class BootScene extends Phaser.Scene {
       // programmatic fallbacks only for keys with no generated texture
       this.makeTankers();
       this.makeThreats();
+      this.makeUpgradeIcons();
       this.scene.start('Menu');
     });
   }
@@ -180,6 +181,73 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0x51606f, 1);
     g.fillCircle(25, 25, 8);
     g.generateTexture('mine', 60, 60);
+    g.destroy();
+  }
+
+  // Hull Armor reuses the tanker sprite art directly — no dedicated icon needed.
+  private makeUpgradeIcons(): void {
+    if (!hasArt(this, 'upgradeIconAir')) this.makeUpgradeIconAir();
+    if (!hasArt(this, 'upgradeIconGold')) this.makeUpgradeIconGold();
+  }
+
+  /** Jet silhouette banking in, three-quarter angle. */
+  private makeUpgradeIconAir(): void {
+    const g = this.g();
+    g.fillStyle(PAL.ink, 1);
+    g.beginPath();
+    g.moveTo(2, 30);
+    g.lineTo(24, 22);
+    g.lineTo(50, 4);
+    g.lineTo(56, 8);
+    g.lineTo(36, 26);
+    g.lineTo(58, 26);
+    g.lineTo(66, 30);
+    g.lineTo(58, 34);
+    g.lineTo(36, 34);
+    g.lineTo(50, 50);
+    g.lineTo(44, 52);
+    g.lineTo(24, 38);
+    g.lineTo(2, 34);
+    g.closePath();
+    g.fillPath();
+    g.fillStyle(PAL.ocean, 1);
+    g.beginPath();
+    g.moveTo(6, 30);
+    g.lineTo(24, 24);
+    g.lineTo(48, 8);
+    g.lineTo(50, 10);
+    g.lineTo(32, 27);
+    g.lineTo(56, 27);
+    g.lineTo(60, 30);
+    g.lineTo(56, 33);
+    g.lineTo(32, 33);
+    g.lineTo(50, 48);
+    g.lineTo(48, 49);
+    g.lineTo(24, 36);
+    g.lineTo(6, 30);
+    g.closePath();
+    g.fillPath();
+    g.fillStyle(0xffffff, 0.5);
+    g.fillTriangle(10, 29, 26, 25, 26, 29);
+    g.generateTexture('upgradeIconAir', 68, 56);
+    g.destroy();
+  }
+
+  /** Stack of gold coins. */
+  private makeUpgradeIconGold(): void {
+    const g = this.g();
+    const coin = (cx: number, cy: number) => {
+      g.fillStyle(PAL.ink, 1);
+      g.fillEllipse(cx, cy, 34, 22);
+      g.fillStyle(PAL.gold, 1);
+      g.fillEllipse(cx, cy, 28, 16);
+      g.fillStyle(0xffe08a, 0.7);
+      g.fillEllipse(cx, cy - 2, 18, 8);
+    };
+    coin(30, 44);
+    coin(30, 32);
+    coin(30, 20);
+    g.generateTexture('upgradeIconGold', 60, 56);
     g.destroy();
   }
 

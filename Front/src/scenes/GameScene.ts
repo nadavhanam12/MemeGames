@@ -3,10 +3,11 @@ import { GAME_H, GAME_W, HEX, PAL, VIEW } from '../core/palette';
 import { settings, vibrate } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
-import { MEMES, resetMemeLog } from '../core/memes';
+import { MemeContext, MEMES, resetMemeLog } from '../core/memes';
 import { TUNING, persistTuningLocal } from '../config/tuning';
 import { devState } from '../dev/state';
 import { leaderboard } from '../backend/leaderboard';
+import { analytics } from '../backend/analytics';
 import {
   camImpulse,
   confetti,
@@ -21,6 +22,7 @@ import {
   MissionType,
   SessionStats,
   bus,
+  computeScore,
   freshStats
 } from '../core/state';
 
@@ -53,6 +55,7 @@ interface Bullet {
   aimX: number;
   aimY: number;
   done?: boolean;
+  fromAir?: boolean; // air-support rounds don't count as player intercepts
 }
 
 interface Tanker {
@@ -94,9 +97,10 @@ export class GameScene extends Phaser.Scene {
   private airTimer = 0;
 
   // day / mission system: each day is a mini-level with one mission; between
-  // days the world freezes for a short break while the news band recaps
+  // days the world freezes for the recap card and waits for the player to
+  // click NEXT DAY (see onNextDayRequest)
   private day = 0;
-  private dayBreakT = 0;
+  private awaitingNextDay = false;
   private mission: DayMission | null = null;
   private lastMissionType: MissionType | '' = '';
   private dayCounters = { priceAtStart: 0, safe: 0, lost: 0, intercepts: 0, bestCombo: 0 };
@@ -136,6 +140,18 @@ export class GameScene extends Phaser.Scene {
   private routeLabel?: Phaser.GameObjects.Text;
   private routeHandles: Phaser.GameObjects.Arc[] = [];
 
+  // meme context/watchers: GameScene's own copy of the last emit time (so a
+  // watcher edge is never blindly fired into UIScene's cooldown with nothing
+  // shown), the last "something happened" timestamp (quiet-watcher input),
+  // and edge-trigger/rearm state for the two state watchers.
+  private lastMemeEmitAt = -Infinity;
+  private lastIncidentAt = 0;
+  private watcherAccum = 0;
+  private watcherState: Record<'dissonance' | 'quiet', { was: boolean; armed: boolean; falseFor: number; lastFiredAt: number }> = {
+    dissonance: { was: false, armed: true, falseFor: 0, lastFiredAt: -Infinity },
+    quiet: { was: false, armed: true, falseFor: 0, lastFiredAt: -Infinity }
+  };
+
   constructor() {
     super('Game');
   }
@@ -144,13 +160,14 @@ export class GameScene extends Phaser.Scene {
     // Prefetch a score token now so it satisfies the server's 60s minimum age
     // by the time the run ends and the player submits from the results screen.
     leaderboard.beginRun();
+    analytics.startRun();
     resetMemeLog();
     this.stats = freshStats();
     this.tankers = [];
     this.threats = [];
     this.elapsed = 0;
     this.day = 0;
-    this.dayBreakT = 0;
+    this.awaitingNextDay = false;
     this.mission = null;
     this.lastMissionType = '';
     this.worldScale = 1;
@@ -167,6 +184,13 @@ export class GameScene extends Phaser.Scene {
     this.lastPriceSide = {};
     this.dangerT = 0;
     this.dangerActive = false;
+    this.lastMemeEmitAt = -Infinity;
+    this.lastIncidentAt = 0;
+    this.watcherAccum = 0;
+    this.watcherState = {
+      dissonance: { was: false, armed: true, falseFor: 0, lastFiredAt: -Infinity },
+      quiet: { was: false, armed: true, falseFor: 0, lastFiredAt: -Infinity }
+    };
     this.mapArt = hasArt(this, 'map_bg');
     this.bullets = [];
     this.heat = 0;
@@ -213,9 +237,12 @@ export class GameScene extends Phaser.Scene {
 
     bus.removeAllListeners('buy-upgrade');
     bus.on('buy-upgrade', (key: 'air' | 'hull' | 'gold', cost: number) => this.buyUpgrade(key, cost));
+    bus.removeAllListeners(EV.NEXT_DAY_REQUEST);
+    bus.on(EV.NEXT_DAY_REQUEST, this.onNextDayRequest, this);
 
     this.events.on('shutdown', () => {
       bus.removeAllListeners('buy-upgrade');
+      bus.removeAllListeners(EV.NEXT_DAY_REQUEST);
     });
   }
 
@@ -634,7 +661,7 @@ export class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------- input
   /** One tracer at the nearest threat to (x,y) — or at the water if nothing's there. */
   private fireShot(x: number, y: number): void {
-    if (this.over || this.dayBreakT > 0) return;
+    if (this.over || this.awaitingNextDay) return;
     if (import.meta.env.DEV && (devState.layoutEdit || devState.routeEdit)) return;
     const tu = TUNING.turret;
     if (this.overheated) return; // heat bar flashes red — the gun is the message
@@ -729,12 +756,11 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.zoomTo(this.baseZoom * 1.12, 150, 'Cubic.easeOut', true);
         this.time.delayedCall(450, () => this.cameras.main.zoomTo(this.baseZoom, 250, 'Cubic.easeOut', true));
       }
-      floatText(this, x, y - 90, 'LAST-SECOND SAVE', HEX.gold, 40);
       this.changePrice(-TUNING.economy.nearMissDrop);
       sfx.bigHit();
       vibrate([20, 30, 40]);
       this.stats.memeMoment = 'LAST-SECOND SAVE';
-      bus.emit('meme-moment', 'LAST-SECOND SAVE');
+      this.emitMeme('LAST-SECOND SAVE');
     }
 
     const gain = TUNING.economy.interceptCredits;
@@ -747,7 +773,6 @@ export class GameScene extends Phaser.Scene {
     if (th.swarmId !== undefined) {
       this.swarmRemaining--;
       this.swarmCounter++;
-      floatText(this, x, y - 130, `CHAIN ×${this.swarmCounter}`, HEX.purple, 26 + this.swarmCounter * 3);
       if (this.swarmRemaining <= 0) this.resolveEvent(true);
     }
   }
@@ -787,13 +812,11 @@ export class GameScene extends Phaser.Scene {
       case 'mine': {
         sfx.disarm();
         this.burst(x, y, 0xaab4bd, 'gear', 9);
-        floatText(this, x, y + 30, 'DISARMED', HEX.cream, 22);
         s.destroy();
         break;
       }
       case 'patrol': {
         sfx.retreat();
-        floatText(this, x, y - 60, 'NOPE.', HEX.cream, 26);
         this.tweens.add({
           targets: s,
           alpha: 0,
@@ -836,7 +859,7 @@ export class GameScene extends Phaser.Scene {
     bus.emit(EV.COMBO, this.stats.combo, milestone);
     this.dayCounters.bestCombo = Math.max(this.dayCounters.bestCombo, this.stats.combo);
     if (this.mission?.type === 'combo') this.bumpMission(this.dayCounters.bestCombo);
-    if (this.stats.combo === MEMES.settings.streakCombo) bus.emit('meme-moment', 'ON A RAMPAGE');
+    if (this.stats.combo === MEMES.settings.streakCombo) this.emitMeme('ON A RAMPAGE');
     if (milestone) {
       this.addCredits(this.stats.combo, GAME_W / 2, 200);
       sfx.comboSting(Math.floor(this.stats.combo / 10));
@@ -870,6 +893,7 @@ export class GameScene extends Phaser.Scene {
     for (const [key, active, , tone] of checks) {
       const was = this.lastPriceSide[key] ?? false;
       if (active && !was) {
+        this.lastIncidentAt = this.elapsed;
         // no headline — the news band is day-system only; the market still flinches
         if (tone === 'bad') {
           sfx.alarm();
@@ -880,11 +904,102 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // ------------------------------------------------------------- meme context
+  /** Snapshot of the run's trajectory, built fresh at every meme emit — lets
+   *  pickMeme() score variants against price trend, streaks, loss history,
+   *  and contradictions, not just the discrete trigger label. */
+  private memeContext(): MemeContext {
+    const s = this.stats;
+    const set = MEMES.settings;
+    const hist = s.priceHistory;
+    // priceHistory is sampled every 0.5s (see historyTimer in update())
+    const samplesAgo = Math.round(set.trendWindowSec / 0.5);
+    const idx = Math.max(0, hist.length - 1 - samplesAgo);
+    const past = hist[idx] ?? hist[0] ?? s.oilPrice;
+    const diff = s.oilPrice - past;
+    const trend: MemeContext['trend'] = diff >= set.trendBand ? 'rising' : diff <= -set.trendBand ? 'falling' : 'stable';
+    return {
+      price: Math.round(s.oilPrice),
+      trend,
+      tankersLost: s.tankersLost,
+      tankersSafe: s.tankersSafe,
+      combo: s.combo,
+      eventActive: this.eventActive,
+      eventsWon: s.eventsWon,
+      eventsLost: s.eventsLost,
+      elapsed: this.elapsed,
+      dangerActive: this.dangerActive,
+      threats: this.threats.filter(t => !t.dead).length
+    };
+  }
+
+  /** Every 'meme-moment' emit goes through here so lastMemeEmitAt (the
+   *  watchers' own copy of the global cooldown gap) always tracks reality. */
+  private emitMeme(label: string): void {
+    this.lastMemeEmitAt = this.elapsed;
+    bus.emit('meme-moment', label, this.memeContext());
+  }
+
+  /** 1s-cadence check for the two state watchers (dissonance + quiet stretch).
+   *  Both are edge-triggered: fire once on entering the state, re-arm only
+   *  after the condition has been continuously false for `rearmSec`. */
+  private checkWatchers(): void {
+    const w = MEMES.settings.watchers;
+    const ctx = this.memeContext();
+
+    const dissA = ctx.combo >= (w.dissonance.comboMin ?? Infinity) &&
+      ctx.price >= (w.dissonance.priceHigh ?? Infinity) &&
+      ctx.trend !== 'falling';
+    const dissB = ctx.price <= (w.dissonance.priceLow ?? -Infinity) &&
+      ctx.tankersLost >= (w.dissonance.lostMin ?? Infinity);
+    this.stepWatcher('dissonance', dissA || dissB, w.dissonance, 'WINNING BUT AT WHAT COST');
+
+    const quietSeconds = this.elapsed - this.lastIncidentAt;
+    const quietCond =
+      this.elapsed >= (w.quiet.graceSec ?? 0) &&
+      quietSeconds >= (w.quiet.quietSec ?? Infinity) &&
+      ctx.threats <= (w.quiet.maxThreats ?? 0) &&
+      ctx.trend === 'stable';
+    this.stepWatcher('quiet', quietCond, w.quiet, 'SUSPICIOUSLY QUIET');
+  }
+
+  private stepWatcher(
+    key: 'dissonance' | 'quiet',
+    cond: boolean,
+    tuning: { cooldownSec: number; rearmSec: number },
+    label: string
+  ): void {
+    const s = this.watcherState[key];
+    if (cond) {
+      s.falseFor = 0;
+      if (!s.was && s.armed) {
+        const cooledDown = this.elapsed - s.lastFiredAt >= tuning.cooldownSec;
+        const gapOk = this.elapsed - this.lastMemeEmitAt >= MEMES.settings.minGapMs / 1000;
+        if (cooledDown && gapOk) {
+          s.lastFiredAt = this.elapsed;
+          s.armed = false;
+          this.emitMeme(label);
+        }
+      }
+    } else {
+      s.falseFor += 1;
+      if (s.falseFor >= tuning.rearmSec) s.armed = true;
+    }
+    s.was = cond;
+  }
+
   private addCredits(gain: number, x: number, y: number): void {
     // OIL MONEY: all credit income scales with the gold upgrade
     const boosted = Math.round(gain * (1 + this.upgrades.gold * TUNING.upgrades.goldBonusPerLevel));
     this.stats.credits += boosted;
-    bus.emit(EV.CREDITS, this.stats.credits, boosted, x, y);
+    // x,y are world coords; UIScene draws unscaled over the full canvas, so
+    // translate through this scene's viewport+zoom+origin (Phaser's actual
+    // camera matrix: viewport pos + origin*(1-zoom) + zoom*(world - scroll))
+    // to land the coin fly-out where the reward actually happened on screen.
+    const cam = this.cameras.main;
+    const hudX = cam.x + cam.width * cam.originX * (1 - cam.zoom) + cam.zoom * (x - cam.scrollX);
+    const hudY = cam.y + cam.height * cam.originY * (1 - cam.zoom) + cam.zoom * (y - cam.scrollY);
+    bus.emit(EV.CREDITS, this.stats.credits, boosted, hudX, hudY);
   }
 
   // ------------------------------------------------------------- upgrades
@@ -895,6 +1010,7 @@ export class GameScene extends Phaser.Scene {
     this.stats.upgradesBought++;
     bus.emit(EV.CREDITS, this.stats.credits, 0, 0, 0);
     bus.emit(EV.UPGRADE_DEMO, key, this.upgrades[key]);
+    analytics.track('upgrade_bought', { key, level: this.upgrades[key] });
     sfx.upgrade();
     vibrate(30);
 
@@ -956,6 +1072,7 @@ export class GameScene extends Phaser.Scene {
 
   private triggerEvent(): void {
     this.eventActive = true;
+    this.lastIncidentAt = this.elapsed;
     bus.emit(EV.EVENT_PROB, this.eventLabel, 0.97, true);
     sfx.eventCard();
     camImpulse(this, 0.006, 200);
@@ -981,6 +1098,7 @@ export class GameScene extends Phaser.Scene {
     this.eventActive = false;
     this.eventProb = 0.05;
     this.eventCooldown = 12;
+    this.lastIncidentAt = this.elapsed;
     if (won) {
       this.stats.eventsWon++;
       this.changePrice(-4);
@@ -988,13 +1106,13 @@ export class GameScene extends Phaser.Scene {
       confetti(this, GAME_W / 2, 200, 20);
       sfx.fanfare();
       this.stats.memeMoment = this.stats.memeMoment || `SURVIVED: ${this.eventLabel}`;
-      bus.emit('meme-moment', 'EVENT SURVIVED');
+      this.emitMeme('EVENT SURVIVED');
     } else {
       this.stats.eventsLost++;
       bus.emit(EV.MARKET_NUDGE, TUNING.market.nudgeBadNews);
       this.changePrice(6);
       this.stats.memeMoment = this.stats.memeMoment || `LOST: ${this.eventLabel}`;
-      bus.emit('meme-moment', 'EVENT LOST');
+      this.emitMeme('EVENT LOST');
     }
     this.eventLabel = this.eventLabel === 'DRONE SWARM SURGE' ? 'VIP TANKER TRANSIT' : 'DRONE SWARM SURGE';
   }
@@ -1096,8 +1214,28 @@ export class GameScene extends Phaser.Scene {
       priceDelta: Math.round(this.stats.oilPrice - this.dayCounters.priceAtStart),
       warnings: this.warningsFor(this.day + 1)
     });
+    analytics.track('day_end', {
+      day: this.day,
+      missionDone: m.done,
+      safe: this.dayCounters.safe,
+      lost: this.dayCounters.lost,
+      price: Math.round(this.stats.oilPrice)
+    });
+    analytics.track('mission_result', { day: this.day, type: m.type, done: m.done });
     this.firingHeld = false;
-    this.dayBreakT = d.breakSec;
+    this.awaitingNextDay = true;
+    // hide the whole world (tankers, threats, gun) behind the recap panel —
+    // GameScene renders on its own camera, so this doesn't touch UIScene
+    this.cameras.main.fadeOut(settings.reducedMotion ? 0 : 300, 7, 59, 92);
+  }
+
+  /** Player clicked NEXT DAY on the frozen recap card — advance and unfreeze. */
+  private onNextDayRequest(): void {
+    if (!this.awaitingNextDay) return;
+    this.awaitingNextDay = false;
+    bus.emit(EV.DAY_BREAK, null);
+    this.startDay(this.day + 1);
+    this.cameras.main.fadeIn(settings.reducedMotion ? 0 : 300, 7, 59, 92);
   }
 
   /** True while any hostile is still a live danger to the tankers we defend —
@@ -1178,6 +1316,7 @@ export class GameScene extends Phaser.Scene {
     t.dead = true;
     th.dead = true;
     this.stats.tankersLost++;
+    this.lastIncidentAt = this.elapsed;
     this.breakCombo();
     sfx.bigHit();
     camImpulse(this, TUNING.juice.shakeBig, 300);
@@ -1194,7 +1333,7 @@ export class GameScene extends Phaser.Scene {
     floatText(this, t.sprite.x, t.sprite.y - 70, `+$${spike} OIL`, HEX.red, 36);
     const lossLabel = this.stats.tankersLost >= 2 ? 'ANOTHER TANKER DOWN' : 'LOST A TANKER ON CAMERA';
     this.stats.memeMoment = this.stats.memeMoment || lossLabel;
-    bus.emit('meme-moment', lossLabel);
+    this.emitMeme(lossLabel);
     this.tweens.add({
       targets: t.sprite,
       angle: 14,
@@ -1245,7 +1384,7 @@ export class GameScene extends Phaser.Scene {
       const d = Phaser.Math.Distance.Between(b.sprite.x, b.sprite.y, b.aimX, b.aimY);
       if (d <= Math.max(step, tu.bulletHitRadius)) {
         if (b.target && !b.target.dead) {
-          this.intercept(b.target, true);
+          this.intercept(b.target, !b.fromAir);
         } else {
           // wasted round — small splash so the miss still reads
           this.burst(b.aimX, b.aimY, 0x8fd6ef, 'puff', 3);
@@ -1318,16 +1457,8 @@ export class GameScene extends Phaser.Scene {
     const dt = rawDt * this.worldScale;
 
     // end-of-day break: the whole world freezes (ships, threats, prices, gun)
-    // so the player can read the recap in the news band
-    if (this.dayBreakT > 0) {
-      this.dayBreakT -= rawDt;
-      bus.emit(EV.DAY_BREAK, Math.max(this.dayBreakT, 0));
-      if (this.dayBreakT <= 0) {
-        bus.emit(EV.DAY_BREAK, null);
-        this.startDay(this.day + 1);
-      }
-      return;
-    }
+    // so the player can read the recap, until they click NEXT DAY
+    if (this.awaitingNextDay) return;
 
     this.elapsed += rawDt;
 
@@ -1395,6 +1526,15 @@ export class GameScene extends Phaser.Scene {
       if (this.stats.priceHistory.length > 90) this.stats.priceHistory.shift();
     }
 
+    // state watchers (dissonance / quiet-stretch memes): 1s cadence, skipped
+    // while the world is over (checked at top of update()) — no separate
+    // over-guard needed here since we already returned above when this.over.
+    this.watcherAccum += rawDt;
+    if (this.watcherAccum >= 1) {
+      this.watcherAccum -= 1;
+      this.checkWatchers();
+    }
+
     // continuous difficulty ramp toward minInterval / maxThreatsEnd
     const sp = TUNING.spawn;
     const prog = Math.min(this.elapsed / sp.rampSeconds, 1);
@@ -1437,17 +1577,28 @@ export class GameScene extends Phaser.Scene {
       const jetSpeed = up.airSpeedBase + this.upgrades.air * up.airSpeedPerLevel;
       const ang = Math.atan2(ty - this.jet.y, tx - this.jet.x);
       const dist = Phaser.Math.Distance.Between(this.jet.x, this.jet.y, tx, ty);
-      const stepLen = Math.min(jetSpeed * dt, dist);
+      // hold a standoff distance from a live target — the jet shoots, it doesn't ram
+      const closeTo = target ? Math.max(0, dist - up.airStandoffDist) : dist;
+      const stepLen = Math.min(jetSpeed * dt, closeTo);
       this.jet.x += Math.cos(ang) * stepLen;
       this.jet.y += Math.sin(ang) * stepLen;
       if (stepLen > 0.5) {
         this.jet.setFlipY(Math.abs(ang) > Math.PI / 2);
         this.jet.setRotation(ang);
       }
-      if (target && dist < up.airInterceptDist && this.airTimer === 0) {
+      if (target && dist < up.airFireDist && this.airTimer === 0) {
         this.airTimer = up.airCooldownBase - this.upgrades.air * up.airCooldownStep;
         floatText(this, target.sprite.x, target.sprite.y - 50, 'AIR INTERCEPT', HEX.orange, 20);
-        this.intercept(target, false);
+        const spr = this.add.image(this.jet.x, this.jet.y, 'tracerGen').setDepth(55);
+        spr.setRotation(Math.atan2(target.sprite.y - this.jet.y, target.sprite.x - this.jet.x));
+        this.bullets.push({
+          sprite: spr,
+          target,
+          aimX: target.sprite.x,
+          aimY: target.sprite.y,
+          fromAir: true,
+        });
+        shockwave(this, this.jet.x, this.jet.y, 0xffe08a, 16);
       }
     }
 
@@ -1597,9 +1748,28 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------- end
+  /** Dev-only hook: force an immediate loss to test the results/leaderboard flow. */
+  devForceLoss(): void {
+    if (!this.over) this.endSession();
+  }
+
+  /** Dev-only hook: end the current day immediately, skipping the remaining timer
+   *  and any still-pressing threats. */
+  devEndDay(): void {
+    if (!this.over && !this.awaitingNextDay) this.endDay();
+  }
+
   private endSession(): void {
     this.over = true;
     this.stats.survivalTime = this.elapsed;
+    analytics.track('run_end', {
+      score: computeScore(this.stats),
+      survivalTime: this.stats.survivalTime,
+      daysSurvived: this.stats.daysSurvived,
+      tankersSafe: this.stats.tankersSafe,
+      tankersLost: this.stats.tankersLost,
+      bestCombo: this.stats.bestCombo
+    });
     bus.emit(EV.DANGER, null);
     sfx.whoosh();
     this.tweens.add({ targets: this.cameras.main, zoom: this.baseZoom * 1.05, duration: 350, ease: 'Sine.easeOut' });

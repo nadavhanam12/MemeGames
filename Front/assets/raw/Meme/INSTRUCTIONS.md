@@ -38,6 +38,18 @@ Each of the four cells must represent a recognizable **Strait Shooter** situatio
 
 The meme must be useful as responsive game feedback, not merely a generic reaction image.
 
+## 3A. Apply the five meme-quality principles
+
+Use these as selection and scenario-design tests without overriding the locked reference composition:
+
+- **Universal relatability:** anchor each cell in a basic emotion such as smugness, panic, denial, temptation, regret, or awkwardness.
+- **High modularity:** keep characters, props, labels, and runtime captions swappable while preserving the underlying visual joke.
+- **Binary visual contrast:** where the reference supports it, make the conflict immediately legible as success versus failure, action versus inaction, or confidence versus chaos.
+- **Zero-friction processing:** expressions, gestures, and background events must communicate the emotional state before runtime text is read.
+- **Ironic tension:** pair casual behavior with severe consequences, confident reactions with obvious failure, or excessive responses with minor triggers.
+
+When planning an atlas, give all four cells distinct gameplay states and casts. Keep any future runtime overlay under eight words per label whenever practical.
+
 ## 4. Runtime text only
 
 - Do **not** bake captions, labels, letters, numbers, logos, or watermarks into new atlases.

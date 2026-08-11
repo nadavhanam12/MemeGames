@@ -8,6 +8,7 @@ import { EASE, confetti, countTo, popIn } from '../core/juice';
 import { SessionStats, computeScore, freshStats } from '../core/state';
 import { leaderboard } from '../backend/leaderboard';
 import { openSubmitOverlay } from '../backend/submitOverlay';
+import { analytics } from '../backend/analytics';
 
 interface Rank {
   name: string;
@@ -176,6 +177,11 @@ export class ResultsScene extends Phaser.Scene {
         overlayOpen = true;
         outcome = await openSubmitOverlay(leaderboard, finalScore);
         overlayOpen = false;
+        if (outcome) {
+          analytics.track('score_submitted', { accepted: outcome.response.accepted, saved: outcome.response.saved });
+        } else {
+          analytics.track('score_submit_skipped');
+        }
       }
       if (outcome) {
         submitted = true;

@@ -32,7 +32,7 @@ server.
   - `design/ART_DIRECTION.md`, `assets/CHATGPT_BRIEF.md` (core game art),
     `assets/MEME_BRIEF.md` (meme atlas workflow; generation rules + per-cell
     catalog live in `assets/raw/Meme/`) — art direction docs.
-- `docs/leaderboard-contract.md` — API contract for the leaderboard server
+- `docs/backend-contract.md` — API contract for the leaderboard server
   (a separate Bun + SQLite repo; consumed over HTTP, no backend code here).
 
 ## Front ↔ back layer (`Front/src/backend/`)

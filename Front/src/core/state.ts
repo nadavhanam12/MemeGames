@@ -94,13 +94,15 @@ export const EV = {
   MISSION: 'day-mission', // (DayMission) — assigned at day start, updated on progress
   DAY_START: 'day-start', // (day, missionText, revealedUpgradeKeys)
   DAY_END: 'day-end', // (DaySummary) — shown in the news band during the break
-  DAY_BREAK: 'day-break', // (secondsRemaining | null) — ticks during the frozen recap
+  DAY_BREAK: 'day-break', // (null) — fires when the player dismisses the frozen recap
+  NEXT_DAY_REQUEST: 'next-day-request', // () — player clicked NEXT DAY on the recap card
   UPGRADE_REVEAL: 'upgrade-reveal', // (upgradeKey) — button unlocks in the shop
   MARKET_NUDGE: 'market-nudge', // (delta) — silent prediction-market push, no headline
   TIMER: 'timer', // (elapsedSeconds — survival time counts UP)
   DANGER: 'danger', // (secondsUntilMeltdown | null when cleared)
   GAME_OVER: 'game-over', // (stats)
-  UPGRADE_DEMO: 'upgrade-demo' // (upgradeKey)
+  UPGRADE_DEMO: 'upgrade-demo', // (upgradeKey)
+  DEV_FORCE_MEME: 'dev-force-meme' // () — dev panel: show a meme now, ignoring the cooldown
 } as const;
 
 export const COMBO_MILESTONES: Record<number, string> = {

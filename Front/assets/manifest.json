@@ -21,7 +21,10 @@
       "name": "map_bg",
       "file": "map_bg.png",
       "kind": "image",
-      "size": [1920, 1080],
+      "size": [
+        1920,
+        1080
+      ],
       "alpha": false,
       "use": "Main gameplay map background, scaled to the 1280x720 world",
       "importFilter": "bilinear"
@@ -30,38 +33,93 @@
       "name": "tankers",
       "file": "tankers_atlas.png",
       "kind": "atlas",
-      "size": [1024, 1536],
+      "size": [
+        1024,
+        1536
+      ],
       "alpha": true,
       "trim": true,
       "pivot": "center",
       "frames": {
-        "tanker_red": { "x": 0, "y": 0, "w": 1024, "h": 512 },
-        "tanker_blue": { "x": 0, "y": 512, "w": 1024, "h": 512 },
-        "tanker_vip": { "x": 0, "y": 1024, "w": 1024, "h": 512 }
+        "tanker_red": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 512
+        },
+        "tanker_blue": {
+          "x": 0,
+          "y": 512,
+          "w": 1024,
+          "h": 512
+        },
+        "tanker_vip": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 512
+        }
       },
-      "targetWidths": { "tanker_red": 220, "tanker_blue": 200, "tanker_vip": 240 }
+      "targetWidths": {
+        "tanker_red": 220,
+        "tanker_blue": 200,
+        "tanker_vip": 240
+      }
     },
     {
       "name": "threats",
       "file": "threats_atlas.png",
       "kind": "atlas",
-      "size": [1024, 1024],
+      "size": [
+        1024,
+        1024
+      ],
       "alpha": true,
       "trim": true,
       "pivot": "center",
       "frames": {
-        "threat_missile": { "x": 0, "y": 0, "w": 512, "h": 512, "facing": "right" },
-        "threat_drone": { "x": 512, "y": 0, "w": 512, "h": 512 },
-        "threat_mine": { "x": 0, "y": 512, "w": 512, "h": 512 },
-        "threat_patrol": { "x": 512, "y": 512, "w": 512, "h": 512, "facing": "left" }
+        "threat_missile": {
+          "x": 0,
+          "y": 0,
+          "w": 512,
+          "h": 512,
+          "facing": "right"
+        },
+        "threat_drone": {
+          "x": 512,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        },
+        "threat_mine": {
+          "x": 0,
+          "y": 512,
+          "w": 512,
+          "h": 512
+        },
+        "threat_patrol": {
+          "x": 512,
+          "y": 512,
+          "w": 512,
+          "h": 512,
+          "facing": "left"
+        }
       },
-      "targetWidths": { "threat_missile": 110, "threat_drone": 90, "threat_mine": 84, "threat_patrol": 150 }
+      "targetWidths": {
+        "threat_missile": 110,
+        "threat_drone": 90,
+        "threat_mine": 84,
+        "threat_patrol": 150
+      }
     },
     {
       "name": "ui_chyron_frame",
       "file": "ui_chyron_frame.png",
       "kind": "image",
-      "size": [1920, 240],
+      "size": [
+        1920,
+        240
+      ],
       "alpha": true,
       "use": "Reusable breaking-news lower-third; headline text rendered at runtime"
     },
@@ -69,7 +127,10 @@
       "name": "meme_frame_broadcast",
       "file": "meme_frame_broadcast.png",
       "kind": "image",
-      "size": [1920, 1080],
+      "size": [
+        1920,
+        1080
+      ],
       "alpha": true,
       "use": "Full-screen broadcast overlay for news-screenshot memes; center and PiP interior are transparent"
     },
@@ -77,217 +138,799 @@
       "name": "characters",
       "file": "characters_atlas.png",
       "kind": "atlas",
-      "size": [2048, 1024],
+      "size": [
+        2048,
+        1024
+      ],
       "alpha": false,
       "trim": false,
       "frames": {
-        "char_anchor_calm": { "x": 0, "y": 0, "w": 512, "h": 512 },
-        "char_anchor_panic": { "x": 512, "y": 0, "w": 512, "h": 512 },
-        "char_analyst_calm": { "x": 1024, "y": 0, "w": 512, "h": 512 },
-        "char_analyst_panic": { "x": 1536, "y": 0, "w": 512, "h": 512 },
-        "char_commander": { "x": 0, "y": 512, "w": 512, "h": 512 },
-        "char_dealmaker": { "x": 512, "y": 512, "w": 512, "h": 512 },
-        "char_spokesperson": { "x": 1024, "y": 512, "w": 512, "h": 512 },
-        "char_captain": { "x": 1536, "y": 512, "w": 512, "h": 512 }
+        "char_commander": {
+          "x": 0,
+          "y": 512,
+          "w": 512,
+          "h": 512
+        },
+        "char_dealmaker": {
+          "x": 512,
+          "y": 512,
+          "w": 512,
+          "h": 512
+        }
       }
     },
     {
       "name": "meme_twobuttons_blank",
       "file": "meme_twobuttons_blank.png",
       "kind": "image",
-      "size": [1024, 1536],
+      "size": [
+        1024,
+        1536
+      ],
       "alpha": false,
       "use": "Blank two-button meme template; button labels and caption rendered at runtime"
-    },
-    {
-      "name": "meme_thisisfine_blank",
-      "file": "Meme/meme_thisisfine_blank.png",
-      "kind": "image",
-      "size": [1024, 1024],
-      "alpha": false,
-      "use": "This-is-fine parody: calm dog at a desk in a burning room; caption rendered at runtime (top band clear)"
     },
     {
       "name": "meme_squint_characters_blank_atlas",
       "file": "Meme/meme_squint_characters_blank_atlas.png",
       "kind": "atlas",
-      "size": [2048, 2048],
+      "size": [
+        2048,
+        2048
+      ],
       "alpha": false,
       "trim": false,
       "targetWidth": 720,
       "use": "Suspicious sideways squint, 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_squint_captain": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_squint_analyst": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_squint_trump": { "x": 0, "y": 1024, "w": 1024, "h": 1024 },
-        "meme_squint_iran": { "x": 1024, "y": 1024, "w": 1024, "h": 1024 }
+        "meme_squint_captain": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_squint_analyst": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_squint_trump": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_squint_iran": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
       }
     },
     {
       "name": "meme_temple_tap_characters_blank_atlas",
       "file": "Meme/meme_temple_tap_characters_blank_atlas.png",
       "kind": "atlas",
-      "size": [2048, 2048],
+      "size": [
+        2048,
+        2048
+      ],
       "alpha": false,
       "trim": false,
       "targetWidth": 720,
       "use": "Knowing temple-tap (roll-safe), 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_temple_captain": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_temple_analyst": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_temple_trump": { "x": 0, "y": 1024, "w": 1024, "h": 1024 },
-        "meme_temple_iran": { "x": 1024, "y": 1024, "w": 1024, "h": 1024 }
-      }
-    },
-    {
-      "name": "meme_distracted_choice_blank_atlas",
-      "file": "Meme/meme_distracted_choice_blank_atlas.png",
-      "kind": "atlas",
-      "size": [2048, 2048],
-      "alpha": false,
-      "trim": false,
-      "targetWidth": 720,
-      "use": "Distracted-look three-figure scenes; runtime labels on left/center/right figures. Bottom row is letterboxed: cells are 796px tall",
-      "frames": {
-        "meme_distracted_captain": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_distracted_trump": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_distracted_soldier": { "x": 0, "y": 1027, "w": 1024, "h": 796 },
-        "meme_distracted_analyst": { "x": 1024, "y": 1027, "w": 1024, "h": 796 }
+        "meme_temple_trump": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_temple_iran": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
       }
     },
     {
       "name": "meme_podcast_bad_idea_blank_atlas",
       "file": "Meme/meme_podcast_bad_idea_blank_atlas.png",
       "kind": "atlas",
-      "size": [2048, 2048],
+      "size": [
+        2048,
+        2048
+      ],
       "alpha": false,
       "trim": false,
       "targetWidth": 720,
       "use": "Smoke-filled podcast bad-idea revelation, 4 characters; runtime caption in the blank white top band of each cell",
       "frames": {
-        "meme_podcast_captain": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_podcast_analyst": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_podcast_khamenei": { "x": 0, "y": 1024, "w": 1024, "h": 1024 },
-        "meme_podcast_commander": { "x": 1024, "y": 1024, "w": 1024, "h": 1024 }
+        "meme_podcast_captain": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_podcast_analyst": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_podcast_khamenei": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_podcast_commander": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
       }
     },
     {
       "name": "meme_condescending_blank_atlas",
       "file": "Meme/meme_condescending_blank_atlas.png",
       "kind": "atlas",
-      "size": [2048, 2048],
+      "size": [
+        2048,
+        2048
+      ],
       "alpha": false,
       "trim": false,
       "targetWidth": 720,
       "use": "Condescending cheek-on-fist smile, 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_condescending_anchor": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_condescending_trump": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_condescending_khamenei": { "x": 0, "y": 1024, "w": 1024, "h": 1024 },
-        "meme_condescending_exec": { "x": 1024, "y": 1024, "w": 1024, "h": 1024 }
+        "meme_condescending_anchor": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_condescending_trump": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_condescending_khamenei": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_condescending_exec": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
       }
     },
     {
       "name": "meme_disaster_smirk_blank_atlas",
       "file": "Meme/meme_disaster_smirk_blank_atlas.png",
       "kind": "atlas",
-      "size": [2048, 2048],
+      "size": [
+        2048,
+        2048
+      ],
       "alpha": false,
       "trim": false,
       "targetWidth": 720,
       "use": "Foreground smirk with burning disaster behind, 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_disaster_captain": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_disaster_trump": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_disaster_khamenei": { "x": 0, "y": 1024, "w": 1024, "h": 1024 },
-        "meme_disaster_anchor": { "x": 1024, "y": 1024, "w": 1024, "h": 1024 }
+        "meme_disaster_captain": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_disaster_trump": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_disaster_khamenei": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_disaster_anchor": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
       }
     },
     {
       "name": "meme_crying_phone_blank_atlas",
       "file": "Meme/meme_crying_phone_blank_atlas.png",
       "kind": "atlas",
-      "size": [2048, 2048],
+      "size": [
+        2048,
+        2048
+      ],
       "alpha": false,
       "trim": false,
       "targetWidth": 720,
       "use": "Crying while reading phone, 4 characters; runtime caption in the blank white top band of each cell",
       "frames": {
-        "meme_crying_analyst": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_crying_captain": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_crying_anchor": { "x": 0, "y": 1024, "w": 1024, "h": 1024 },
-        "meme_crying_soldier": { "x": 1024, "y": 1024, "w": 1024, "h": 1024 }
+        "meme_crying_analyst": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_crying_captain": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_crying_anchor": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_crying_soldier": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
       }
     },
     {
       "name": "meme_vehicle_sideeye_blank_atlas",
       "file": "Meme/meme_vehicle_sideeye_blank_atlas.png",
       "kind": "atlas",
-      "size": [2048, 2048],
+      "size": [
+        2048,
+        2048
+      ],
       "alpha": false,
       "trim": false,
       "targetWidth": 720,
       "use": "Awkward side-eye from a vehicle seat, 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_vehicle_anchor": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_vehicle_analyst": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_vehicle_civilian": { "x": 0, "y": 1024, "w": 1024, "h": 1024 },
-        "meme_vehicle_diplomat": { "x": 1024, "y": 1024, "w": 1024, "h": 1024 }
+        "meme_vehicle_anchor": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_vehicle_analyst": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_vehicle_civilian": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_vehicle_diplomat": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
       }
     },
     {
       "name": "meme_success_fist_blank_atlas",
       "file": "Meme/meme_success_fist_blank_atlas.png",
       "kind": "atlas",
-      "size": [2048, 2048],
+      "size": [
+        2048,
+        2048
+      ],
       "alpha": false,
       "trim": false,
       "targetWidth": 720,
       "use": "Determined fist-clench celebration, 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_success_captain": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_success_trump": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_success_soldier": { "x": 0, "y": 1024, "w": 1024, "h": 1024 },
-        "meme_success_responder": { "x": 1024, "y": 1024, "w": 1024, "h": 1024 }
+        "meme_success_captain": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_success_trump": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_success_soldier": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_success_responder": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
       }
     },
     {
       "name": "meme_calm_fire_blank_atlas",
       "file": "Meme/meme_calm_fire_blank_atlas.png",
       "kind": "atlas",
-      "size": [2048, 2048],
+      "size": [
+        2048,
+        2048
+      ],
       "alpha": false,
       "trim": false,
       "targetWidth": 720,
       "use": "Sitting calmly in a burning room, 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_calmfire_anchor": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_calmfire_trump": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_calmfire_khamenei": { "x": 0, "y": 1024, "w": 1024, "h": 1024 },
-        "meme_calmfire_captain": { "x": 1024, "y": 1024, "w": 1024, "h": 1024 }
+        "meme_calmfire_anchor": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_calmfire_trump": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_calmfire_khamenei": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_calmfire_captain": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
       }
     },
     {
       "name": "meme_change_mind_blank_atlas",
       "file": "Meme/meme_change_mind_blank_atlas.png",
       "kind": "atlas",
-      "size": [2048, 2048],
+      "size": [
+        2048,
+        2048
+      ],
       "alpha": false,
       "trim": false,
       "targetWidth": 720,
       "use": "Debate-table with blank placard, 4 characters; runtime caption on the placard. Bottom row is letterboxed: cells are 694px tall",
       "frames": {
-        "meme_changemind_analyst": { "x": 0, "y": 0, "w": 1024, "h": 1024 },
-        "meme_changemind_diplomat": { "x": 1024, "y": 0, "w": 1024, "h": 1024 },
-        "meme_changemind_civilian": { "x": 0, "y": 1025, "w": 1024, "h": 694 },
-        "meme_changemind_exec": { "x": 1024, "y": 1025, "w": 1024, "h": 694 }
+        "meme_changemind_analyst": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_changemind_diplomat": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_changemind_civilian": {
+          "x": 0,
+          "y": 1025,
+          "w": 1024,
+          "h": 694
+        },
+        "meme_changemind_exec": {
+          "x": 1024,
+          "y": 1025,
+          "w": 1024,
+          "h": 694
+        }
+      }
+    },
+    {
+      "name": "meme_two_buttons_blank_atlas",
+      "file": "Meme/meme_two_buttons_blank_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "New two-buttons dilemma atlas (distinct from meme_twobuttons_blank.png): captain/Trump/Khamenei/trader each sweat between two console buttons. Bottom row is letterboxed: cells are ~950px tall",
+      "frames": {
+        "meme_twobuttons2_captain": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_twobuttons2_trump": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_twobuttons2_khamenei": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 950
+        },
+        "meme_twobuttons2_trader": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 950
+        }
+      }
+    },
+    {
+      "name": "meme_draw_25_blank_atlas",
+      "file": "Meme/meme_draw_25_blank_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "UNO 'draw 25 cards rather than do the easy thing' stubbornness atlas, no letterbox.",
+      "frames": {
+        "meme_draw25_captain": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_draw25_trump": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_draw25_khamenei": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_draw25_exec": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_disaster_sideeye_blank_atlas",
+      "file": "Meme/meme_disaster_sideeye_blank_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Smirk/side-eye-while-it-burns atlas (a loss that hides another angle), no letterbox.",
+      "frames": {
+        "meme_disastereye_trump": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_reject_approve_blank_atlas",
+      "file": "Meme/meme_reject_approve_blank_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Drake-style reject/approve two-row comparison atlas, no letterbox.",
+      "frames": {
+        "meme_rejectapprove_trump": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_rejectapprove_khamenei": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_rejectapprove_captain": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_rejectapprove_trader": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_highway_exit_blank_atlas",
+      "file": "Meme/meme_highway_exit_blank_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Highway-exit last-second-swerve atlas, no letterbox.",
+      "frames": {
+        "meme_highwayexit_trump": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_highwayexit_khamenei": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_highwayexit_trader": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_salt_sprinkle_blank_atlas",
+      "file": "Meme/meme_salt_sprinkle_blank_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Smug 'sprinkle it on top' escalation-with-ease atlas, no letterbox.",
+      "frames": {
+        "meme_salt_trump": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_salt_khamenei": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_salt_commander": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_salt_diplomat": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_success_fist_blank_atlas_v2",
+      "file": "Meme/meme_success_fist_blank_atlas_v2.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Second success-fist-pump variant with new scenarios/characters (additive to meme_success_fist_blank_atlas, not a replacement), no letterbox.",
+      "frames": {
+        "meme_success2_trump": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_change_mind_blank_atlas_v2",
+      "file": "Meme/meme_change_mind_blank_atlas_v2.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Second change-my-mind debate-table variant with new scenarios/characters (additive to meme_change_mind_blank_atlas, not a replacement), no letterbox.",
+      "frames": {
+        "meme_changemind2_analyst": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_changemind2_diplomat": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_changemind2_civilian": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_changemind2_exec": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_distracted_choice_blank_atlas_v2",
+      "file": "Meme/meme_distracted_choice_blank_atlas_v2.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Second distracted-boyfriend variant with new scenarios/characters (additive to meme_distracted_choice_blank_atlas, not a replacement), no letterbox.",
+      "frames": {
+        "meme_distracted2_captain": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_distracted2_trump": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_distracted2_khamenei": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_distracted2_trader": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_condescending_blank_atlas_v2",
+      "file": "Meme/meme_condescending_blank_atlas_v2.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Second condescending-smile variant with new scenarios/characters (additive to meme_condescending_blank_atlas, not a replacement), no letterbox.",
+      "frames": {
+        "meme_condescending2_anchor": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_condescending2_trump": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_condescending2_khamenei": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_condescending2_exec": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "upgrade_icons",
+      "file": "upgrade_icons_atlas.png",
+      "kind": "atlas",
+      "size": [
+        1024,
+        512
+      ],
+      "alpha": true,
+      "trim": true,
+      "targetWidth": 120,
+      "use": "Shop upgrade card icons: Air Assistance jet + Oil Money coins (Hull Armor reuses tanker0)",
+      "frames": {
+        "upgrade_icon_air": {
+          "x": 0,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        },
+        "upgrade_icon_gold": {
+          "x": 512,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        }
       }
     },
     {
       "name": "trump_gunner",
       "file": "turret.png",
       "kind": "atlas",
-      "size": [1448, 1086],
+      "size": [
+        1448,
+        1086
+      ],
       "alpha": true,
       "chromaKey": "green",
       "trim": false,
@@ -295,23 +938,89 @@
       "targetWidth": 220,
       "use": "Player machine-gun turret at bottom-center: Trump caricature from behind. Delivered on a green screen (chromaKey strips it). 12 cells of 362x362, rows = aim direction (right/mid/left), cols = idle 1-2 then fire 1-2. trim:false on purpose — frames must keep identical geometry so pose swaps don't jitter.",
       "frames": {
-        "trump_right_idle_1": { "x": 0, "y": 0, "w": 362, "h": 362 },
-        "trump_right_idle_2": { "x": 362, "y": 0, "w": 362, "h": 362 },
-        "trump_right_fire_1": { "x": 724, "y": 0, "w": 362, "h": 362 },
-        "trump_right_fire_2": { "x": 1086, "y": 0, "w": 362, "h": 362 },
-        "trump_mid_idle_1": { "x": 0, "y": 362, "w": 362, "h": 362 },
-        "trump_mid_idle_2": { "x": 362, "y": 362, "w": 362, "h": 362 },
-        "trump_mid_fire_1": { "x": 724, "y": 362, "w": 362, "h": 362 },
-        "trump_mid_fire_2": { "x": 1086, "y": 362, "w": 362, "h": 362 },
-        "trump_left_idle_1": { "x": 0, "y": 724, "w": 362, "h": 362 },
-        "trump_left_idle_2": { "x": 362, "y": 724, "w": 362, "h": 362 },
-        "trump_left_fire_1": { "x": 724, "y": 724, "w": 362, "h": 362 },
-        "trump_left_fire_2": { "x": 1086, "y": 724, "w": 362, "h": 362 }
+        "trump_right_idle_1": {
+          "x": 0,
+          "y": 0,
+          "w": 362,
+          "h": 362
+        },
+        "trump_right_idle_2": {
+          "x": 362,
+          "y": 0,
+          "w": 362,
+          "h": 362
+        },
+        "trump_right_fire_1": {
+          "x": 724,
+          "y": 0,
+          "w": 362,
+          "h": 362
+        },
+        "trump_right_fire_2": {
+          "x": 1086,
+          "y": 0,
+          "w": 362,
+          "h": 362
+        },
+        "trump_mid_idle_1": {
+          "x": 0,
+          "y": 362,
+          "w": 362,
+          "h": 362
+        },
+        "trump_mid_idle_2": {
+          "x": 362,
+          "y": 362,
+          "w": 362,
+          "h": 362
+        },
+        "trump_mid_fire_1": {
+          "x": 724,
+          "y": 362,
+          "w": 362,
+          "h": 362
+        },
+        "trump_mid_fire_2": {
+          "x": 1086,
+          "y": 362,
+          "w": 362,
+          "h": 362
+        },
+        "trump_left_idle_1": {
+          "x": 0,
+          "y": 724,
+          "w": 362,
+          "h": 362
+        },
+        "trump_left_idle_2": {
+          "x": 362,
+          "y": 724,
+          "w": 362,
+          "h": 362
+        },
+        "trump_left_fire_1": {
+          "x": 724,
+          "y": 724,
+          "w": 362,
+          "h": 362
+        },
+        "trump_left_fire_2": {
+          "x": 1086,
+          "y": 724,
+          "w": 362,
+          "h": 362
+        }
       }
     }
   ],
   "rejected": [
-    { "name": "map_labels_overlay", "reason": "Replaced: labels, route lines and arrows are drawn by the game at runtime for crispness and localization." },
-    { "name": "ship_tanker_a/b standalone sprites", "reason": "Superseded by tankers_atlas.png." }
+    {
+      "name": "map_labels_overlay",
+      "reason": "Replaced: labels, route lines and arrows are drawn by the game at runtime for crispness and localization."
+    },
+    {
+      "name": "ship_tanker_a/b standalone sprites",
+      "reason": "Superseded by tankers_atlas.png."
+    }
   ]
 }

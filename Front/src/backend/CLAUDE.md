@@ -1,7 +1,7 @@
 # src/backend — leaderboard server client
 
 Reusable client layer for the Meme Games leaderboard server (contract:
-`docs/leaderboard-contract.md` at the repo root, server default port 3151). Designed to be copied
+`docs/backend-contract.md` at the repo root, server default port 3151). Designed to be copied
 into future MemeGames titles — nothing in here knows about Hormuz gameplay.
 
 ## Files
@@ -18,6 +18,12 @@ into future MemeGames titles — nothing in here knows about Hormuz gameplay.
 - `src/backend/submitOverlay.ts` — DOM overlay form (name/email) used by the
   results screen; DOM because text input needs the real keyboard/IME. Calls
   `service.submit()` and reports progress into the form's status line.
+- `src/backend/analytics.ts` — fire-and-forget event tracker, `POST /api/event`
+  (spec in `docs/backend-contract.md`; endpoint not yet implemented
+  server-side, so sends currently fail silently). Exports `analytics`
+  (`AnalyticsService('hormuz')`); `startRun()` mints a `runId`, `track(event,
+  payload)` sends one event. Never awaited by callers — must not affect
+  gameplay if the server is unreachable.
 
 ## Key flow (server contract constraints)
 

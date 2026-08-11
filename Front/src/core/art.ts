@@ -36,7 +36,9 @@ const CORE_ART: Record<string, string> = {
   trump_left_idle_1: 'trump_left_idle_1.png',
   trump_left_idle_2: 'trump_left_idle_2.png',
   trump_left_fire_1: 'trump_left_fire_1.png',
-  trump_left_fire_2: 'trump_left_fire_2.png'
+  trump_left_fire_2: 'trump_left_fire_2.png',
+  upgradeIconAir: 'upgrade_icon_air.png',
+  upgradeIconGold: 'upgrade_icon_gold.png'
 };
 
 const MEME_ART: Record<string, string> = Object.fromEntries(

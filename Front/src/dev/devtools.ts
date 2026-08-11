@@ -5,6 +5,7 @@ import Phaser from 'phaser';
 import { TUNING, persistTuningLocal, resetTuningLocal, saveToDisk } from '../config/tuning';
 import { layoutData, setLayoutEdit } from './layout';
 import { devState } from './state';
+import { bus, EV } from '../core/state';
 
 let gui: any = null;
 let visible = false;
@@ -49,7 +50,7 @@ const TIPS: Record<string, string> = {
   'Upgrades.airCooldownStep': 'Jet intercept cooldown reduction per air level.',
   'Upgrades.airSpeedBase': 'Jet flight speed at level 0, pixels/second.',
   'Upgrades.airSpeedPerLevel': 'Extra jet speed per air level.',
-  'Upgrades.airInterceptDist': 'How close the jet must get to intercept, pixels.',
+  'Upgrades.airFireDist': 'How close the jet must get to intercept, pixels.',
   'Upgrades.hullHpPerLevel': 'Extra hits a tanker survives per hull level.',
   'Upgrades.hullDamagedSpikeFactor': 'Price-spike fraction when armor absorbs a hit (1 = full spike).',
   'Upgrades.goldBonusPerLevel': 'Credit income bonus per gold level (0.25 = +25%/level).',
@@ -62,11 +63,14 @@ const TIPS: Record<string, string> = {
   'Juice / FX.slowmoScale': 'World speed during near-miss slow motion (0.25 = quarter speed).',
   'Juice / FX.slowmoMs': 'Slow-motion duration in milliseconds.',
   'Juice / FX.particleScale': 'Multiplier on all particle burst counts (0 = off, 2 = double).',
+  'Gameplay Events.endDay': 'Ends the current day immediately, skipping the rest of the timer and any pressing threats.',
+  'Gameplay Events.nextMeme': 'Shows a randomly-picked meme reaction right now, ignoring the normal cooldown.',
   'Editors.pauseGame': 'Freeze the gameplay scene (timer, threats, tankers). HUD stays live. Toggle off to resume.',
   'Editors.layoutEdit': 'Drag HUD groups to move them; mouse-wheel over one to scale. Gameplay taps are disabled while on.',
   'Editors.routeEdit': 'Drag the purple waypoints to reshape the tanker shipping route live.',
   '_.saveToDisk': 'Write current tuning + layout into src/config/*.json — makes tweaks permanent project defaults.',
   '_.restartGame': 'Restart the current run to feel tuning changes from t=0.',
+  '_.forceLoss': 'Instantly end the run (market meltdown) to test the Results screen and leaderboard submit flow.',
   '_.resetOverrides': 'Discard unsaved local tweaks and reload with the values from tuning.json/layout.json.'
 };
 
@@ -160,18 +164,20 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
     tipped(eco.add(TUNING.economy, k, 0, 50, 0.5).onChange(onChange), 'Economy', k)
   );
 
+  const costFolders: any[] = [];
   const up = folder('Upgrades', true);
   tipped(up.add(TUNING.upgrades, 'airCooldownBase', 1, 15, 0.5).onChange(onChange), 'Upgrades', 'airCooldownBase');
   tipped(up.add(TUNING.upgrades, 'airCooldownStep', 0, 4, 0.25).onChange(onChange), 'Upgrades', 'airCooldownStep');
   tipped(up.add(TUNING.upgrades, 'airSpeedBase', 40, 300, 5).onChange(onChange), 'Upgrades', 'airSpeedBase');
   tipped(up.add(TUNING.upgrades, 'airSpeedPerLevel', 0, 100, 5).onChange(onChange), 'Upgrades', 'airSpeedPerLevel');
-  tipped(up.add(TUNING.upgrades, 'airInterceptDist', 20, 150, 5).onChange(onChange), 'Upgrades', 'airInterceptDist');
+  tipped(up.add(TUNING.upgrades, 'airFireDist', 20, 150, 5).onChange(onChange), 'Upgrades', 'airFireDist');
   tipped(up.add(TUNING.upgrades, 'hullHpPerLevel', 0, 3, 1).onChange(onChange), 'Upgrades', 'hullHpPerLevel');
   tipped(up.add(TUNING.upgrades, 'hullDamagedSpikeFactor', 0, 1, 0.05).onChange(onChange), 'Upgrades', 'hullDamagedSpikeFactor');
   tipped(up.add(TUNING.upgrades, 'goldBonusPerLevel', 0, 1, 0.05).onChange(onChange), 'Upgrades', 'goldBonusPerLevel');
   (['airCosts', 'hullCosts', 'goldCosts'] as const).forEach(name => {
     const arr = TUNING.upgrades[name];
     const f = folder(name, true);
+    costFolders.push(f);
     arr.forEach((_, i) => {
       const ctrl = f.add(arr, String(i), 5, 200, 5).name(`level ${i + 1}`).onChange(onChange);
       ctrl.domElement.setAttribute('title', `Defense Credit cost of ${name.replace('Costs', '')} level ${i + 1}.`);
@@ -188,6 +194,28 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
   tipped(juice.add(TUNING.juice, 'slowmoScale', 0.05, 1, 0.05).onChange(onChange), 'Juice / FX', 'slowmoScale');
   tipped(juice.add(TUNING.juice, 'slowmoMs', 100, 2000, 50).onChange(onChange), 'Juice / FX', 'slowmoMs');
   tipped(juice.add(TUNING.juice, 'particleScale', 0, 3, 0.1).onChange(onChange), 'Juice / FX', 'particleScale');
+
+  // Temporary: focus the panel on Gameplay Events + Editors only.
+  [session, spawn, speeds, eco, up, juice, ...costFolders].forEach(f => f.hide());
+
+  const gameplayEvents = {
+    endDay: () => {
+      const gs = game.scene.getScene('Game') as any;
+      gs?.devEndDay?.();
+    },
+    nextMeme: () => bus.emit(EV.DEV_FORCE_MEME)
+  };
+  const events = folder('Gameplay Events');
+  tipped(
+    events.add(gameplayEvents, 'endDay').name('⏭ End current day'),
+    'Gameplay Events',
+    'endDay'
+  );
+  tipped(
+    events.add(gameplayEvents, 'nextMeme').name('🎭 Show next meme'),
+    'Gameplay Events',
+    'nextMeme'
+  );
 
   const editors = folder('Editors');
   const editorState = {
@@ -234,6 +262,11 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
       if (gs?.scene.isPaused()) gs.scene.resume();
       if (gs?.scene.isActive()) gs.scene.restart();
     },
+    forceLoss: () => {
+      const gs = game.scene.getScene('Game') as any;
+      if (gs?.scene.isPaused()) gs.scene.resume();
+      gs?.devForceLoss?.();
+    },
     resetOverrides: () => {
       resetTuningLocal();
       location.reload();
@@ -241,6 +274,7 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
   };
   tipped(gui.add(actions, 'saveToDisk').name('💾 Save to disk (src/config)'), '_', 'saveToDisk');
   tipped(gui.add(actions, 'restartGame').name('↻ Restart run'), '_', 'restartGame');
+  tipped(gui.add(actions, 'forceLoss').name('💀 Force loss (test results/leaderboard)'), '_', 'forceLoss');
   tipped(gui.add(actions, 'resetOverrides').name('⚠ Reset local overrides'), '_', 'resetOverrides');
 
   // remember which folders are open/closed for next session
