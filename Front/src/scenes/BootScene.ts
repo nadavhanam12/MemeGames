@@ -13,13 +13,26 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     this.makeParticles();
-    void loadGeneratedArt(this).then(() => {
+    void Promise.all([this.loadFonts(), loadGeneratedArt(this)]).then(() => {
       // programmatic fallbacks only for keys with no generated texture
       this.makeTankers();
       this.makeThreats();
       this.makeUpgradeIcons();
       this.scene.start('Menu');
     });
+  }
+
+  // Text objects render to canvas immediately; if the webfont lands after
+  // that, Phaser won't repaint, so make sure both faces are ready first.
+  private loadFonts(): Promise<unknown> {
+    const fonts = document.fonts;
+    if (!fonts) return Promise.resolve();
+    return Promise.all([fonts.load('400 20px Anton'), fonts.load('600 20px "Chakra Petch"')])
+      .catch((err) => console.error('[fonts] webfont load failed, using fallbacks:', err))
+      .then(() => {
+        if (!fonts.check('400 20px Anton')) console.error('[fonts] Anton not available — rendering with fallback');
+        if (!fonts.check('600 20px "Chakra Petch"')) console.error('[fonts] Chakra Petch not available — rendering with fallback');
+      });
   }
 
   private g(): Phaser.GameObjects.Graphics {
