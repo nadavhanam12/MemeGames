@@ -897,33 +897,6 @@
       }
     },
     {
-      "name": "upgrade_icons",
-      "file": "upgrade_icons_atlas.png",
-      "kind": "atlas",
-      "size": [
-        1024,
-        512
-      ],
-      "alpha": true,
-      "trim": true,
-      "targetWidth": 120,
-      "use": "Shop upgrade card icons: Air Assistance jet + Oil Money coins (Hull Armor reuses tanker0)",
-      "frames": {
-        "upgrade_icon_air": {
-          "x": 0,
-          "y": 0,
-          "w": 512,
-          "h": 512
-        },
-        "upgrade_icon_gold": {
-          "x": 512,
-          "y": 0,
-          "w": 512,
-          "h": 512
-        }
-      }
-    },
-    {
       "name": "trump_gunner",
       "file": "turret.png",
       "kind": "atlas",

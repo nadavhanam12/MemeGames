@@ -17,14 +17,8 @@ const CORE_ART: Record<string, string> = {
   patrol: 'threat_patrol.png',
   chyron: 'ui_chyron_frame.png',
   memeFrame: 'meme_frame_broadcast.png',
-  charAnchorCalm: 'char_anchor_calm.png',
-  charAnchorPanic: 'char_anchor_panic.png',
-  charAnalystCalm: 'char_analyst_calm.png',
-  charAnalystPanic: 'char_analyst_panic.png',
   charCommander: 'char_commander.png',
   charDealmaker: 'char_dealmaker.png',
-  charSpokesperson: 'char_spokesperson.png',
-  charCaptain: 'char_captain.png',
   trump_right_idle_1: 'trump_right_idle_1.png',
   trump_right_idle_2: 'trump_right_idle_2.png',
   trump_right_fire_1: 'trump_right_fire_1.png',
@@ -36,9 +30,7 @@ const CORE_ART: Record<string, string> = {
   trump_left_idle_1: 'trump_left_idle_1.png',
   trump_left_idle_2: 'trump_left_idle_2.png',
   trump_left_fire_1: 'trump_left_fire_1.png',
-  trump_left_fire_2: 'trump_left_fire_2.png',
-  upgradeIconAir: 'upgrade_icon_air.png',
-  upgradeIconGold: 'upgrade_icon_gold.png'
+  trump_left_fire_2: 'trump_left_fire_2.png'
 };
 
 const MEME_ART: Record<string, string> = Object.fromEntries(
