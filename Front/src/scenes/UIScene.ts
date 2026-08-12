@@ -1069,15 +1069,15 @@ export class UIScene extends Phaser.Scene {
     lines.forEach((ln, i) => {
       card.add(
         this.add
-          .text(-width / 2 + 18, -h / 2 + padTop + i * lineH, ln.text, {
+          .text(0, -h / 2 + padTop + i * lineH, ln.text, {
             fontFamily: FONT_SANS,
             fontSize: ln.size ?? '15px',
             fontStyle: 'bold',
             color: ln.color,
-            align: 'left',
+            align: 'center',
             wordWrap: { width: width - 40 }
           })
-          .setOrigin(0, 0.5)
+          .setOrigin(0.5)
       );
     });
     parent.add(card);
@@ -1111,7 +1111,8 @@ export class UIScene extends Phaser.Scene {
     if (shown.length) {
       const gap = 12;
       const widths = shown.map(id => Math.max(36, Math.round(thumbH / MEMES.templates[id].aspect)));
-      let x = -width / 2 + 18;
+      const rowW = widths.reduce((a, b) => a + b + gap, -gap);
+      let x = -rowW / 2;
       const rowY = -h / 2 + 20 + thumbH / 2;
       shown.forEach((id, i) => {
         const tpl = MEMES.templates[id];
@@ -1134,13 +1135,13 @@ export class UIScene extends Phaser.Scene {
       : `NO NEW MEMES TODAY · COLLECTION: ${unlocked}/${total}`;
     card.add(
       this.add
-        .text(-width / 2 + 18, h / 2 - 16, tallyText, {
+        .text(0, h / 2 - 16, tallyText, {
           fontFamily: FONT_SANS,
           fontSize: '14px',
           fontStyle: 'bold',
           color: shown.length ? HEX.gold : HEX.cream
         })
-        .setOrigin(0, 0.5)
+        .setOrigin(0.5)
     );
     parent.add(card);
     popIn(this, card, 220);
