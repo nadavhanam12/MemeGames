@@ -1187,7 +1187,7 @@ export class GameScene extends Phaser.Scene {
   /** Daily mission, scaled by day. Day 1 is always the teaching intercept quota. */
   private rollMission(n: number): DayMission {
     const d = TUNING.days;
-    let pool: MissionType[] = n === 1 ? ['intercept'] : ['price', 'escort', 'intercept', 'combo'];
+    let pool: MissionType[] = n === 1 ? ['intercept'] : ['price', 'intercept', 'combo'];
     if (n >= 3) pool.push('perfect');
     const filtered = pool.filter(t => t !== this.lastMissionType);
     const type = Phaser.Math.RND.pick(filtered.length ? filtered : pool);
@@ -1198,10 +1198,6 @@ export class GameScene extends Phaser.Scene {
       case 'price':
         target = Math.ceil((this.stats.oilPrice + d.priceMargin) / 5) * 5;
         text = `END THE DAY UNDER $${target}`;
-        break;
-      case 'escort':
-        target = d.escortQuotaBase + Math.floor(n / d.escortQuotaPerDays);
-        text = `ESCORT ${target} TANKERS SAFELY`;
         break;
       case 'intercept':
         target = d.interceptQuotaBase + n * d.interceptQuotaPerDay;
@@ -1331,7 +1327,6 @@ export class GameScene extends Phaser.Scene {
     this.addCredits(credits, ex, t.sprite.y);
     bus.emit('tanker-safe', this.stats.tankersSafe, drop);
     this.dayCounters.safe++;
-    if (this.mission?.type === 'escort') this.bumpMission(this.dayCounters.safe);
     this.bumpCombo();
     confetti(this, ex, t.sprite.y, this.stats.tankersSafe % 3 === 0 ? 26 : 10);
     floatText(this, ex, t.sprite.y - 60, `SAFE! −$${drop} OIL`, HEX.green, 34);

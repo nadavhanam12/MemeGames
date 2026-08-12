@@ -24,7 +24,7 @@ export interface SessionStats {
 }
 
 // Daily mission carried by EV.MISSION / resolved in the day-end summary.
-export type MissionType = 'price' | 'escort' | 'intercept' | 'perfect' | 'combo';
+export type MissionType = 'price' | 'intercept' | 'perfect' | 'combo';
 
 export interface DayMission {
   day: number;
