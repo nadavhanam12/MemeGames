@@ -122,8 +122,6 @@
     "rewardCreditsBase": 15,
     "rewardCreditsPerDay": 5,
     "rewardScorePerDay": 20,
-    "escortQuotaBase": 2,
-    "escortQuotaPerDays": 4,
     "interceptQuotaBase": 6,
     "interceptQuotaPerDay": 2,
     "comboTargetBase": 6,

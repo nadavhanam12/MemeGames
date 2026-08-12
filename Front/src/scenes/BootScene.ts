@@ -27,7 +27,12 @@ export class BootScene extends Phaser.Scene {
   private loadFonts(): Promise<unknown> {
     const fonts = document.fonts;
     if (!fonts) return Promise.resolve();
-    return Promise.all([fonts.load('400 20px Anton'), fonts.load('600 20px "Chakra Petch"')]).catch(() => undefined);
+    return Promise.all([fonts.load('400 20px Anton'), fonts.load('600 20px "Chakra Petch"')])
+      .catch((err) => console.error('[fonts] webfont load failed, using fallbacks:', err))
+      .then(() => {
+        if (!fonts.check('400 20px Anton')) console.error('[fonts] Anton not available — rendering with fallback');
+        if (!fonts.check('600 20px "Chakra Petch"')) console.error('[fonts] Chakra Petch not available — rendering with fallback');
+      });
   }
 
   private g(): Phaser.GameObjects.Graphics {
