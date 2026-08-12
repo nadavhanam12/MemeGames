@@ -103,6 +103,7 @@ export class UIScene extends Phaser.Scene {
   private mission: DayMission | null = null;
   private hourText!: Phaser.GameObjects.Text;
   private summaryPanel?: Phaser.GameObjects.Container;
+  private summaryCashText?: Phaser.GameObjects.Text;
   private summaryNextDay = 2;
   private missionChipBg!: Phaser.GameObjects.Rectangle;
   private missionDayText!: Phaser.GameObjects.Text;
@@ -668,6 +669,7 @@ export class UIScene extends Phaser.Scene {
     const from = this.displayedCredits;
     this.displayedCredits = credits;
     countTo(this, this.creditsText, from, credits, v => `$${Math.round(v)}`, 350);
+    if (this.summaryCashText?.active) this.summaryCashText.setText(`CASH: $${Math.round(credits)}`);
     if (gain > 0 && x > 0 && !settings.reducedMotion) {
       const m = this.creditsText.getWorldTransformMatrix();
       for (let i = 0; i < Math.min(gain, 5); i++) {
@@ -887,9 +889,9 @@ export class UIScene extends Phaser.Scene {
     if (!s.missionDone) this.graphFlash = 1;
     this.showDayCompletePanel(s.day, () => {
       if (s.newMemesUnlocked.length) {
-        this.showNewUnlocksPopup(s.newMemesUnlocked, () => this.showDaySummaryPanel(s, delta));
+        this.showNewUnlocksPopup(s.newMemesUnlocked, () => this.showDaySummaryPanel(s));
       } else {
-        this.showDaySummaryPanel(s, delta);
+        this.showDaySummaryPanel(s);
       }
     });
   }
@@ -1067,15 +1069,15 @@ export class UIScene extends Phaser.Scene {
     lines.forEach((ln, i) => {
       card.add(
         this.add
-          .text(0, -h / 2 + padTop + i * lineH, ln.text, {
+          .text(-width / 2 + 18, -h / 2 + padTop + i * lineH, ln.text, {
             fontFamily: FONT_SANS,
             fontSize: ln.size ?? '15px',
             fontStyle: 'bold',
             color: ln.color,
-            align: 'center',
+            align: 'left',
             wordWrap: { width: width - 40 }
           })
-          .setOrigin(0.5)
+          .setOrigin(0, 0.5)
       );
     });
     parent.add(card);
@@ -1109,8 +1111,7 @@ export class UIScene extends Phaser.Scene {
     if (shown.length) {
       const gap = 12;
       const widths = shown.map(id => Math.max(36, Math.round(thumbH / MEMES.templates[id].aspect)));
-      const rowW = widths.reduce((a, b) => a + b + gap, -gap);
-      let x = -rowW / 2;
+      let x = -width / 2 + 18;
       const rowY = -h / 2 + 20 + thumbH / 2;
       shown.forEach((id, i) => {
         const tpl = MEMES.templates[id];
@@ -1133,13 +1134,13 @@ export class UIScene extends Phaser.Scene {
       : `NO NEW MEMES TODAY · COLLECTION: ${unlocked}/${total}`;
     card.add(
       this.add
-        .text(0, h / 2 - 16, tallyText, {
+        .text(-width / 2 + 18, h / 2 - 16, tallyText, {
           fontFamily: FONT_SANS,
           fontSize: '14px',
           fontStyle: 'bold',
           color: shown.length ? HEX.gold : HEX.cream
         })
-        .setOrigin(0.5)
+        .setOrigin(0, 0.5)
     );
     parent.add(card);
     popIn(this, card, 220);
@@ -1148,7 +1149,7 @@ export class UIScene extends Phaser.Scene {
 
   /** Frozen-world recap + shop screen, covering 80% of the game window; the only
    *  time upgrades are purchasable. Waits for the player to click NEXT DAY. */
-  private showDaySummaryPanel(s: DaySummary, delta: string): void {
+  private showDaySummaryPanel(s: DaySummary): void {
     this.summaryPanel?.destroy();
     this.upgradeButtons = {};
     this.summaryNextDay = s.day + 1;
@@ -1157,7 +1158,8 @@ export class UIScene extends Phaser.Scene {
     const panel = this.add.container(GAME_W / 2, GAME_H / 2).setDepth(1700);
     this.summaryPanel = panel;
     this.registry.set('ui-modal', true);
-    panel.add(this.add.rectangle(0, 0, W, H, PAL.ink, 0.97).setStrokeStyle(4, PAL.gold, 0.9));
+    const bg = this.add.rectangle(0, 0, W, H, PAL.ink, 0.97).setStrokeStyle(4, PAL.gold, 0.9);
+    panel.add(bg);
     let y = -H / 2 + 20;
     panel.add(
       this.add
@@ -1182,18 +1184,11 @@ export class UIScene extends Phaser.Scene {
     ], s.missionDone ? PAL.green : PAL.red);
     y += 8;
 
-    // section 2 — end-of-day report
-    y += this.buildSummaryCard(panel, y, cardW, 'REPORT', [
-      { text: `CASH ON HAND: $${Math.round(this.displayedCredits)}`, color: HEX.gold },
-      { text: `${s.safe} TANKERS SAFE · ${s.lost} LOST · OIL $${s.price} (${delta})`, color: HEX.cream }
-    ], PAL.gold);
-    y += 8;
-
-    // section 3 — memes: today's newly collected templates + overall collection tally
+    // section 2 — memes: today's newly collected templates + overall collection tally
     y += this.buildMemesCard(panel, y, cardW, s.newMemesUnlocked);
     y += 8;
 
-    // section 4 — intel (warnings), only when there's something to show
+    // section 3 — intel (warnings), only when there's something to show
     const intelLines: { text: string; color: string; size?: string }[] = s.warnings.map(w => ({
       text: `⚠ ${w}`,
       color: '#F2D8FF',
@@ -1207,6 +1202,16 @@ export class UIScene extends Phaser.Scene {
     // shop — the only window in which upgrades can be bought; sits below whatever
     // the recap cards above needed, so a long warnings list can never overlap it
     const upgradeCardH = 150;
+    // live cash readout right above the shop; onCredits keeps it current on buys
+    this.summaryCashText = this.add
+      .text(0, y + 12, `CASH: $${Math.round(this.displayedCredits)}`, {
+        fontFamily: FONT_DISPLAY,
+        fontSize: '24px',
+        color: HEX.gold
+      })
+      .setOrigin(0.5);
+    panel.add(this.summaryCashText);
+    y += 34;
     const upgradesHeaderY = y + 10;
     panel.add(
       this.add
@@ -1217,6 +1222,13 @@ export class UIScene extends Phaser.Scene {
     UPGRADES.forEach((u, i) => this.buildUpgradeCard(panel, u, (i - 1) * 280, upgradeCardsY, upgradeCardH));
 
     const nextBtnY = Math.max(H / 2 - 40, upgradeCardsY + upgradeCardH / 2 + 30);
+    // grow the backdrop to fit however far the content ran, and re-center on screen
+    const bgH = Math.max(H, nextBtnY + 29 + 24 - (-H / 2));
+    if (bgH > H) {
+      bg.setSize(W, bgH);
+      bg.setPosition(0, -H / 2 + bgH / 2);
+      panel.setY(GAME_H / 2 - bg.y);
+    }
     const nextBtn = this.add.container(0, nextBtnY);
     const nextBtnBg = this.add.rectangle(0, 0, 300, 58, PAL.green).setStrokeStyle(4, PAL.ink);
     const nextBtnText = this.add
