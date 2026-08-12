@@ -710,7 +710,7 @@ export class GameScene extends Phaser.Scene {
     // atlas art: the gun end shifts with the left/mid/right pose frames
     const dx = this.turretAimX - tu.x;
     const side = dx < -tu.poseSwitchDx ? -1 : dx > tu.poseSwitchDx ? 1 : 0;
-    return { x: tu.x + side * tu.muzzleOffsetX, y: tu.y - 34 };
+    return { x: tu.x + side * tu.muzzleOffsetX, y: tu.y - 34 + (side === -1 ? tu.muzzleLeftDy : 0) };
   }
 
   // ------------------------------------------------------------- input

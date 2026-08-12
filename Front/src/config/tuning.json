@@ -141,7 +141,8 @@
     "heatCoolPerSec": 0.35,
     "overheatRecoverAt": 0.3,
     "poseSwitchDx": 110,
-    "muzzleOffsetX": 75
+    "muzzleOffsetX": 75,
+    "muzzleLeftDy": -14
   },
   "juice": {
     "tapRadius": 80,
