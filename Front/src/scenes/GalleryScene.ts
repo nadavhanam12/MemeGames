@@ -7,7 +7,7 @@
 // removing a meme there needs no change here — the gallery follows automatically.
 // Launch with: this.scene.start('Gallery', { from: 'Menu' | 'Results' })
 import Phaser from 'phaser';
-import { FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL } from '../core/palette';
+import { DPR, FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL } from '../core/palette';
 import { hasArt } from '../core/art';
 import { sfx } from '../core/sfx';
 import { pressPulse } from '../core/juice';
@@ -157,9 +157,11 @@ export class GalleryScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       // 'pointerdown' only fires on a genuine press (mouse button or touch
       // contact) — never on hover — so no extra isDown gate is needed here.
-      if (p.y < VIEWPORT_TOP || p.y > VIEWPORT_BOTTOM) return;
+      // (pointer coords are in DPR-scaled canvas pixels; layout is logical)
+      const py = p.y / DPR;
+      if (py < VIEWPORT_TOP || py > VIEWPORT_BOTTOM) return;
       this.pointerDown = true;
-      this.dragStartY = p.y;
+      this.dragStartY = py;
       this.dragStartOffset = this.contentOffset;
       this.dragMoved = 0;
     });
@@ -171,7 +173,7 @@ export class GalleryScene extends Phaser.Scene {
         this.pointerDown = false;
         return;
       }
-      const dy = p.y - this.dragStartY;
+      const dy = p.y / DPR - this.dragStartY;
       this.dragMoved = Math.max(this.dragMoved, Math.abs(dy));
       this.contentOffset = Phaser.Math.Clamp(this.dragStartOffset + dy, -this.maxScroll, 0);
       this.grid.y = this.contentOffset;

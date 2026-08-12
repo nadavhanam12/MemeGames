@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_H, GAME_W, HEX, PAL, VIEW } from '../core/palette';
+import { DPR, FONT_DISPLAY, GAME_H, GAME_W, HEX, PAL, VIEW } from '../core/palette';
 import { settings, vibrate } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
@@ -212,9 +212,11 @@ export class GameScene extends Phaser.Scene {
       .setAlpha(0)
       .setDepth(900);
 
-    // render the world inside the broadcast window; HUD frames it
-    this.baseZoom = Math.min(VIEW.w / GAME_W, VIEW.h / GAME_H);
-    this.cameras.main.setViewport(VIEW.x, VIEW.y, VIEW.w, VIEW.h);
+    // render the world inside the broadcast window; HUD frames it.
+    // VIEW is in 1280×720 logical coords; the canvas backing store is DPR×
+    // larger, so both the viewport rect and the zoom carry the DPR factor.
+    this.baseZoom = Math.min(VIEW.w / GAME_W, VIEW.h / GAME_H) * DPR;
+    this.cameras.main.setViewport(VIEW.x * DPR, VIEW.y * DPR, VIEW.w * DPR, VIEW.h * DPR);
     this.cameras.main.setZoom(this.baseZoom);
     this.cameras.main.centerOn(GAME_W / 2, GAME_H / 2);
     this.cameras.main.fadeIn(250, 7, 59, 92);
@@ -226,7 +228,10 @@ export class GameScene extends Phaser.Scene {
       // ignore taps while a UI modal (upgrades panel) is open
       if (this.registry.get('ui-modal')) return;
       // ignore taps on the HUD frame outside the broadcast window
-      if (p.x < VIEW.x || p.x > VIEW.x + VIEW.w || p.y < VIEW.y || p.y > VIEW.y + VIEW.h) return;
+      // (pointer coords are in DPR-scaled canvas pixels; VIEW is logical)
+      const px = p.x / DPR;
+      const py = p.y / DPR;
+      if (px < VIEW.x || px > VIEW.x + VIEW.w || py < VIEW.y || py > VIEW.y + VIEW.h) return;
       const wp = this.cameras.main.getWorldPoint(p.x, p.y);
       // tap = one shot; holding keeps the burst going (see update())
       this.firingHeld = true;
@@ -374,7 +379,7 @@ export class GameScene extends Phaser.Scene {
     const mid = this.routes[0].getPoint(0.45);
     this.routeLabel = this.add
       .text(mid.x, mid.y - 40, 'STRAIT OF HORMUZ', {
-        fontFamily: '"Arial Black", Impact, sans-serif',
+        fontFamily: FONT_DISPLAY,
         fontSize: '20px',
         color: '#FFFFFF',
         stroke: HEX.ink,
@@ -1039,13 +1044,14 @@ export class GameScene extends Phaser.Scene {
     // OIL MONEY: all credit income scales with the gold upgrade
     const boosted = Math.round(gain * (1 + this.upgrades.gold * TUNING.upgrades.goldBonusPerLevel));
     this.stats.credits += boosted;
-    // x,y are world coords; UIScene draws unscaled over the full canvas, so
-    // translate through this scene's viewport+zoom+origin (Phaser's actual
-    // camera matrix: viewport pos + origin*(1-zoom) + zoom*(world - scroll))
-    // to land the coin fly-out where the reward actually happened on screen.
+    // x,y are world coords; UIScene draws over the full canvas in 1280×720
+    // logical coords, so translate through this scene's viewport+zoom+origin
+    // (Phaser's actual camera matrix: viewport pos + origin*(1-zoom) +
+    // zoom*(world - scroll)) — that yields physical canvas pixels, so divide
+    // by DPR to land the coin fly-out in UIScene's logical space.
     const cam = this.cameras.main;
-    const hudX = cam.x + cam.width * cam.originX * (1 - cam.zoom) + cam.zoom * (x - cam.scrollX);
-    const hudY = cam.y + cam.height * cam.originY * (1 - cam.zoom) + cam.zoom * (y - cam.scrollY);
+    const hudX = (cam.x + cam.width * cam.originX * (1 - cam.zoom) + cam.zoom * (x - cam.scrollX)) / DPR;
+    const hudY = (cam.y + cam.height * cam.originY * (1 - cam.zoom) + cam.zoom * (y - cam.scrollY)) / DPR;
     bus.emit(EV.CREDITS, this.stats.credits, boosted, hudX, hudY);
   }
 
@@ -1416,7 +1422,9 @@ export class GameScene extends Phaser.Scene {
     this.fireTimer = Math.max(0, this.fireTimer - rawDt);
     if (this.firingHeld && !this.overheated && this.fireTimer === 0 && !this.registry.get('ui-modal')) {
       const p = this.input.activePointer;
-      if (p.isDown && p.x >= VIEW.x && p.x <= VIEW.x + VIEW.w && p.y >= VIEW.y && p.y <= VIEW.y + VIEW.h) {
+      const px = p.x / DPR;
+      const py = p.y / DPR;
+      if (p.isDown && px >= VIEW.x && px <= VIEW.x + VIEW.w && py >= VIEW.y && py <= VIEW.y + VIEW.h) {
         this.fireTimer = tu.fireInterval;
         const wp = this.cameras.main.getWorldPoint(p.x, p.y);
         this.fireShot(wp.x, wp.y);

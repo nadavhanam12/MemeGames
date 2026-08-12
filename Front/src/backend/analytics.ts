@@ -6,6 +6,17 @@
 
 import { getApiBase } from './api';
 
+// crypto.randomUUID() only exists in secure contexts (https / localhost);
+// over plain http on a LAN IP it's undefined. Analytics run IDs don't need
+// cryptographic strength, so fall back to Math.random.
+function makeRunId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  const hex = () => Math.floor(Math.random() * 0xffff).toString(16).padStart(4, '0');
+  return `${hex()}${hex()}-${hex()}-${hex()}-${hex()}-${hex()}${hex()}${hex()}`;
+}
+
 export class AnalyticsService {
   private runId: string | null = null;
 
@@ -13,7 +24,7 @@ export class AnalyticsService {
 
   /** Call once per run start; generates the runId later events are grouped under. */
   startRun(): void {
-    this.runId = crypto.randomUUID();
+    this.runId = makeRunId();
     this.track('run_start');
   }
 

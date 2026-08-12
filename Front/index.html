@@ -2,9 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>STRAIT SHOOTER — Hormuz Market Defense</title>
     <style>
+      @font-face {
+        font-family: 'Anton';
+        src: url('/assets/fonts/Anton.woff2') format('woff2');
+        font-weight: 400;
+        font-display: block;
+      }
+      @font-face {
+        font-family: 'Chakra Petch';
+        src: url('/assets/fonts/ChakraPetch-SemiBold.woff2') format('woff2');
+        font-weight: 600;
+        font-display: block;
+      }
       html, body {
         margin: 0;
         padding: 0;
@@ -23,10 +35,69 @@
         justify-content: center;
       }
       canvas { display: block; }
+      /* Portrait blocker: touch devices only — desktop portrait windows stay playable */
+      #rotate-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        background: #17202A;
+        color: #FFF3D6;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        text-align: center;
+        font-family: 'Chakra Petch', 'Helvetica Neue', Arial, sans-serif;
+      }
+      #rotate-overlay .icon {
+        font-size: 64px;
+        animation: rotate-hint 1.8s ease-in-out infinite;
+      }
+      #rotate-overlay .title {
+        font-family: 'Anton', 'Arial Black', Impact, sans-serif;
+        font-size: 30px;
+        letter-spacing: 2px;
+        color: #F4B942;
+      }
+      #rotate-overlay .sub { font-size: 14px; opacity: 0.8; }
+      @keyframes rotate-hint {
+        0%, 25% { transform: rotate(0deg); }
+        65%, 100% { transform: rotate(90deg); }
+      }
+      @media (orientation: portrait) and (pointer: coarse) {
+        #rotate-overlay { display: flex; }
+      }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="rotate-overlay">
+      <div class="icon">📱</div>
+      <div class="title">ROTATE YOUR DEVICE</div>
+      <div class="sub">This game plays in landscape</div>
+    </div>
+    <!-- TEMP DEBUG: on-screen error reporter for mobile — remove after diagnosing -->
+    <script>
+      (function () {
+        var box = null;
+        function show(msg) {
+          if (!box) {
+            box = document.createElement('pre');
+            box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(120,0,0,.92);color:#fff;font:11px/1.4 monospace;padding:8px;margin:0;max-height:60%;overflow:auto;white-space:pre-wrap;pointer-events:none;';
+            document.body.appendChild(box);
+          }
+          box.textContent += msg + '\n\n';
+        }
+        window.addEventListener('error', function (e) {
+          show('ERROR: ' + e.message + '\n  at ' + (e.filename || '?') + ':' + e.lineno + ':' + e.colno + (e.error && e.error.stack ? '\n' + e.error.stack : ''));
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason;
+          show('UNHANDLED REJECTION: ' + (r && (r.stack || r.message) || String(r)));
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

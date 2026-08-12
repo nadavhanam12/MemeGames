@@ -25,11 +25,16 @@ export const HEX = {
   purple: '#9B5DE5'
 } as const;
 
-export const FONT_DISPLAY = '"Arial Black", "Impact", "Helvetica Neue", sans-serif';
-export const FONT_SANS = '"Helvetica Neue", Arial, sans-serif';
+export const FONT_DISPLAY = '"Anton", "Arial Black", "Impact", sans-serif';
+export const FONT_SANS = '"Chakra Petch", "Helvetica Neue", Arial, sans-serif';
 
 export const GAME_W = 1280;
 export const GAME_H = 720;
+
+// Canvas backing-store multiplier for hi-DPI screens (capped to keep fill
+// rate sane on weak GPUs). World/layout coordinates stay in GAME_W×GAME_H;
+// the canvas is DPR× larger and every camera zooms by DPR to compensate.
+export const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
 // The gameplay camera renders inside this screen rect ("broadcast window");
 // the HUD frames it: left column, top band, bottom chyron.
