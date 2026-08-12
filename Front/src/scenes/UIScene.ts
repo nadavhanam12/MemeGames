@@ -272,6 +272,12 @@ export class UIScene extends Phaser.Scene {
       fontStyle: 'bold',
       color: HEX.gold
     });
+    const failLabel = this.add.text(oilLabel.x + oilLabel.width + 12, oilLabel.y, `KEEP UNDER $${TUNING.session.failPrice}`, {
+      fontFamily: FONT_SANS,
+      fontSize: '16px',
+      fontStyle: 'bold',
+      color: HEX.red
+    });
     this.priceBox = this.add.rectangle(cx - 10, 92, 200, 56, 0x22303e).setStrokeStyle(3, PAL.gold);
     this.priceText = this.add
       .text(cx - 10, 92, '$112', { fontFamily: FONT_DISPLAY, fontSize: '34px', color: HEX.cream })
@@ -310,7 +316,7 @@ export class UIScene extends Phaser.Scene {
       .text(0, 0, '', { fontFamily: FONT_SANS, fontSize: '11px', fontStyle: 'bold', color: HEX.gold })
       .setOrigin(1, 1)
       .setAlpha(0);
-    group.add([oilLabel, this.priceBox, this.priceText, this.priceArrow, this.graph, this.graphTip, this.targetLabel]);
+    group.add([oilLabel, failLabel, this.priceBox, this.priceText, this.priceArrow, this.graph, this.graphTip, this.targetLabel]);
     group.add(this.yAxisLabels);
     group.add(this.dayLabels);
     registerLayout(this, 'hud-price', group, { x: LEFT_BOX.x, y: LEFT_BOX.y, w: LEFT_BOX.w, h: LEFT_BOX.h });
@@ -1184,6 +1190,13 @@ export class UIScene extends Phaser.Scene {
           thumb.add(this.add.rectangle(0, 0, w, thumbH, 0x39424e));
         }
         thumb.add(this.add.rectangle(0, 0, w, thumbH).setStrokeStyle(2, PAL.gold));
+        thumb.setSize(w, thumbH);
+        thumb.setInteractive({ useHandCursor: true });
+        thumb.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+          ev.stopPropagation();
+          sfx.tap();
+          this.showFocusedUnlock(parent, id);
+        });
         card.add(thumb);
         x += w + gap;
       });
