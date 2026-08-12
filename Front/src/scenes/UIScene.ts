@@ -928,6 +928,15 @@ export class UIScene extends Phaser.Scene {
         thumb.add(this.add.rectangle(0, 0, w, H, 0x39424e));
       }
       thumb.add(this.add.rectangle(0, 0, w, H).setStrokeStyle(3, PAL.gold));
+      thumb.setSize(w, H);
+      thumb.setInteractive({ useHandCursor: true });
+      // pointerdown + stopPropagation: matches the popup's dismiss listener's
+      // event type, so tapping a thumb zooms it instead of closing the popup.
+      thumb.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+        ev.stopPropagation();
+        sfx.tap();
+        this.showFocusedUnlock(c, id);
+      });
       panel.add(thumb);
       x += w + gap;
     });
@@ -945,7 +954,7 @@ export class UIScene extends Phaser.Scene {
     }
     panel.add(
       this.add
-        .text(0, 118, 'TAP TO CONTINUE', { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: '#AAB4BD' })
+        .text(0, 118, 'TAP A MEME TO ZOOM · TAP ANYWHERE ELSE TO CONTINUE', { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: '#AAB4BD' })
         .setOrigin(0.5)
     );
 
@@ -971,6 +980,57 @@ export class UIScene extends Phaser.Scene {
     if (import.meta.env.DEV && devState.autoPlay === 'full') {
       this.time.delayedCall(900 / devState.speedMultiplier, dismiss);
     }
+  }
+
+  /** Full-screen zoom for one just-unlocked template, same presentation as the
+   *  gallery's zoom view. Added as a child of the popup container so it dies
+   *  with it; tapping it closes only the zoom, returning to the popup. */
+  private showFocusedUnlock(popup: Phaser.GameObjects.Container, id: string): void {
+    const tpl = MEMES.templates[id];
+    if (!tpl) return;
+
+    const layer = this.add.container(0, 0);
+    popup.add(layer);
+    layer.add(this.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.85));
+
+    const maxW = 520;
+    const maxH = 440;
+    let w = maxW;
+    let h = w * tpl.aspect;
+    if (h > maxH) {
+      h = maxH;
+      w = h / tpl.aspect;
+    }
+
+    layer.add(this.add.rectangle(0, -30, w + 24, h + 24, PAL.ink).setStrokeStyle(5, PAL.gold));
+    if (hasArt(this, tpl.artKey)) {
+      layer.add(this.add.image(0, -30, tpl.artKey).setDisplaySize(w, h));
+    } else {
+      layer.add(this.add.rectangle(0, -30, w, h, 0xf2f2f2));
+      layer.add(
+        this.add.text(0, -30, tpl.label, { fontFamily: FONT_SANS, fontSize: '16px', color: '#9aa4ad' }).setOrigin(0.5)
+      );
+    }
+    layer.add(
+      this.add
+        .text(0, h / 2 + 14, '✓ UNLOCKED', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.green })
+        .setOrigin(0.5)
+    );
+    layer.add(
+      this.add
+        .text(0, h / 2 + 46, 'TAP TO CLOSE', { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: '#AAB4BD' })
+        .setOrigin(0.5)
+    );
+
+    layer.setSize(GAME_W, GAME_H);
+    layer.setInteractive({ useHandCursor: true });
+    // pointerdown + stopPropagation: consumed before it can reach the thumbs
+    // or the popup's own dismiss listener underneath.
+    layer.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+      ev.stopPropagation();
+      sfx.tap();
+      layer.destroy();
+    });
   }
 
   /** One bordered, labeled group inside the day-end recap (mission / report / intel).
