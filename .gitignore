@@ -19,3 +19,4 @@ dist/
 
 # Meme pack delivery zips (contents are extracted alongside)
 Front/assets/raw/Meme/*.zip
+.claude/worktrees/
