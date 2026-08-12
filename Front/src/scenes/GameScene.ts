@@ -702,7 +702,10 @@ export class GameScene extends Phaser.Scene {
       const a = this.turretBarrel.rotation;
       return { x: tu.x + Math.cos(a) * 42, y: tu.y - 8 + Math.sin(a) * 42 };
     }
-    return { x: tu.x, y: tu.y - 34 };
+    // atlas art: the gun end shifts with the left/mid/right pose frames
+    const dx = this.turretAimX - tu.x;
+    const side = dx < -tu.poseSwitchDx ? -1 : dx > tu.poseSwitchDx ? 1 : 0;
+    return { x: tu.x + side * tu.muzzleOffsetX, y: tu.y - 34 };
   }
 
   // ------------------------------------------------------------- input
@@ -1454,7 +1457,7 @@ export class GameScene extends Phaser.Scene {
     const firing = this.firingHeld || this.elapsed - this.lastShotAt < 0.18;
     if (this.turretArt) {
       const dx = this.turretAimX - tu.x;
-      const dir = dx < -110 ? 'left' : dx > 110 ? 'right' : 'mid';
+      const dir = dx < -tu.poseSwitchDx ? 'left' : dx > tu.poseSwitchDx ? 'right' : 'mid';
       const frame = Math.floor(this.turretAnimT * (firing ? 10 : 2)) % 2 + 1;
       const key = `trump_${dir}_${firing ? 'fire' : 'idle'}_${frame}`;
       if (this.textures.exists(key) && this.turretBody.texture.key !== key) this.turretBody.setTexture(key);
