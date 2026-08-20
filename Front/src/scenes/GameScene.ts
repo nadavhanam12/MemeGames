@@ -67,6 +67,9 @@ interface Tanker {
   routeIdx: number; // which shipping lane it sails
   vip: boolean;
   hp: number; // hits it can still take (HULL ARMOR adds +1 per level)
+  maxHp: number;
+  list: number; // damaged ships heel over a little — added to route heading
+  smoke?: Phaser.GameObjects.Particles.ParticleEmitter; // distress smoke once hit
   dead: boolean;
 }
 
@@ -136,6 +139,9 @@ export class GameScene extends Phaser.Scene {
   private swarmCounter = 0;
 
   private waveGfx!: Phaser.GameObjects.Graphics;
+  private trailGfx!: Phaser.GameObjects.Graphics; // tracer streaks, redrawn per frame
+  private lastHitstopAt = -10;
+  private tensionTimer = 0;
   private waveT = 0;
   private lastTickSecond = -1;
   private baseZoom = 1;
@@ -210,6 +216,9 @@ export class GameScene extends Phaser.Scene {
     this.spawnTurret();
     if (import.meta.env.DEV && devState.routeEdit) this.enableRouteEdit(true);
     this.waveGfx = this.add.graphics().setDepth(6);
+    this.trailGfx = this.add.graphics().setDepth(54);
+    this.lastHitstopAt = -10;
+    this.tensionTimer = 0;
     // day/night light: navy wash over the world, alpha driven in update()
     this.nightOverlay = this.add
       .rectangle(GAME_W / 2, GAME_H / 2, GAME_W * 1.25, GAME_H * 1.25, 0x0a1a3c)
@@ -241,6 +250,7 @@ export class GameScene extends Phaser.Scene {
       this.firingHeld = true;
       this.fireTimer = TUNING.turret.fireInterval;
       sfx.unlock();
+      sfx.startAmbient(); // ocean bed can only start once audio is unlocked
       shockwave(this, wp.x, wp.y, 0xffffff, 36); // designation marker
       this.fireShot(wp.x, wp.y);
     });
@@ -257,6 +267,7 @@ export class GameScene extends Phaser.Scene {
     this.events.on('shutdown', () => {
       bus.removeAllListeners('buy-upgrade');
       bus.removeAllListeners(EV.NEXT_DAY_REQUEST);
+      sfx.stopAmbient();
     });
   }
 
@@ -481,6 +492,7 @@ export class GameScene extends Phaser.Scene {
     const sp = TUNING.speeds;
     // VIP sails at normal tanker speed — same random range as everyone else
     const base = Phaser.Math.Between(sp.tankerMin, sp.tankerMax);
+    const hp = 1 + this.upgrades.hull * TUNING.upgrades.hullHpPerLevel;
     const t: Tanker = {
       sprite,
       wake,
@@ -488,7 +500,9 @@ export class GameScene extends Phaser.Scene {
       dist: 0,
       routeIdx,
       vip,
-      hp: 1 + this.upgrades.hull * TUNING.upgrades.hullHpPerLevel,
+      hp,
+      maxHp: hp,
+      list: 0,
       dead: false
     };
     if (vip) {
@@ -638,6 +652,11 @@ export class GameScene extends Phaser.Scene {
       sfx.splash();
       shockwave(this, x, y, 0x8fd6ef, 46);
     }
+    // flying weapons launch from off-screen — blink an edge chevron so the
+    // player knows where to look before the threat is even visible
+    if (t === 'missile' || t === 'drone') {
+      this.spawnTelegraph(x, t === 'missile' ? PAL.red : PAL.orange);
+    }
     if (t === 'missile' && !settings.reducedMotion) {
       (sprite as any).trail = this.add.particles(0, 0, 'puff', {
         speed: 10,
@@ -749,7 +768,29 @@ export class GameScene extends Phaser.Scene {
 
     sfx.tap();
     vibrate(5);
-    shockwave(this, m.x, m.y, 0xffe08a, 20); // muzzle flash — small, kills get the big one
+    // muzzle flash: additive hot disc at the barrel (kills get the big ring)
+    if (!settings.reducedMotion) {
+      const flash = this.add
+        .circle(m.x, m.y, 13, 0xfff2b0, 1)
+        .setDepth(56)
+        .setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({
+        targets: flash,
+        scale: { from: 0.5, to: 1.7 },
+        alpha: { from: 0.95, to: 0 },
+        duration: 70,
+        ease: 'Quad.easeOut',
+        onComplete: () => flash.destroy()
+      });
+      // recoil: the whole nest kicks a couple px away from the shot
+      if (this.turret) {
+        const tu = TUNING.turret;
+        const kick = Math.atan2(this.turretAimY - tu.y, this.turretAimX - tu.x);
+        this.tweens.killTweensOf(this.turret);
+        this.turret.setPosition(tu.x - Math.cos(kick) * 3, tu.y - Math.sin(kick) * 3);
+        this.tweens.add({ targets: this.turret, x: tu.x, y: tu.y, duration: 80, ease: 'Quad.easeOut' });
+      }
+    }
     camImpulse(this, TUNING.juice.shakeSmall * 0.6, 40);
 
     this.heat = Math.min(1, this.heat + tu.heatPerShot);
@@ -789,16 +830,19 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
       onComplete: () => this.destroyAnim(th)
     });
+    this.hitstop(TUNING.juice.hitstopKillMs);
     impactFlash(this, x, y);
     const col = { missile: PAL.red, drone: PAL.orange, mine: 0xaab4bd, patrol: PAL.red }[th.type];
     shockwave(this, x, y, col, 90);
-    this.burst(x, y, col, th.type === 'mine' ? 'gear' : 'spark', 10);
+    // a hot streak makes the world hit harder: denser bursts, stronger shake
+    const tier = Math.min(4, Math.floor(this.stats.combo / 10));
+    this.burst(x, y, col, th.type === 'mine' ? 'gear' : 'spark', 10 + tier * 2);
 
     const eco = TUNING.economy;
     const drop = th.type === 'patrol' ? eco.patrolDrop : eco.interceptDrop;
     this.changePrice(-drop);
     sfx.hit();
-    camImpulse(this, TUNING.juice.shakeSmall, 80);
+    camImpulse(this, TUNING.juice.shakeSmall * (1 + tier * TUNING.juice.comboShakePerTier), 80);
     vibrate(15);
 
     // near-miss = intercepted close to ANY tanker (missiles have no live target)
@@ -929,6 +973,12 @@ export class GameScene extends Phaser.Scene {
 
   private breakCombo(): void {
     if (this.stats.combo > 0) {
+      // losing a real streak deserves its own sting — a silent reset reads as a bug
+      if (this.stats.combo >= 5) {
+        sfx.comboBreak();
+        camImpulse(this, TUNING.juice.shakeSmall, 100);
+        floatText(this, GAME_W / 2, 250, `COMBO ×${this.stats.combo} LOST`, HEX.red, 24);
+      }
       this.stats.combo = 0;
       bus.emit(EV.COMBO, 0, undefined);
     }
@@ -1092,6 +1142,7 @@ export class GameScene extends Phaser.Scene {
       // existing ships get the extra plating too
       for (const t of this.aliveTankers()) {
         t.hp += TUNING.upgrades.hullHpPerLevel;
+        t.maxHp += TUNING.upgrades.hullHpPerLevel;
         floatText(this, t.sprite.x, t.sprite.y - 60, 'REINFORCED!', HEX.green, 22);
       }
       shockwave(this, mid.x, mid.y, PAL.green, 260);
@@ -1347,6 +1398,7 @@ export class GameScene extends Phaser.Scene {
     floatText(this, ex, t.sprite.y - 60, `SAFE! −$${drop} OIL`, HEX.green, 34);
     if (t.vip && this.eventActive && this.eventLabel === 'VIP TANKER TRANSIT') this.resolveEvent(true);
     t.wake.destroy();
+    t.smoke?.destroy();
     ((t.sprite as any).sparkle as Phaser.GameObjects.Particles.ParticleEmitter | undefined)?.destroy();
     t.sprite.destroy();
   }
@@ -1367,6 +1419,24 @@ export class GameScene extends Phaser.Scene {
       );
       this.changePrice(dmgSpike);
       floatText(this, t.sprite.x, t.sprite.y - 70, `HULL HOLDS (${t.hp} HP)`, HEX.gold, 26);
+      // persistent distress: scorched hull, a slight heel, and a smoke plume —
+      // a wounded ship should look worth protecting, not pristine
+      t.sprite.setTint(0xb8b0a4);
+      t.list = (Math.random() < 0.5 ? -1 : 1) * 0.07;
+      if (!t.smoke && !settings.reducedMotion) {
+        t.smoke = this.add
+          .particles(0, 0, 'puff', {
+            speed: { min: 6, max: 20 },
+            angle: { min: 250, max: 290 },
+            scale: { start: 0.9, end: 0 },
+            alpha: { start: 0.5, end: 0 },
+            lifespan: 900,
+            frequency: 140,
+            tint: 0x3a4148,
+            follow: t.sprite
+          })
+          .setDepth(22);
+      }
       ((th.sprite as any).trail as Phaser.GameObjects.Particles.ParticleEmitter | undefined)?.destroy();
       th.sprite.destroy();
       th.warnRing?.destroy();
@@ -1378,7 +1448,13 @@ export class GameScene extends Phaser.Scene {
     this.lastIncidentAt = this.elapsed;
     this.breakCombo();
     sfx.bigHit();
+    this.hitstop(TUNING.juice.hitstopLossMs);
     camImpulse(this, TUNING.juice.shakeBig, 300);
+    // the run's worst moment gets the camera punch, not just a shake
+    if (!settings.reducedMotion) {
+      this.cameras.main.zoomTo(this.baseZoom * TUNING.juice.lossZoom, 120, 'Cubic.easeOut', true);
+      this.time.delayedCall(280, () => this.cameras.main.zoomTo(this.baseZoom, 300, 'Cubic.easeOut', true));
+    }
     vibrate([40, 40, 80]);
     impactFlash(this, t.sprite.x, t.sprite.y, PAL.orange, 80);
     shockwave(this, t.sprite.x, t.sprite.y, PAL.red, 200);
@@ -1403,6 +1479,7 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => t.sprite.destroy()
     });
     t.wake.destroy();
+    t.smoke?.destroy();
     ((t.sprite as any).sparkle as Phaser.GameObjects.Particles.ParticleEmitter | undefined)?.destroy();
     ((th.sprite as any).trail as Phaser.GameObjects.Particles.ParticleEmitter | undefined)?.destroy();
     th.sprite.destroy();
@@ -1445,6 +1522,9 @@ export class GameScene extends Phaser.Scene {
       const d = Phaser.Math.Distance.Between(b.sprite.x, b.sprite.y, b.aimX, b.aimY);
       if (d <= Math.max(step, tu.bulletHitRadius)) {
         if (b.target && !b.target.dead) {
+          // round-on-armor sparks at the point of arrival — separate from the
+          // death burst, so armored first hits still feel like metal on metal
+          this.burst(b.sprite.x, b.sprite.y, 0xffe08a, 'spark', 4);
           this.intercept(b.target, !b.fromAir);
         } else {
           // wasted round — small splash so the miss still reads
@@ -1460,6 +1540,19 @@ export class GameScene extends Phaser.Scene {
       b.sprite.setRotation(ang);
     }
     this.bullets = this.bullets.filter(b => !b.done);
+
+    // tracer streaks: one shared graphics, redrawn per frame — a hot fading
+    // tail behind every round sells the projectile speed for near-zero cost
+    this.trailGfx.clear();
+    if (!settings.reducedMotion) {
+      for (const b of this.bullets) {
+        const ang = b.sprite.rotation;
+        this.trailGfx.lineStyle(3, 0xffe08a, 0.3);
+        this.trailGfx.lineBetween(b.sprite.x - Math.cos(ang) * 30, b.sprite.y - Math.sin(ang) * 30, b.sprite.x, b.sprite.y);
+        this.trailGfx.lineStyle(2, 0xfff6cf, 0.55);
+        this.trailGfx.lineBetween(b.sprite.x - Math.cos(ang) * 14, b.sprite.y - Math.sin(ang) * 14, b.sprite.x, b.sprite.y);
+      }
+    }
 
     // pose: direction from aim point, firing state from recent shots
     this.turretAnimT += rawDt;
@@ -1538,6 +1631,36 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(ms, () => (this.worldScale = 1));
   }
 
+  /** Hitstop: a few frames of total freeze on a kill so impacts crunch.
+   *  Skips if slow-mo (or another hitstop) already owns worldScale, and is
+   *  rate-capped so held-fire kill chains don't turn into stutter. */
+  private hitstop(ms: number): void {
+    if (settings.reducedMotion || this.worldScale !== 1) return;
+    if (this.elapsed - this.lastHitstopAt < 0.15) return;
+    this.lastHitstopAt = this.elapsed;
+    this.worldScale = 0;
+    this.time.delayedCall(ms, () => {
+      if (this.worldScale === 0) this.worldScale = 1;
+    });
+  }
+
+  /** Blinking chevron at the top edge marking where a flyer just launched. */
+  private spawnTelegraph(x: number, color: number): void {
+    sfx.spawnCue();
+    if (settings.reducedMotion) return;
+    const g = this.add.graphics().setDepth(870);
+    g.fillStyle(color, 0.9);
+    g.fillTriangle(x - 14, 8, x + 14, 8, x, 32);
+    this.tweens.add({
+      targets: g,
+      alpha: { from: 1, to: 0.15 },
+      duration: 110,
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => g.destroy()
+    });
+  }
+
   // ------------------------------------------------------------- main loop
   update(_time: number, deltaMs: number): void {
     this.drawWaves();
@@ -1594,6 +1717,17 @@ export class GameScene extends Phaser.Scene {
         this.lastTickSecond = -1;
         bus.emit(EV.DANGER, null);
       }
+    }
+
+    // ambient audio: the tension drone swells as the price closes on the
+    // meltdown line, and keeps climbing through the countdown itself
+    this.tensionTimer += rawDt;
+    if (this.tensionTimer >= 0.25) {
+      this.tensionTimer = 0;
+      const fail = TUNING.session.failPrice;
+      let tension = Phaser.Math.Clamp((this.stats.oilPrice - (fail - 30)) / 30, 0, 1) * 0.6;
+      if (this.dangerActive) tension = 0.6 + 0.4 * Math.min(1, this.dangerT / TUNING.session.failSeconds);
+      sfx.setTension(tension);
     }
 
     // live-market jitter: small mean-reverting ticks between the real
@@ -1709,7 +1843,7 @@ export class GameScene extends Phaser.Scene {
       const tan = route.getTangent(frac);
       const heading = Math.atan2(tan.y, tan.x);
       t.sprite.setPosition(p.x, p.y + Math.sin(this.waveT * 2 + t.dist / 90) * 2);
-      t.sprite.rotation = heading + Math.sin(this.waveT * 2 + t.dist / 90) * 0.02;
+      t.sprite.rotation = heading + t.list + Math.sin(this.waveT * 2 + t.dist / 90) * 0.02;
       // keep the foam at the stern as the route curves
       t.wake.followOffset.set(-tan.x * t.sprite.width * 0.5, -tan.y * t.sprite.width * 0.5);
       // keep the hull upright when sailing right -> left
@@ -1865,6 +1999,7 @@ export class GameScene extends Phaser.Scene {
       bestCombo: this.stats.bestCombo
     });
     bus.emit(EV.DANGER, null);
+    sfx.stopAmbient();
     sfx.whoosh();
     this.tweens.add({ targets: this.cameras.main, zoom: this.baseZoom * 1.05, duration: 350, ease: 'Sine.easeOut' });
     this.registry.set('finalStats', this.stats);

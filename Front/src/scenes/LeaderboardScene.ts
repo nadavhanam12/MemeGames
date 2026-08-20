@@ -2,10 +2,12 @@
 // player's own rank (myRanking) when they have a saved best score.
 // Launch with: this.scene.start('Leaderboard', { from: 'Menu' | 'Results' })
 import Phaser from 'phaser';
-import { FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL } from '../core/palette';
+import { FONT_SANS, GAME_H, GAME_W, HEX, PAL } from '../core/palette';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
 import { pressPulse } from '../core/juice';
+import { settings } from '../core/settings';
+import { broadcastCut, broadcastReveal, lowerThird } from '../core/broadcast';
 import { LeaderboardPeriod, LeaderboardResponse } from '../backend/api';
 import { leaderboard } from '../backend/leaderboard';
 
@@ -46,16 +48,15 @@ export class LeaderboardScene extends Phaser.Scene {
       this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, PAL.navy);
     }
 
+    broadcastReveal(this);
     this.add.rectangle(cx, 52, GAME_W, 88, PAL.ink).setStrokeStyle(4, PAL.gold, 0.5);
-    this.add
-      .text(cx, 52, 'GLOBAL LEADERBOARD', {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '40px',
-        color: HEX.cream,
-        stroke: HEX.ink,
-        strokeThickness: 6
-      })
-      .setOrigin(0.5);
+    lowerThird(this, {
+      x: 90,
+      y: 58,
+      kicker: 'MARKET CLOSE RANKINGS',
+      main: 'GLOBAL LEADERBOARD',
+      mainSize: 34
+    });
 
     // period tabs
     PERIODS.forEach((p, i) => {
@@ -90,7 +91,7 @@ export class LeaderboardScene extends Phaser.Scene {
       .text(cx, 668, '', { fontFamily: FONT_SANS, fontSize: '20px', fontStyle: 'bold', color: HEX.cream })
       .setOrigin(0.5);
     this.makeButton(cx + 190, 668, 150, 'NEXT ▶', PAL.ocean, () => this.turnPage(1));
-    this.makeButton(150, 668, 200, '← BACK', PAL.red, () => this.scene.start(this.from));
+    this.makeButton(150, 668, 200, '← BACK', PAL.red, () => broadcastCut(this, () => this.scene.start(this.from)));
 
     this.refreshTabs();
     this.loadPage();
@@ -152,18 +153,33 @@ export class LeaderboardScene extends Phaser.Scene {
     const rowH = 40;
     const myRank = res.myRanking?.rank;
 
+    // podium accents: gold / silver / bronze for the top three
+    const MEDALS: Record<number, { color: string; stroke: number }> = {
+      1: { color: HEX.gold, stroke: PAL.gold },
+      2: { color: '#C8D0D8', stroke: 0xc8d0d8 },
+      3: { color: '#D8925A', stroke: 0xd8925a }
+    };
     res.entries.forEach((e, i) => {
       const y = top + i * rowH;
       const mine = myRank !== undefined && e.rank === myRank;
+      const medal = MEDALS[e.rank];
+      const rowC = this.add.container(0, 0);
       const bg = this.add
         .rectangle(cx, y, 900, rowH - 6, mine ? PAL.gold : PAL.ink, mine ? 0.9 : 0.7)
-        .setStrokeStyle(2, mine ? PAL.cream : PAL.gold, mine ? 1 : 0.35);
-      const color = mine ? HEX.ink : e.rank <= 3 ? HEX.gold : HEX.cream;
+        .setStrokeStyle(2, mine ? PAL.cream : medal ? medal.stroke : PAL.gold, mine || medal ? 1 : 0.35);
+      const color = mine ? HEX.ink : medal ? medal.color : HEX.cream;
       const style = { fontFamily: FONT_SANS, fontSize: '21px', fontStyle: 'bold', color };
       const rankT = this.add.text(cx - 420, y, `#${e.rank}`, style).setOrigin(0, 0.5);
       const nameT = this.add.text(cx - 320, y, e.name.toUpperCase().slice(0, 24), style).setOrigin(0, 0.5);
       const scoreT = this.add.text(cx + 420, y, `${e.score}`, style).setOrigin(1, 0.5);
-      this.rows.add([bg, rankT, nameT, scoreT]);
+      rowC.add([bg, rankT, nameT, scoreT]);
+      this.rows.add(rowC);
+      // chart-rundown stagger: each row slides in off the right edge
+      if (!settings.reducedMotion) {
+        rowC.setAlpha(0);
+        rowC.x = 60;
+        this.tweens.add({ targets: rowC, x: 0, alpha: 1, delay: i * 45, duration: 240, ease: 'Cubic.easeOut' });
+      }
     });
 
     // player's own rank, pinned below the list when outside the current page

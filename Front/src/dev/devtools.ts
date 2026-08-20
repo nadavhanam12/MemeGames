@@ -116,7 +116,7 @@ function loadFolderState(): Record<string, boolean> {
 }
 
 function buildPanel(GUI: any, game: Phaser.Game): void {
-  gui = new GUI({ title: 'STRAIT SHOOTER DEV' });
+  gui = new GUI({ title: "HORMUZ HOLD'EM DEV" });
   gui.domElement.style.zIndex = '10000';
 
   const folderState = loadFolderState();

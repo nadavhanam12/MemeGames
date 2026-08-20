@@ -12,8 +12,13 @@ server.
   - `src/scenes/` — Boot, Menu, Game, UI, Results, Leaderboard, Gallery scenes.
   - `src/core/` — game-side systems: `state.ts` (run state + `computeScore()`,
     the canonical submitted score, plus the `DayMission`/`DaySummary` types and
-    day-system bus events), `art.ts`, `juice.ts`, `sfx.ts`, `palette.ts`,
-    `settings.ts`, `memeUnlocks.ts` (persisted meme-collection progress).
+    day-system bus events), `art.ts`, `juice.ts`, `sfx.ts` (synthesized SFX +
+    ambient ocean/tension bed via `startAmbient`/`setTension`), `palette.ts`,
+    `settings.ts`, `memeUnlocks.ts` (persisted meme-collection progress),
+    `broadcast.ts` (shared "TV broadcast" screen language: `broadcastCut`/
+    `broadcastReveal` channel-cut scene transitions, `staticBlink`,
+    `lowerThird` news straps, `createTicker` headline crawl, `stampIn` —
+    used by Menu/Results/Leaderboard/Gallery and the UIScene day recap).
   - **Day/mission system**: each 45s "day" (`tuning.json` → `dayNight.dayLengthSec`)
     is a mini-level with one rolled mission (price / escort / intercept / combo /
     perfect). `GameScene.startDay/endDay` drive it; between days the world

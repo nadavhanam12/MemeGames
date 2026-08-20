@@ -101,7 +101,7 @@ export function shockwave(scene: Phaser.Scene, x: number, y: number, color: numb
 export function impactFlash(scene: Phaser.Scene, x: number, y: number, color = 0xffffff, size = 44): void {
   if (!fxBudget()) return;
   fxOpen();
-  const c = scene.add.circle(x, y, size, color, 1).setDepth(860);
+  const c = scene.add.circle(x, y, size, color, 1).setDepth(860).setBlendMode(Phaser.BlendModes.ADD);
   scene.tweens.add({
     targets: c,
     scale: { from: 0.3, to: 1.2 },

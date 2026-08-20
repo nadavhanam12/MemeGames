@@ -6,6 +6,7 @@ import { hasArt } from '../core/art';
 import { MEMES, MemePick, getMemeLog, renderMeme } from '../core/memes';
 import { getRunUnlocks, getUnlockedTemplates } from '../core/memeUnlocks';
 import { EASE, confetti, countTo } from '../core/juice';
+import { broadcastCut, broadcastReveal, stampIn } from '../core/broadcast';
 import { SessionStats, computeScore, freshStats } from '../core/state';
 import { captureAndShare } from '../core/share';
 import { leaderboard } from '../backend/leaderboard';
@@ -49,6 +50,7 @@ export class ResultsScene extends Phaser.Scene {
       this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, PAL.navy);
     }
 
+    broadcastReveal(this);
     const root = this.add.container(0, 0);
     const reduced = settings.reducedMotion;
 
@@ -184,11 +186,29 @@ export class ResultsScene extends Phaser.Scene {
     root.list
       .filter((o): o is Phaser.GameObjects.Container => o instanceof Phaser.GameObjects.Container && o !== card)
       .forEach((btn, i) => slideIn(btn, 380 + i * 90, 40));
+    if (!reduced) {
+      this.time.delayedCall(180, () => sfx.whoosh());
+      this.time.delayedCall(620, () => sfx.whoosh());
+    }
 
     this.time.delayedCall(reduced ? 100 : 260, () => {
       countTo(this, scoreTxt, 0, finalScore, v => `${Math.round(v)}`, 900);
       sfx.priceDown();
     });
+
+    // certification stamp slams on once the score finishes counting up
+    const stamp = this.add
+      .text(GAME_W / 2 + 262, 198, 'OFFICIAL — HHN', {
+        fontFamily: FONT_DISPLAY,
+        fontSize: '22px',
+        color: HEX.gold,
+        stroke: HEX.ink,
+        strokeThickness: 5
+      })
+      .setOrigin(0.5)
+      .setAngle(-9);
+    root.add(stamp);
+    stampIn(this, stamp, reduced ? 400 : 1250);
     this.time.delayedCall(reduced ? 500 : 1200, () => {
       sfx.fanfare();
       confetti(this, GAME_W / 2, 250, 26);
@@ -200,29 +220,13 @@ export class ResultsScene extends Phaser.Scene {
       this.time.delayedCall(reduced ? 1200 : 2200, () => void runSubmitFlow(false));
     }
 
-    // --- exit --------------------------------------------------------------
-    this.exitRoot = root;
   }
 
-  private exitRoot?: Phaser.GameObjects.Container;
-
-  /** Slide-fade the whole screen out, then switch scenes. */
+  /** Channel-cut out of the studio, then switch scenes. */
   private exitTo(go: () => void): void {
     if (this.leaving) return;
     this.leaving = true;
-    if (settings.reducedMotion || !this.exitRoot) {
-      go();
-      return;
-    }
-    sfx.whoosh();
-    this.tweens.add({
-      targets: this.exitRoot,
-      y: 40,
-      alpha: 0,
-      duration: 220,
-      ease: 'Cubic.easeIn',
-      onComplete: go
-    });
+    broadcastCut(this, go);
   }
 
   /** The whole front page in one container centered on CARD — masthead,

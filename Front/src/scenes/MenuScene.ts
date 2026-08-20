@@ -3,8 +3,10 @@ import { FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL } from '../core/palet
 import { loadSettings, settings } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
-import { popIn, pressPulse } from '../core/juice';
+import { pressPulse } from '../core/juice';
 import { MEMES, renderMeme } from '../core/memes';
+import { getUnlockedTemplates } from '../core/memeUnlocks';
+import { broadcastCut, broadcastReveal, createTicker } from '../core/broadcast';
 import { fetchLeaderboard } from '../backend/api';
 
 export class MenuScene extends Phaser.Scene {
@@ -14,10 +16,25 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     loadSettings();
+    broadcastReveal(this);
+    let leaving = false;
     const cx = GAME_W / 2;
 
     if (hasArt(this, 'map_bg')) {
-      this.add.image(cx, GAME_H / 2, 'map_bg').setDisplaySize(GAME_W, GAME_H).setAlpha(0.45);
+      const bgImg = this.add.image(cx, GAME_H / 2, 'map_bg').setDisplaySize(GAME_W, GAME_H).setAlpha(0.45);
+      // slow aerial-camera drift so the "studio backdrop" never sits still
+      if (!settings.reducedMotion) {
+        this.tweens.add({
+          targets: bgImg,
+          scaleX: bgImg.scaleX * 1.06,
+          scaleY: bgImg.scaleY * 1.06,
+          x: cx - 16,
+          duration: 16000,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
       this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, PAL.ink, 0.35);
     } else {
       this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, PAL.navy);
@@ -37,7 +54,7 @@ export class MenuScene extends Phaser.Scene {
     const banner = this.add.container(cx, 120);
     const bg = this.add.rectangle(0, 0, 700, 130, PAL.red).setStrokeStyle(6, PAL.ink);
     const t1 = this.add
-      .text(0, -24, 'STRAIT SHOOTER', {
+      .text(0, -24, "HORMUZ HOLD'EM", {
         fontFamily: FONT_DISPLAY,
         fontSize: '58px',
         color: HEX.cream,
@@ -54,7 +71,29 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     banner.add([bg, t1, t2]);
-    popIn(this, banner, 400);
+    // kicker tab + blinking LIVE dot: the title reads as a news lower-third
+    const kick = this.add
+      .text(-318, -80, 'LIVE FROM THE STRAIT', {
+        fontFamily: FONT_SANS,
+        fontSize: '15px',
+        fontStyle: 'bold',
+        color: HEX.ink
+      })
+      .setOrigin(0, 0.5);
+    const kickBg = this.add
+      .rectangle(-346 + (kick.width + 46) / 2, -80, kick.width + 46, 26, PAL.cream)
+      .setStrokeStyle(3, PAL.ink);
+    const dot = this.add
+      .text(-336, -81, '●', { fontFamily: FONT_SANS, fontSize: '14px', color: HEX.red })
+      .setOrigin(0, 0.5);
+    banner.add([kickBg, dot, kick]);
+    if (!settings.reducedMotion) {
+      this.tweens.add({ targets: dot, alpha: 0.15, duration: 600, yoyo: true, repeat: -1 });
+      // graphics package slide-in from the left
+      banner.setAlpha(0);
+      banner.x = cx - 360;
+      this.tweens.add({ targets: banner, x: cx, alpha: 1, duration: 320, ease: 'Cubic.easeOut' });
+    }
 
     // the situation, in plain english
     const blurb = [
@@ -65,8 +104,21 @@ export class MenuScene extends Phaser.Scene {
       'KEEP THE TANKERS SAFE and complete each day’s MISSION for bonus cash.'
     ];
     this.add.rectangle(cx, 319, 900, 200, PAL.ink, 0.75).setStrokeStyle(3, PAL.gold, 0.6);
+    // "VIEWER GUIDE" tab on the box's top edge — the blurb as a news card
+    const guideTxt = this.add
+      .text(cx - 438, 219, 'VIEWER GUIDE', {
+        fontFamily: FONT_SANS,
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: HEX.ink
+      })
+      .setOrigin(0, 0.5);
+    this.add
+      .rectangle(cx - 450 + (guideTxt.width + 44) / 2, 219, guideTxt.width + 44, 24, PAL.gold)
+      .setStrokeStyle(3, PAL.ink);
+    guideTxt.setDepth(1);
     blurb.forEach((line, i) => {
-      this.add
+      const t = this.add
         .text(cx, 254 + i * 34, line, {
           fontFamily: FONT_SANS,
           fontSize: '22px',
@@ -76,6 +128,11 @@ export class MenuScene extends Phaser.Scene {
           strokeThickness: 3
         })
         .setOrigin(0.5);
+      if (!settings.reducedMotion) {
+        t.setAlpha(0);
+        t.x -= 36;
+        this.tweens.add({ targets: t, x: cx, alpha: 1, delay: 160 + i * 80, duration: 260, ease: 'Cubic.easeOut' });
+      }
     });
 
     // static menu memes, bottom corners (fixed picks — not part of the run's meme log)
@@ -128,10 +185,12 @@ export class MenuScene extends Phaser.Scene {
     lb.setSize(250, 70);
     lb.setInteractive({ useHandCursor: true });
     lb.on('pointerdown', () => {
+      if (leaving) return;
+      leaving = true;
       sfx.unlock();
       sfx.tap();
       pressPulse(this, lb);
-      this.scene.start('Leaderboard', { from: 'Menu' });
+      broadcastCut(this, () => this.scene.start('Leaderboard', { from: 'Menu' }));
     });
 
     // meme collection gallery
@@ -144,23 +203,41 @@ export class MenuScene extends Phaser.Scene {
     gallery.setSize(250, 70);
     gallery.setInteractive({ useHandCursor: true });
     gallery.on('pointerdown', () => {
+      if (leaving) return;
+      leaving = true;
       sfx.unlock();
       sfx.tap();
       pressPulse(this, gallery);
-      this.scene.start('Gallery', { from: 'Menu' });
+      broadcastCut(this, () => this.scene.start('Gallery', { from: 'Menu' }));
     });
 
     start.on('pointerdown', () => {
+      if (leaving) return;
+      leaving = true;
       sfx.unlock();
       sfx.fanfare();
       pressPulse(this, start);
-      this.time.delayedCall(180, () => {
-        this.cameras.main.fadeOut(250, 7, 59, 92);
-      });
-      this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.start('Game');
-      });
+      this.time.delayedCall(150, () => broadcastCut(this, () => this.scene.start('Game')));
     });
+
+    // staggered fly-ins: buttons and studio memes enter like graphics packages
+    const flyIn = (obj: Phaser.GameObjects.Container, delay: number, fromY = 50): void => {
+      if (settings.reducedMotion) return;
+      const y = obj.y;
+      obj.setAlpha(0);
+      obj.y = y + fromY;
+      this.tweens.add({ targets: obj, y, alpha: 1, delay, duration: 300, ease: 'Cubic.easeOut' });
+    };
+    flyIn(start, 320);
+    flyIn(lb, 430);
+    flyIn(gallery, 500);
+    flyIn(memeLeft, 590, 30);
+    flyIn(memeRight, 650, 30);
+
+    // bottom ticker crawl — live archive stat woven in ahead of the canned pool
+    createTicker(this, 702, [
+      `MEME ARCHIVE: ${getUnlockedTemplates().size}/${Object.keys(MEMES.templates).length} COLLECTED`
+    ]);
   }
 
 }

@@ -8,6 +8,7 @@ import { addExportButtonRow } from '../core/shareButtons';
 import { hasArt } from '../core/art';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
 import { EASE, confetti, countTo, floatText, popIn, pressPulse } from '../core/juice';
+import { staticBlink } from '../core/broadcast';
 import { DayMission, DaySummary, EV, SessionStats, bus } from '../core/state';
 import { TUNING } from '../config/tuning';
 import { registerLayout } from '../dev/layout';
@@ -135,6 +136,7 @@ export class UIScene extends Phaser.Scene {
   private predCardGfx!: Phaser.GameObjects.Graphics;
   private dangerBanner?: Phaser.GameObjects.Container;
   private dangerText!: Phaser.GameObjects.Text;
+  private dangerVignette?: Phaser.GameObjects.Image;
   private predLabel!: Phaser.GameObjects.Text;
   private upgradeLevels: Record<string, number> = { air: 0, hull: 0, gold: 0 };
   private upgradeButtons: Record<string, Phaser.GameObjects.Container> = {};
@@ -798,7 +800,15 @@ export class UIScene extends Phaser.Scene {
   private onCombo(combo: number, milestone?: string): void {
     if (combo > 0) this.nudgeMarket(milestone ? TUNING.market.nudgeMilestone : TUNING.market.nudgeCombo);
     if (combo === 0) {
-      this.tweens.add({ targets: this.comboText, alpha: 0, duration: 200 });
+      // streak lost: flash red and crumple instead of quietly fading
+      this.comboText.setColor(HEX.red);
+      this.tweens.add({
+        targets: this.comboText,
+        alpha: 0,
+        scale: { from: 1.2, to: 0.7 },
+        duration: settings.reducedMotion ? 150 : 320,
+        ease: 'Quad.easeIn'
+      });
       return;
     }
     const colors = [HEX.cream, HEX.gold, HEX.orange, HEX.red, HEX.purple];
@@ -933,6 +943,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private onDayEnd(s: DaySummary): void {
+    staticBlink(this, 130); // channel-cut into the recap segment
     const mission = s.missionDone ? `MISSION COMPLETE +$${s.rewardCredits}` : 'MISSION FAILED';
     const delta = s.priceDelta >= 0 ? `+$${s.priceDelta}` : `−$${Math.abs(s.priceDelta)}`;
     this.onHeadline(
@@ -1392,6 +1403,7 @@ export class UIScene extends Phaser.Scene {
       nextBtn.disableInteractive();
       pressPulse(this, nextBtn);
       sfx.tap();
+      staticBlink(this, 130); // channel-cut back to the live feed
       bus.emit(EV.NEXT_DAY_REQUEST);
     };
     nextBtn.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
@@ -1621,8 +1633,36 @@ export class UIScene extends Phaser.Scene {
   private onDanger(remaining: number | null): void {
     if (remaining === null) {
       this.dangerBanner?.setVisible(false);
+      if (this.dangerVignette) {
+        this.tweens.add({ targets: this.dangerVignette, alpha: 0, duration: 400 });
+      }
       return;
     }
+    // red vignette that closes in as the countdown runs out — danger you feel
+    // at the edges of the screen without reading the banner
+    if (!this.dangerVignette) {
+      if (!this.textures.exists('vignetteGen')) {
+        const c = this.textures.createCanvas('vignetteGen', 320, 180);
+        if (c) {
+          const cx = c.getContext();
+          const grad = cx.createRadialGradient(160, 90, 55, 160, 90, 185);
+          grad.addColorStop(0, 'rgba(230,72,61,0)');
+          grad.addColorStop(1, 'rgba(230,72,61,0.9)');
+          cx.fillStyle = grad;
+          cx.fillRect(0, 0, 320, 180);
+          c.refresh();
+        }
+      }
+      this.dangerVignette = this.add
+        .image(VIEW.x + VIEW.w / 2, VIEW.y + VIEW.h / 2, 'vignetteGen')
+        .setDisplaySize(VIEW.w, VIEW.h)
+        .setDepth(1600)
+        .setAlpha(0);
+    }
+    this.tweens.killTweensOf(this.dangerVignette);
+    const closeness = 1 - remaining / TUNING.session.failSeconds;
+    const pulse = settings.reducedMotion ? 1 : 0.8 + 0.2 * Math.sin(this.time.now / 130);
+    this.dangerVignette.setAlpha(TUNING.juice.vignetteMaxAlpha * (0.4 + 0.6 * closeness) * pulse);
     if (!this.dangerBanner) {
       this.dangerBanner = this.add.container(VIEW.x + VIEW.w / 2, VIEW.y + 42).setDepth(1650);
       const bg = this.add.rectangle(0, 0, 520, 54, PAL.red, 0.95).setStrokeStyle(4, PAL.ink);

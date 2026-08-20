@@ -151,7 +151,12 @@
     "shakeBig": 0.006,
     "slowmoScale": 0.25,
     "slowmoMs": 450,
-    "particleScale": 1
+    "particleScale": 1,
+    "hitstopKillMs": 50,
+    "hitstopLossMs": 90,
+    "comboShakePerTier": 0.15,
+    "lossZoom": 1.08,
+    "vignetteMaxAlpha": 0.42
   },
   "route": {
     "map2": [
