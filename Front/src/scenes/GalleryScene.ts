@@ -14,6 +14,7 @@ import { pressPulse } from '../core/juice';
 import { broadcastCut, broadcastReveal, lowerThird, staticBlink } from '../core/broadcast';
 import { MEMES } from '../core/memes';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
+import { settings } from '../core/settings';
 
 const COLS = 9;
 const TILE_W = 118;
@@ -37,6 +38,7 @@ export class GalleryScene extends Phaser.Scene {
   private dragStartY = 0;
   private dragStartOffset = 0;
   private dragMoved = 0;
+  private leaving = false;
 
   constructor() {
     super('Gallery');
@@ -49,11 +51,12 @@ export class GalleryScene extends Phaser.Scene {
     this.pointerDown = false;
     this.dragMoved = 0;
     this.focusLayer = undefined;
+    this.leaving = false;
 
     const cx = GAME_W / 2;
     this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, PAL.navy);
     broadcastReveal(this);
-    this.add.rectangle(cx, 52, GAME_W, 88, PAL.ink).setStrokeStyle(4, PAL.gold, 0.5);
+    const headerBar = this.add.rectangle(cx, 52, GAME_W, 88, PAL.ink).setStrokeStyle(4, PAL.gold, 0.5);
     lowerThird(this, {
       x: 90,
       y: 44,
@@ -62,7 +65,7 @@ export class GalleryScene extends Phaser.Scene {
       mainSize: 30,
       color: PAL.purple
     });
-    this.add
+    const countTxt = this.add
       .text(cx, 78, `${getUnlockedTemplates().size} / ${this.ids.length} UNLOCKED — TAP AN UNLOCKED MEME TO ZOOM`, {
         fontFamily: FONT_SANS,
         fontSize: '15px',
@@ -80,9 +83,26 @@ export class GalleryScene extends Phaser.Scene {
     maskShape.fillRect(0, VIEWPORT_TOP, GAME_W, VIEWPORT_BOTTOM - VIEWPORT_TOP);
     this.grid.setMask(maskShape.createGeometryMask());
 
-    this.makeButton(150, 668, 200, '← BACK', PAL.red, () => broadcastCut(this, () => this.scene.start(this.from)));
+    const back = this.makeButton(150, 668, 200, '← BACK', PAL.red, () => this.exitTo(this.from));
 
     this.setupScrollInput();
+
+    // staggered fly-ins: header, blurb, grid and back button enter like graphics packages
+    const flyIn = (
+      obj: Phaser.GameObjects.Components.Transform & { setAlpha(a: number): unknown },
+      delay: number,
+      fromY = 24
+    ): void => {
+      if (settings.reducedMotion) return;
+      const y = obj.y;
+      obj.setAlpha(0);
+      obj.y = y - fromY;
+      this.tweens.add({ targets: obj, y, alpha: 1, delay, duration: 300, ease: 'Cubic.easeOut' });
+    };
+    flyIn(headerBar, 0, 40);
+    flyIn(countTxt, 100, 16);
+    flyIn(this.grid, 160, 30);
+    flyIn(back, 280, 24);
 
     this.events.on('shutdown', () => {
       this.input.off('pointerdown');
@@ -90,6 +110,13 @@ export class GalleryScene extends Phaser.Scene {
       this.input.off('pointerup');
       this.input.off('wheel');
     });
+  }
+
+  /** Channel-cut out of the archive, then switch scenes. */
+  private exitTo(target: string): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    broadcastCut(this, () => this.scene.start(target));
   }
 
   private buildGrid(): void {
@@ -134,7 +161,7 @@ export class GalleryScene extends Phaser.Scene {
       tile.setSize(TILE_W, TILE_H);
       tile.setInteractive({ useHandCursor: unlockedHere });
       tile.on('pointerup', () => {
-        if (this.dragMoved > CLICK_DRAG_THRESHOLD) return;
+        if (this.leaving || this.dragMoved > CLICK_DRAG_THRESHOLD) return;
         if (!unlockedHere) {
           // locked — a little shake instead of opening the zoom view
           sfx.tap();
@@ -257,7 +284,14 @@ export class GalleryScene extends Phaser.Scene {
     });
   }
 
-  private makeButton(x: number, y: number, w: number, label: string, color: number, onClick: () => void): void {
+  private makeButton(
+    x: number,
+    y: number,
+    w: number,
+    label: string,
+    color: number,
+    onClick: () => void
+  ): Phaser.GameObjects.Container {
     const c = this.add.container(x, y);
     const bg = this.add.rectangle(0, 0, w, 56, color).setStrokeStyle(4, PAL.ink);
     const t = this.add
@@ -267,10 +301,12 @@ export class GalleryScene extends Phaser.Scene {
     c.setSize(w, 56);
     c.setInteractive({ useHandCursor: true });
     c.on('pointerdown', () => {
+      if (this.leaving) return;
       sfx.unlock();
       sfx.tap();
       pressPulse(this, c);
       onClick();
     });
+    return c;
   }
 }
