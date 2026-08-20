@@ -607,7 +607,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     sprite.setDepth(30);
-    const late = 1 + Math.min((this.elapsed / 60) * TUNING.spawn.speedRampPerMinute, TUNING.spawn.speedRampMax);
+    const late = this.dayCurve(TUNING.days.difficulty.speedMult);
     // difficulty step: from the armored day on, flying weapons take two hits
     const armored = (t === 'missile' || t === 'drone') && this.day >= TUNING.days.threatUnlockDays.armored;
     const threat: Threat = {
@@ -1250,6 +1250,12 @@ export class GameScene extends Phaser.Scene {
     bus.emit(EV.DAY_START, n, this.mission.text, reveals);
   }
 
+  /** Day-indexed difficulty lookup: entry [day-1], clamped to the last entry
+   *  for endless play (day 0 during the brief pre-day-1 window reads entry 0). */
+  private dayCurve(curve: number[]): number {
+    return curve[Math.min(Math.max(this.day - 1, 0), curve.length - 1)];
+  }
+
   /** Daily mission, scaled by day. Day 1 is always the teaching intercept quota. */
   private rollMission(n: number): DayMission {
     const d = TUNING.days;
@@ -1759,11 +1765,11 @@ export class GameScene extends Phaser.Scene {
       this.checkWatchers();
     }
 
-    // continuous difficulty ramp toward minInterval / maxThreatsEnd
+    // day-authored difficulty: spawn pressure comes from the current day's
+    // entry in days.difficulty (clamped to the last entry for endless play)
     const sp = TUNING.spawn;
-    const prog = Math.min(this.elapsed / sp.rampSeconds, 1);
-    const interval = Phaser.Math.Linear(sp.startInterval, sp.minInterval, prog);
-    const maxThreats = Math.round(Phaser.Math.Linear(sp.maxThreatsStart, sp.maxThreatsEnd, prog));
+    const interval = this.dayCurve(TUNING.days.difficulty.spawnInterval);
+    const maxThreats = this.dayCurve(TUNING.days.difficulty.maxThreats);
     this.spawnTimer -= rawDt;
     if (this.spawnTimer <= 0 && !overtime && this.threats.filter(t => !t.dead).length < maxThreats) {
       this.spawnTimer = interval * (0.8 + Math.random() * 0.4);
