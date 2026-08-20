@@ -1099,8 +1099,12 @@ export class UIScene extends Phaser.Scene {
     c.setSize(GAME_W, GAME_H);
     c.setInteractive({ useHandCursor: true });
     let dismissed = false;
+    // grace period: ignore the opening tap so a held-down shoot input from the
+    // instant the day ended can't dismiss this before the player sees it
+    let canDismiss = false;
+    this.time.delayedCall(500, () => { canDismiss = true; });
     const dismiss = () => {
-      if (dismissed) return;
+      if (dismissed || !canDismiss) return;
       dismissed = true;
       sfx.tap();
       this.fadeOutModal(c, onDone);
@@ -1126,7 +1130,15 @@ export class UIScene extends Phaser.Scene {
     popup.add(layer);
     layer.add(this.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.85));
 
-    const maxW = 520;
+    if (settings.reducedMotion) {
+      layer.setAlpha(0);
+      this.tweens.add({ targets: layer, alpha: 1, duration: 150 });
+    } else {
+      layer.setScale(0.85).setAlpha(0);
+      this.tweens.add({ targets: layer, scale: 1, alpha: 1, duration: 220, ease: 'Back.easeOut' });
+    }
+
+    const maxW = 700;
     const maxH = 440;
     let w = maxW;
     let h = w * tpl.aspect;
@@ -1144,16 +1156,8 @@ export class UIScene extends Phaser.Scene {
         this.add.text(0, -30, tpl.label, { fontFamily: FONT_SANS, fontSize: '16px', color: '#9aa4ad' }).setOrigin(0.5)
       );
     }
-    layer.add(
-      this.add
-        .text(0, h / 2 + 14, '✓ UNLOCKED', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.green })
-        .setOrigin(0.5)
-    );
-    layer.add(
-      this.add
-        .text(0, h / 2 + 46, 'TAP TO CLOSE', { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: '#AAB4BD' })
-        .setOrigin(0.5)
-    );
+    // "✓ UNLOCKED" / "TAP TO CLOSE" are hidden here to give the share block
+    // below the frame more room — the share buttons are the point of this screen.
 
     // SAVE downloads the framed art rect as a watermarked PNG; the platform
     // buttons download it too, then open that platform's share-compose
@@ -1170,7 +1174,7 @@ export class UIScene extends Phaser.Scene {
     addExportButtonRow(
       this,
       layer,
-      h / 2 + 96,
+      h / 2 + 10,
       () =>
         void captureAndShare(this.game, frameRect(), `hormuz-meme-${id}.png`, "Just unlocked in HORMUZ HOLD'EM", 'unlock_zoom', 'download'),
       platform =>
@@ -1184,7 +1188,18 @@ export class UIScene extends Phaser.Scene {
     layer.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
       ev.stopPropagation();
       sfx.tap();
-      layer.destroy();
+      if (settings.reducedMotion) {
+        layer.destroy();
+      } else {
+        this.tweens.add({
+          targets: layer,
+          scale: 0.85,
+          alpha: 0,
+          duration: 150,
+          ease: 'Back.easeIn',
+          onComplete: () => layer.destroy()
+        });
+      }
     });
   }
 
@@ -1578,34 +1593,6 @@ export class UIScene extends Phaser.Scene {
         this.tweens.add({ targets: inner, scale: 1, duration: 380, ease: 'Back.easeOut' });
       }
       sfx.whoosh();
-
-      // SAVE chip: exports the whole popup rect (band + meme + this run's
-      // captions) as a watermarked PNG. Hidden while the snapshot is taken so
-      // the button itself never appears in the shared image.
-      const save = this.add.container(LEFT_BOX.w / 2 - 50, LEFT_BOX.h / 2 - 26);
-      save.add(this.add.rectangle(0, 0, 78, 32, PAL.gold).setStrokeStyle(3, PAL.ink));
-      save.add(
-        this.add
-          .text(0, 0, 'SAVE', { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: HEX.ink })
-          .setOrigin(0.5)
-      );
-      save.setSize(78, 32);
-      save.setInteractive({ useHandCursor: true });
-      save.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
-        ev.stopPropagation();
-        sfx.tap();
-        save.setVisible(false);
-        void captureAndShare(
-          this.game,
-          { x: LEFT_BOX.x, y: LEFT_BOX.y, w: LEFT_BOX.w, h: LEFT_BOX.h },
-          `hormuz-meme-${pick.id}.png`,
-          "Live from the strait — HORMUZ HOLD'EM",
-          'meme_popup'
-        ).then(() => {
-          if (save.active) save.setVisible(true);
-        });
-      });
-      pop.add(save);
 
       // hold, then bounce out and drop the cutaway
       this.time.delayedCall(MEMES.settings.durationMs, () => {

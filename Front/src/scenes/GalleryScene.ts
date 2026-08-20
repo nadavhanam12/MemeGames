@@ -16,6 +16,7 @@ import { MEMES } from '../core/memes';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
 import { captureAndShare, captureAndShareTo } from '../core/share';
 import { addExportButtonRow } from '../core/shareButtons';
+import { settings } from '../core/settings';
 
 const COLS = 9;
 const TILE_W = 118;
@@ -201,7 +202,15 @@ export class GalleryScene extends Phaser.Scene {
     this.focusLayer = layer;
     layer.add(this.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.85));
 
-    const maxW = 520;
+    if (settings.reducedMotion) {
+      layer.setAlpha(0);
+      this.tweens.add({ targets: layer, alpha: 1, duration: 150 });
+    } else {
+      layer.setScale(0.85).setAlpha(0);
+      this.tweens.add({ targets: layer, scale: 1, alpha: 1, duration: 220, ease: 'Back.easeOut' });
+    }
+
+    const maxW = 700;
     const maxH = 440;
     let w = maxW;
     let h = w * tpl.aspect;
@@ -225,27 +234,10 @@ export class GalleryScene extends Phaser.Scene {
       );
     }
 
-    layer.add(
-      this.add
-        .text(0, h / 2 + 14, unlockedHere ? '✓ UNLOCKED' : '🔒 LOCKED', {
-          fontFamily: FONT_DISPLAY,
-          fontSize: '22px',
-          color: unlockedHere ? HEX.green : '#9aa4ad'
-        })
-        .setOrigin(0.5)
-    );
-    layer.add(
-      this.add
-        .text(0, h / 2 + 46, 'TAP TO CLOSE', {
-          fontFamily: FONT_SANS,
-          fontSize: '14px',
-          fontStyle: 'bold',
-          color: '#AAB4BD'
-        })
-        .setOrigin(0.5)
-    );
-
     if (unlockedHere) {
+      // "✓ UNLOCKED" / "TAP TO CLOSE" are hidden here (rather than for the
+      // locked state below) to give the share block below the frame more
+      // room — the share buttons are the point of this state.
       // SAVE downloads the framed art rect as a watermarked PNG; the platform
       // buttons download it too, then open that platform's share-compose
       // window/app with a caption + link prefilled (see share.ts — no web
@@ -258,11 +250,27 @@ export class GalleryScene extends Phaser.Scene {
       addExportButtonRow(
         this,
         layer,
-        h / 2 + 96,
+        h / 2 + 10,
         () =>
           void captureAndShare(this.game, frameRect(), `hormuz-meme-${id}.png`, "From my HORMUZ HOLD'EM collection", 'gallery', 'download'),
         platform =>
           void captureAndShareTo(this.game, frameRect(), `hormuz-meme-${id}.png`, "From my HORMUZ HOLD'EM collection", 'gallery', platform)
+      );
+    } else {
+      layer.add(
+        this.add
+          .text(0, h / 2 + 14, '🔒 LOCKED', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: '#9aa4ad' })
+          .setOrigin(0.5)
+      );
+      layer.add(
+        this.add
+          .text(0, h / 2 + 46, 'TAP TO CLOSE', {
+            fontFamily: FONT_SANS,
+            fontSize: '14px',
+            fontStyle: 'bold',
+            color: '#AAB4BD'
+          })
+          .setOrigin(0.5)
       );
     }
 
@@ -275,8 +283,12 @@ export class GalleryScene extends Phaser.Scene {
       ev.stopPropagation();
       sfx.tap();
       staticBlink(this, 110); // channel-flip back to the grid
-      layer.destroy();
-      if (this.focusLayer === layer) this.focusLayer = undefined;
+      const close = () => {
+        layer.destroy();
+        if (this.focusLayer === layer) this.focusLayer = undefined;
+      };
+      if (settings.reducedMotion) close();
+      else this.tweens.add({ targets: layer, scale: 0.85, alpha: 0, duration: 150, ease: 'Back.easeIn', onComplete: close });
     });
   }
 
