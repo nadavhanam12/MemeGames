@@ -70,34 +70,30 @@ export function staticBlink(scene: Phaser.Scene, ms = 150, withSound = true): vo
   });
 }
 
-/** Outgoing half of the channel cut: white flash → static → switch scenes.
- *  ~330ms total; instant under reduced motion. The incoming scene should call
- *  broadcastReveal() in create() for the matching static-settle. */
+/** Outgoing half of the channel cut: a brief static shimmer → switch scenes.
+ *  No white flash — just a soft camera-switch feel. ~200ms total; instant
+ *  under reduced motion. The incoming scene should call broadcastReveal() in
+ *  create() for the matching static-settle. */
 export function broadcastCut(scene: Phaser.Scene, go: () => void): void {
   if (settings.reducedMotion) {
     go();
     return;
   }
   ensureStatic(scene);
-  const flash = scene.add
-    .rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0xffffff)
+  sfx.staticBurst();
+  const tile = scene.add
+    .tileSprite(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 'staticGen')
+    .setTileScale(3)
     .setDepth(CUT_DEPTH)
     .setAlpha(0);
-  scene.tweens.add({ targets: flash, alpha: 0.95, duration: 80, ease: 'Quad.easeIn' });
-  scene.time.delayedCall(80, () => {
-    sfx.staticBurst();
-    const tile = scene.add
-      .tileSprite(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 'staticGen')
-      .setTileScale(3)
-      .setDepth(CUT_DEPTH + 1);
-    scene.time.addEvent({
-      delay: 40,
-      repeat: 5,
-      callback: () => tile.setTilePosition(Math.random() * 200, Math.random() * 112)
-    });
+  scene.tweens.add({ targets: tile, alpha: 0.55, duration: 70, ease: 'Quad.easeIn' });
+  scene.time.addEvent({
+    delay: 40,
+    repeat: 3,
+    callback: () => tile.setTilePosition(Math.random() * 200, Math.random() * 112)
   });
-  // switch while the static frame still covers the screen — a hard TV cut
-  scene.time.delayedCall(250, go);
+  // switch while the static frame still covers the screen — a soft cut
+  scene.time.delayedCall(160, go);
 }
 
 /** Incoming half: a static frame settling into the new "camera feed". */
@@ -108,17 +104,16 @@ export function broadcastReveal(scene: Phaser.Scene): void {
     .tileSprite(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 'staticGen')
     .setTileScale(3)
     .setDepth(CUT_DEPTH)
-    .setAlpha(1);
+    .setAlpha(0.55);
   const jitter = scene.time.addEvent({
     delay: 40,
-    repeat: 4,
+    repeat: 3,
     callback: () => tile.setTilePosition(Math.random() * 200, Math.random() * 112)
   });
   scene.tweens.add({
     targets: tile,
     alpha: 0,
-    delay: 60,
-    duration: 160,
+    duration: 130,
     ease: 'Quad.easeOut',
     onComplete: () => {
       jitter.remove();
