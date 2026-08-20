@@ -6,6 +6,7 @@ import { MemeContext, MEMES, pickMeme, renderMeme } from '../core/memes';
 import { hasArt } from '../core/art';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
 import { EASE, confetti, countTo, floatText, popIn, pressPulse } from '../core/juice';
+import { staticBlink } from '../core/broadcast';
 import { DayMission, DaySummary, EV, SessionStats, bus } from '../core/state';
 import { TUNING } from '../config/tuning';
 import { registerLayout } from '../dev/layout';
@@ -114,6 +115,7 @@ export class UIScene extends Phaser.Scene {
 
   private creditsText!: Phaser.GameObjects.Text;
   private displayedCredits = 30;
+  private pendingCreditsCount?: Phaser.Time.TimerEvent;
   private comboText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
   private headlineText!: Phaser.GameObjects.Text;
@@ -132,6 +134,7 @@ export class UIScene extends Phaser.Scene {
   private predCardGfx!: Phaser.GameObjects.Graphics;
   private dangerBanner?: Phaser.GameObjects.Container;
   private dangerText!: Phaser.GameObjects.Text;
+  private dangerVignette?: Phaser.GameObjects.Image;
   private predLabel!: Phaser.GameObjects.Text;
   private upgradeLevels: Record<string, number> = { air: 0, hull: 0, gold: 0 };
   private upgradeButtons: Record<string, Phaser.GameObjects.Container> = {};
@@ -674,12 +677,31 @@ export class UIScene extends Phaser.Scene {
   private onCredits(credits: number, gain: number, x: number, y: number): void {
     const from = this.displayedCredits;
     this.displayedCredits = credits;
-    countTo(this, this.creditsText, from, credits, v => `$${Math.round(v)}`, 350);
+    this.pendingCreditsCount?.remove(false);
+    this.pendingCreditsCount = undefined;
+    const coinsFly = gain > 0 && x > 0 && !settings.reducedMotion;
+    if (coinsFly) {
+      // hold the readout until the first coin lands, then count up as the rest arrive
+      const nCoins = Math.min(gain, 5);
+      this.pendingCreditsCount = this.time.delayedCall(750, () => {
+        this.pendingCreditsCount = undefined;
+        countTo(this, this.creditsText, from, credits, v => `$${Math.round(v)}`, (nCoins - 1) * 100 + 150);
+      });
+    } else {
+      countTo(this, this.creditsText, from, credits, v => `$${Math.round(v)}`, 350);
+    }
     if (this.summaryCashText?.active) this.summaryCashText.setText(`CASH: $${Math.round(credits)}`);
-    if (gain > 0 && x > 0 && !settings.reducedMotion) {
+    if (coinsFly) {
+      this.moneyBurst(x, y);
       const m = this.creditsText.getWorldTransformMatrix();
       for (let i = 0; i < Math.min(gain, 5); i++) {
-        const coin = this.add.circle(x, y, 7, PAL.gold).setStrokeStyle(2, PAL.ink).setDepth(1500);
+        const coin = this.add
+          .text(x, y, '$', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.green })
+          .setStroke(HEX.ink, 3)
+          .setOrigin(0.5)
+          .setDepth(1500)
+          .setScale(0);
+        this.tweens.add({ targets: coin, scale: 1, delay: i * 100, duration: 130, ease: EASE.pop });
         this.tweens.add({
           targets: coin,
           x: m.tx - 30,
@@ -696,6 +718,33 @@ export class UIScene extends Phaser.Scene {
       }
     }
     this.refreshUpgradeAffordability();
+  }
+
+  /** Small green pop where kill money spawns: expanding ring + radial sparks. */
+  private moneyBurst(x: number, y: number): void {
+    const ring = this.add.circle(x, y, 6).setStrokeStyle(3, PAL.green).setDepth(1499);
+    this.tweens.add({
+      targets: ring,
+      radius: 34,
+      alpha: { from: 0.9, to: 0 },
+      duration: 280,
+      ease: EASE.snap,
+      onComplete: () => ring.destroy()
+    });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + Math.random() * 0.6;
+      const spark = this.add.circle(x, y, 3, PAL.green).setDepth(1499);
+      this.tweens.add({
+        targets: spark,
+        x: x + Math.cos(a) * (22 + Math.random() * 14),
+        y: y + Math.sin(a) * (22 + Math.random() * 14),
+        scale: 0,
+        alpha: { from: 1, to: 0.4 },
+        duration: 260 + Math.random() * 120,
+        ease: EASE.snap,
+        onComplete: () => spark.destroy()
+      });
+    }
   }
 
   private refreshUpgradeAffordability(): void {
@@ -749,7 +798,15 @@ export class UIScene extends Phaser.Scene {
   private onCombo(combo: number, milestone?: string): void {
     if (combo > 0) this.nudgeMarket(milestone ? TUNING.market.nudgeMilestone : TUNING.market.nudgeCombo);
     if (combo === 0) {
-      this.tweens.add({ targets: this.comboText, alpha: 0, duration: 200 });
+      // streak lost: flash red and crumple instead of quietly fading
+      this.comboText.setColor(HEX.red);
+      this.tweens.add({
+        targets: this.comboText,
+        alpha: 0,
+        scale: { from: 1.2, to: 0.7 },
+        duration: settings.reducedMotion ? 150 : 320,
+        ease: 'Quad.easeIn'
+      });
       return;
     }
     const colors = [HEX.cream, HEX.gold, HEX.orange, HEX.red, HEX.purple];
@@ -884,6 +941,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private onDayEnd(s: DaySummary): void {
+    staticBlink(this, 130); // channel-cut into the recap segment
     const mission = s.missionDone ? `MISSION COMPLETE +$${s.rewardCredits}` : 'MISSION FAILED';
     const delta = s.priceDelta >= 0 ? `+$${s.priceDelta}` : `−$${Math.abs(s.priceDelta)}`;
     this.onHeadline(
@@ -1321,6 +1379,7 @@ export class UIScene extends Phaser.Scene {
       nextBtn.disableInteractive();
       pressPulse(this, nextBtn);
       sfx.tap();
+      staticBlink(this, 130); // channel-cut back to the live feed
       bus.emit(EV.NEXT_DAY_REQUEST);
     };
     nextBtn.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
@@ -1515,8 +1574,36 @@ export class UIScene extends Phaser.Scene {
   private onDanger(remaining: number | null): void {
     if (remaining === null) {
       this.dangerBanner?.setVisible(false);
+      if (this.dangerVignette) {
+        this.tweens.add({ targets: this.dangerVignette, alpha: 0, duration: 400 });
+      }
       return;
     }
+    // red vignette that closes in as the countdown runs out — danger you feel
+    // at the edges of the screen without reading the banner
+    if (!this.dangerVignette) {
+      if (!this.textures.exists('vignetteGen')) {
+        const c = this.textures.createCanvas('vignetteGen', 320, 180);
+        if (c) {
+          const cx = c.getContext();
+          const grad = cx.createRadialGradient(160, 90, 55, 160, 90, 185);
+          grad.addColorStop(0, 'rgba(230,72,61,0)');
+          grad.addColorStop(1, 'rgba(230,72,61,0.9)');
+          cx.fillStyle = grad;
+          cx.fillRect(0, 0, 320, 180);
+          c.refresh();
+        }
+      }
+      this.dangerVignette = this.add
+        .image(VIEW.x + VIEW.w / 2, VIEW.y + VIEW.h / 2, 'vignetteGen')
+        .setDisplaySize(VIEW.w, VIEW.h)
+        .setDepth(1600)
+        .setAlpha(0);
+    }
+    this.tweens.killTweensOf(this.dangerVignette);
+    const closeness = 1 - remaining / TUNING.session.failSeconds;
+    const pulse = settings.reducedMotion ? 1 : 0.8 + 0.2 * Math.sin(this.time.now / 130);
+    this.dangerVignette.setAlpha(TUNING.juice.vignetteMaxAlpha * (0.4 + 0.6 * closeness) * pulse);
     if (!this.dangerBanner) {
       this.dangerBanner = this.add.container(VIEW.x + VIEW.w / 2, VIEW.y + 42).setDepth(1650);
       const bg = this.add.rectangle(0, 0, 520, 54, PAL.red, 0.95).setStrokeStyle(4, PAL.ink);

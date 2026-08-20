@@ -11,6 +11,7 @@ import { DPR, FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL } from '../core/
 import { hasArt } from '../core/art';
 import { sfx } from '../core/sfx';
 import { pressPulse } from '../core/juice';
+import { broadcastCut, broadcastReveal, lowerThird, staticBlink } from '../core/broadcast';
 import { MEMES } from '../core/memes';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
 
@@ -51,16 +52,16 @@ export class GalleryScene extends Phaser.Scene {
 
     const cx = GAME_W / 2;
     this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, PAL.navy);
+    broadcastReveal(this);
     this.add.rectangle(cx, 52, GAME_W, 88, PAL.ink).setStrokeStyle(4, PAL.gold, 0.5);
-    this.add
-      .text(cx, 38, 'MEME COLLECTION', {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '38px',
-        color: HEX.cream,
-        stroke: HEX.ink,
-        strokeThickness: 6
-      })
-      .setOrigin(0.5);
+    lowerThird(this, {
+      x: 90,
+      y: 44,
+      kicker: 'HHN ARCHIVE',
+      main: 'MEME COLLECTION',
+      mainSize: 30,
+      color: PAL.purple
+    });
     this.add
       .text(cx, 78, `${getUnlockedTemplates().size} / ${this.ids.length} UNLOCKED — TAP AN UNLOCKED MEME TO ZOOM`, {
         fontFamily: FONT_SANS,
@@ -79,7 +80,7 @@ export class GalleryScene extends Phaser.Scene {
     maskShape.fillRect(0, VIEWPORT_TOP, GAME_W, VIEWPORT_BOTTOM - VIEWPORT_TOP);
     this.grid.setMask(maskShape.createGeometryMask());
 
-    this.makeButton(150, 668, 200, '← BACK', PAL.red, () => this.scene.start(this.from));
+    this.makeButton(150, 668, 200, '← BACK', PAL.red, () => broadcastCut(this, () => this.scene.start(this.from)));
 
     this.setupScrollInput();
 
@@ -141,6 +142,7 @@ export class GalleryScene extends Phaser.Scene {
           return;
         }
         sfx.tap();
+        staticBlink(this, 110); // channel-flip into the meme
         this.showFocusedMeme(id);
       });
 
@@ -249,6 +251,7 @@ export class GalleryScene extends Phaser.Scene {
     layer.on('pointerup', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
       ev.stopPropagation();
       sfx.tap();
+      staticBlink(this, 110); // channel-flip back to the grid
       layer.destroy();
       if (this.focusLayer === layer) this.focusLayer = undefined;
     });

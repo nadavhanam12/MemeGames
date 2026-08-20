@@ -6,6 +6,7 @@ import { hasArt } from '../core/art';
 import { MEMES } from '../core/memes';
 import { getRunUnlocks, getUnlockedTemplates } from '../core/memeUnlocks';
 import { EASE, confetti, countTo } from '../core/juice';
+import { broadcastCut, broadcastReveal, lowerThird, stampIn } from '../core/broadcast';
 import { SessionStats, computeScore, freshStats } from '../core/state';
 import { leaderboard } from '../backend/leaderboard';
 import { openSubmitOverlay } from '../backend/submitOverlay';
@@ -34,19 +35,19 @@ export class ResultsScene extends Phaser.Scene {
       this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, PAL.navy);
     }
 
+    broadcastReveal(this);
     const root = this.add.container(0, 0);
     const reduced = settings.reducedMotion;
 
     // --- content -----------------------------------------------------------
-    const title = this.add
-      .text(GAME_W / 2, 88, 'MARKET CLOSE', {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '44px',
-        color: HEX.cream,
-        stroke: HEX.ink,
-        strokeThickness: 8
-      })
-      .setOrigin(0.5);
+    // the title is a news lower-third: BREAKING kicker + red strap
+    const title = lowerThird(this, {
+      x: 90,
+      y: 88,
+      kicker: 'BREAKING NEWS',
+      main: 'MARKET CLOSE — RUN ENDS',
+      mainSize: 36
+    });
 
     const scoreLabel = this.add
       .text(GAME_W / 2, 168, 'FINAL SCORE', {
@@ -150,13 +151,15 @@ export class ResultsScene extends Phaser.Scene {
     };
 
     const totalMemes = Object.keys(MEMES.templates).length;
-    mkButton(GAME_W / 2 - 330, 260, PAL.ocean, 'LEADERBOARD', HEX.cream, () => void runSubmitFlow(true));
-    mkButton(GAME_W / 2, 320, PAL.green, 'DEFEND AGAIN', HEX.ink, () =>
-      this.exitTo(() => this.scene.start('Game'))
-    );
-    mkButton(GAME_W / 2 + 330, 260, PAL.purple, `GALLERY ${getUnlockedTemplates().size}/${totalMemes}`, HEX.cream, () =>
-      this.exitTo(() => this.scene.start('Gallery', { from: 'Results' }))
-    );
+    const btns = [
+      mkButton(GAME_W / 2 - 330, 260, PAL.ocean, 'LEADERBOARD', HEX.cream, () => void runSubmitFlow(true)),
+      mkButton(GAME_W / 2, 320, PAL.green, 'DEFEND AGAIN', HEX.ink, () =>
+        this.exitTo(() => this.scene.start('Game'))
+      ),
+      mkButton(GAME_W / 2 + 330, 260, PAL.purple, `GALLERY ${getUnlockedTemplates().size}/${totalMemes}`, HEX.cream, () =>
+        this.exitTo(() => this.scene.start('Gallery', { from: 'Results' }))
+      )
+    ];
 
     // --- entrance ----------------------------------------------------------
     const slideIn = (obj: Phaser.GameObjects.Components.Transform & { setAlpha(a: number): unknown }, delay: number, fromY = 24): void => {
@@ -173,19 +176,36 @@ export class ResultsScene extends Phaser.Scene {
       });
     };
 
-    slideIn(title, 0, -24);
+    // title (the lower-third) animates itself; the rest fly in as sequential
+    // graphics packages with a whoosh per wave
     slideIn(scoreLabel, 120);
     slideIn(scoreTxt, 180);
     slideIn(days, 340);
     slideIn(memeRow, 480);
-    root.list
-      .filter((o): o is Phaser.GameObjects.Container => o instanceof Phaser.GameObjects.Container && o !== memeRow)
-      .forEach((btn, i) => slideIn(btn, 620 + i * 90, 40));
+    btns.forEach((btn, i) => slideIn(btn, 620 + i * 90, 40));
+    if (!reduced) {
+      this.time.delayedCall(180, () => sfx.whoosh());
+      this.time.delayedCall(620, () => sfx.whoosh());
+    }
 
     this.time.delayedCall(reduced ? 100 : 260, () => {
       countTo(this, scoreTxt, 0, finalScore, v => `${Math.round(v)}`, 900);
       sfx.priceDown();
     });
+
+    // certification stamp slams on once the score finishes counting up
+    const stamp = this.add
+      .text(GAME_W / 2 + 262, 198, 'OFFICIAL — HHN', {
+        fontFamily: FONT_DISPLAY,
+        fontSize: '22px',
+        color: HEX.gold,
+        stroke: HEX.ink,
+        strokeThickness: 5
+      })
+      .setOrigin(0.5)
+      .setAngle(-9);
+    root.add(stamp);
+    stampIn(this, stamp, reduced ? 400 : 1250);
     this.time.delayedCall(reduced ? 500 : 1200, () => {
       sfx.fanfare();
       confetti(this, GAME_W / 2, 250, 26);
@@ -197,29 +217,13 @@ export class ResultsScene extends Phaser.Scene {
       this.time.delayedCall(reduced ? 1200 : 2200, () => void runSubmitFlow(false));
     }
 
-    // --- exit --------------------------------------------------------------
-    this.exitRoot = root;
   }
 
-  private exitRoot?: Phaser.GameObjects.Container;
-
-  /** Slide-fade the whole screen out, then switch scenes. */
+  /** Channel-cut out of the studio, then switch scenes. */
   private exitTo(go: () => void): void {
     if (this.leaving) return;
     this.leaving = true;
-    if (settings.reducedMotion || !this.exitRoot) {
-      go();
-      return;
-    }
-    sfx.whoosh();
-    this.tweens.add({
-      targets: this.exitRoot,
-      y: 40,
-      alpha: 0,
-      duration: 220,
-      ease: 'Cubic.easeIn',
-      onComplete: go
-    });
+    broadcastCut(this, go);
   }
 
   /** Centered row of memes unlocked for the first time this run; falls back
