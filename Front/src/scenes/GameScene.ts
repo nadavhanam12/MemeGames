@@ -4,7 +4,7 @@ import { settings, vibrate } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
 import { MemeContext, MEMES, resetMemeLog } from '../core/memes';
-import { getDayUnlocks, resetDayUnlocks, resetRunUnlocks } from '../core/memeUnlocks';
+import { getDayFired, getDayUnlocks, resetDayUnlocks, resetRunUnlocks } from '../core/memeUnlocks';
 import { TUNING, persistTuningLocal } from '../config/tuning';
 import { devState } from '../dev/state';
 import { leaderboard } from '../backend/leaderboard';
@@ -1329,7 +1329,8 @@ export class GameScene extends Phaser.Scene {
       price: Math.round(this.stats.oilPrice),
       priceDelta: Math.round(this.stats.oilPrice - this.dayCounters.priceAtStart),
       warnings: this.warningsFor(this.day + 1),
-      newMemesUnlocked: getDayUnlocks()
+      newMemesUnlocked: getDayUnlocks(),
+      memesToday: getDayFired()
     });
     analytics.track('day_end', {
       day: this.day,
