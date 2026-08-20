@@ -18,15 +18,8 @@ const TIPS: Record<string, string> = {
   'Session.startCredits': 'Defense Credits the player begins with — sets how fast the first upgrade arrives.',
   'Session.failPrice': 'Meltdown threshold: when oil is at/above this, the meltdown clock runs.',
   'Session.failSeconds': 'Seconds oil may stay at/above failPrice before the run ends.',
-  'Spawning.startInterval': 'Seconds between threat spawns at the start of a run.',
-  'Spawning.minInterval': 'Spawn interval floor the difficulty ramps down to.',
-  'Spawning.rampSeconds': 'Seconds of survival it takes to reach full difficulty.',
-  'Spawning.maxThreatsStart': 'Threat cap at the start of a run.',
-  'Spawning.maxThreatsEnd': 'Threat cap once the ramp completes.',
   'Spawning.tankerInterval': 'Seconds between tanker departures.',
   'Spawning.maxTankers': 'Maximum tankers sailing simultaneously.',
-  'Spawning.speedRampPerMinute': 'Extra threat speed gained per minute survived (0.3 = +30%/min).',
-  'Spawning.speedRampMax': 'Cap on the survival speed bonus (1.2 = at most +120%).',
   'Speeds.missile': 'Missile travel speed, pixels/second (before the late-game ramp).',
   'Speeds.drone': 'Drone travel speed, pixels/second.',
   'Speeds.mine': 'Unused — mines are stationary (they pop into place and wait).',
@@ -147,15 +140,10 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
   tipped(session.add(TUNING.session, 'failSeconds', 2, 30, 1).onChange(onChange), 'Session', 'failSeconds');
 
   const spawn = folder('Spawning');
-  tipped(spawn.add(TUNING.spawn, 'startInterval', 0.5, 10, 0.1).onChange(onChange), 'Spawning', 'startInterval');
-  tipped(spawn.add(TUNING.spawn, 'minInterval', 0.2, 5, 0.1).onChange(onChange), 'Spawning', 'minInterval');
-  tipped(spawn.add(TUNING.spawn, 'rampSeconds', 30, 600, 10).onChange(onChange), 'Spawning', 'rampSeconds');
-  tipped(spawn.add(TUNING.spawn, 'maxThreatsStart', 1, 20, 1).onChange(onChange), 'Spawning', 'maxThreatsStart');
-  tipped(spawn.add(TUNING.spawn, 'maxThreatsEnd', 1, 30, 1).onChange(onChange), 'Spawning', 'maxThreatsEnd');
+  // Per-day spawn pressure (interval / threat cap / speed) is authored in
+  // tuning.json -> days.difficulty arrays, not slider-tunable here.
   tipped(spawn.add(TUNING.spawn, 'tankerInterval', 2, 20, 0.5).onChange(onChange), 'Spawning', 'tankerInterval');
   tipped(spawn.add(TUNING.spawn, 'maxTankers', 1, 5, 1).onChange(onChange), 'Spawning', 'maxTankers');
-  tipped(spawn.add(TUNING.spawn, 'speedRampPerMinute', 0, 1, 0.05).onChange(onChange), 'Spawning', 'speedRampPerMinute');
-  tipped(spawn.add(TUNING.spawn, 'speedRampMax', 0, 3, 0.1).onChange(onChange), 'Spawning', 'speedRampMax');
 
   const speeds = folder('Speeds');
   (Object.keys(TUNING.speeds) as Array<keyof typeof TUNING.speeds>).forEach(k =>
