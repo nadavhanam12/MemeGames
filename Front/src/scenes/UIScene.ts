@@ -1210,14 +1210,15 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** Day-end recap card for the meme collection: thumbnails of every template
-   *  unlocked today plus the overall gallery tally. Returns the card's height. */
+   *  that fired today (new unlocks or repeats) plus the overall gallery tally.
+   *  Returns the card's height. */
   private buildMemesCard(
     parent: Phaser.GameObjects.Container,
     y: number,
     width: number,
-    newIds: string[]
+    todayIds: string[]
   ): number {
-    const shown = newIds.filter(id => MEMES.templates[id]).slice(0, 8);
+    const shown = todayIds.filter(id => MEMES.templates[id]).slice(0, 8);
     const thumbH = shown.length ? 64 : 0;
     const h = 20 + thumbH + (shown.length ? 8 : 0) + 20 + 8;
     const card = this.add.container(0, y + h / 2);
@@ -1262,8 +1263,8 @@ export class UIScene extends Phaser.Scene {
     const total = Object.keys(MEMES.templates).length;
     const unlocked = getUnlockedTemplates().size;
     const tallyText = shown.length
-      ? `+${newIds.length} NEW TODAY · COLLECTION: ${unlocked}/${total}`
-      : `NO NEW MEMES TODAY · COLLECTION: ${unlocked}/${total}`;
+      ? `${todayIds.length} TODAY · COLLECTION: ${unlocked}/${total}`
+      : `NO MEMES TODAY · COLLECTION: ${unlocked}/${total}`;
     card.add(
       this.add
         .text(0, h / 2 - 16, tallyText, {
@@ -1316,8 +1317,8 @@ export class UIScene extends Phaser.Scene {
     ], s.missionDone ? PAL.green : PAL.red);
     y += 8;
 
-    // section 2 — memes: today's newly collected templates + overall collection tally
-    y += this.buildMemesCard(panel, y, cardW, s.newMemesUnlocked);
+    // section 2 — memes: every template that fired today + overall collection tally
+    y += this.buildMemesCard(panel, y, cardW, s.memesToday);
     y += 8;
 
     // section 3 — intel (warnings), only when there's something to show

@@ -19,6 +19,7 @@ function load(): Set<string> {
 
 const unlocked = load();
 let dayUnlocks: string[] = [];
+let dayFired: string[] = [];
 let runUnlocks: string[] = [];
 
 function persist(): void {
@@ -29,9 +30,10 @@ function persist(): void {
   }
 }
 
-/** Marks a template as seen; the first time ever, it's also queued as a
- *  same-day unlock for the day-end recap. No-op on repeat sightings. */
+/** Marks a template as seen today (whether or not it was already unlocked),
+ *  and, the first time ever, also queues it as a same-day unlock. */
 export function recordMemeShown(templateId: string): void {
+  if (!dayFired.includes(templateId)) dayFired.push(templateId);
   if (unlocked.has(templateId)) return;
   unlocked.add(templateId);
   dayUnlocks.push(templateId);
@@ -44,13 +46,20 @@ export function getUnlockedTemplates(): ReadonlySet<string> {
 }
 
 /** Call at the start of each in-game day so the day-end summary can report
- *  just that day's fresh unlocks. */
+ *  just that day's fresh unlocks and fired templates. */
 export function resetDayUnlocks(): void {
   dayUnlocks = [];
+  dayFired = [];
 }
 
 export function getDayUnlocks(): string[] {
   return dayUnlocks;
+}
+
+/** Every template that fired at least once today, unlocked-before or not,
+ *  in first-fired order. */
+export function getDayFired(): string[] {
+  return dayFired;
 }
 
 /** Call at run start (next to resetMemeLog) so the results screen can show
