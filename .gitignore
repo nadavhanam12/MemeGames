@@ -17,6 +17,11 @@ dist/
 # Vite stray cache
 .vite/
 
+# Playwright regression harness output
+Front/test-results/
+Front/playwright-report/
+Front/playwright/.cache/
+
 # Meme pack delivery zips (contents are extracted alongside)
 Front/assets/raw/Meme/*.zip
 .claude/worktrees/

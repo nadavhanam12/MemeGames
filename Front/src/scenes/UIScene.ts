@@ -3,6 +3,8 @@ import { FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL, VIEW } from '../core
 import { settings } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { MemeContext, MEMES, pickMeme, renderMeme } from '../core/memes';
+import { captureAndShare, captureAndShareTo } from '../core/share';
+import { addExportButtonRow } from '../core/shareButtons';
 import { hasArt } from '../core/art';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
 import { EASE, confetti, countTo, floatText, popIn, pressPulse } from '../core/juice';
@@ -114,6 +116,7 @@ export class UIScene extends Phaser.Scene {
 
   private creditsText!: Phaser.GameObjects.Text;
   private displayedCredits = 30;
+  private pendingCreditsCount?: Phaser.Time.TimerEvent;
   private comboText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
   private headlineText!: Phaser.GameObjects.Text;
@@ -674,12 +677,31 @@ export class UIScene extends Phaser.Scene {
   private onCredits(credits: number, gain: number, x: number, y: number): void {
     const from = this.displayedCredits;
     this.displayedCredits = credits;
-    countTo(this, this.creditsText, from, credits, v => `$${Math.round(v)}`, 350);
+    this.pendingCreditsCount?.remove(false);
+    this.pendingCreditsCount = undefined;
+    const coinsFly = gain > 0 && x > 0 && !settings.reducedMotion;
+    if (coinsFly) {
+      // hold the readout until the first coin lands, then count up as the rest arrive
+      const nCoins = Math.min(gain, 5);
+      this.pendingCreditsCount = this.time.delayedCall(750, () => {
+        this.pendingCreditsCount = undefined;
+        countTo(this, this.creditsText, from, credits, v => `$${Math.round(v)}`, (nCoins - 1) * 100 + 150);
+      });
+    } else {
+      countTo(this, this.creditsText, from, credits, v => `$${Math.round(v)}`, 350);
+    }
     if (this.summaryCashText?.active) this.summaryCashText.setText(`CASH: $${Math.round(credits)}`);
-    if (gain > 0 && x > 0 && !settings.reducedMotion) {
+    if (coinsFly) {
+      this.moneyBurst(x, y);
       const m = this.creditsText.getWorldTransformMatrix();
       for (let i = 0; i < Math.min(gain, 5); i++) {
-        const coin = this.add.circle(x, y, 7, PAL.gold).setStrokeStyle(2, PAL.ink).setDepth(1500);
+        const coin = this.add
+          .text(x, y, '$', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.green })
+          .setStroke(HEX.ink, 3)
+          .setOrigin(0.5)
+          .setDepth(1500)
+          .setScale(0);
+        this.tweens.add({ targets: coin, scale: 1, delay: i * 100, duration: 130, ease: EASE.pop });
         this.tweens.add({
           targets: coin,
           x: m.tx - 30,
@@ -696,6 +718,33 @@ export class UIScene extends Phaser.Scene {
       }
     }
     this.refreshUpgradeAffordability();
+  }
+
+  /** Small green pop where kill money spawns: expanding ring + radial sparks. */
+  private moneyBurst(x: number, y: number): void {
+    const ring = this.add.circle(x, y, 6).setStrokeStyle(3, PAL.green).setDepth(1499);
+    this.tweens.add({
+      targets: ring,
+      radius: 34,
+      alpha: { from: 0.9, to: 0 },
+      duration: 280,
+      ease: EASE.snap,
+      onComplete: () => ring.destroy()
+    });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + Math.random() * 0.6;
+      const spark = this.add.circle(x, y, 3, PAL.green).setDepth(1499);
+      this.tweens.add({
+        targets: spark,
+        x: x + Math.cos(a) * (22 + Math.random() * 14),
+        y: y + Math.sin(a) * (22 + Math.random() * 14),
+        scale: 0,
+        alpha: { from: 1, to: 0.4 },
+        duration: 260 + Math.random() * 120,
+        ease: EASE.snap,
+        onComplete: () => spark.destroy()
+      });
+    }
   }
 
   private refreshUpgradeAffordability(): void {
@@ -1095,6 +1144,28 @@ export class UIScene extends Phaser.Scene {
         .setOrigin(0.5)
     );
 
+    // SAVE downloads the framed art rect as a watermarked PNG; the platform
+    // buttons download it too, then open that platform's share-compose
+    // window/app with a caption + link prefilled (see share.ts — no web API
+    // lets a page attach the image directly into WhatsApp/X/Facebook).
+    const frameRect = () => {
+      // the layer sits inside a (possibly nested) popup container — resolve
+      // its world-space origin instead of assuming a centered parent
+      const m = layer.getWorldTransformMatrix();
+      const frameW = w + 24;
+      const frameH = h + 24;
+      return { x: m.tx - frameW / 2, y: m.ty - 30 - frameH / 2, w: frameW, h: frameH };
+    };
+    addExportButtonRow(
+      this,
+      layer,
+      h / 2 + 96,
+      () =>
+        void captureAndShare(this.game, frameRect(), `hormuz-meme-${id}.png`, "Just unlocked in HORMUZ HOLD'EM", 'unlock_zoom', 'download'),
+      platform =>
+        void captureAndShareTo(this.game, frameRect(), `hormuz-meme-${id}.png`, "Just unlocked in HORMUZ HOLD'EM", 'unlock_zoom', platform)
+    );
+
     layer.setSize(GAME_W, GAME_H);
     layer.setInteractive({ useHandCursor: true });
     // pointerdown + stopPropagation: consumed before it can reach the thumbs
@@ -1425,17 +1496,17 @@ export class UIScene extends Phaser.Scene {
     // opaque backing covers the graph; band + backing stay static while the
     // countdown/meme content animates inside `inner`
     pop.add(this.add.rectangle(0, 0, LEFT_BOX.w, LEFT_BOX.h, PAL.ink, 1));
-    pop.add(this.add.rectangle(0, -LEFT_BOX.h / 2 + 20, 190, 28, BAND_RED).setStrokeStyle(3, PAL.ink));
-    pop.add(
-      this.add
-        .text(0, -LEFT_BOX.h / 2 + 20, 'BREAKING MEME', {
-          fontFamily: FONT_SANS,
-          fontSize: '14px',
-          fontStyle: 'bold',
-          color: HEX.cream
-        })
-        .setOrigin(0.5)
-    );
+    const band = this.add.rectangle(0, -LEFT_BOX.h / 2 + 20, 190, 28, BAND_RED).setStrokeStyle(3, PAL.ink);
+    pop.add(band);
+    const bandLabel = this.add
+      .text(0, -LEFT_BOX.h / 2 + 20, 'BREAKING MEME', {
+        fontFamily: FONT_SANS,
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: HEX.cream
+      })
+      .setOrigin(0.5);
+    pop.add(bandLabel);
 
     // -- countdown teaser
     const cd = this.add.container(0, 0);
@@ -1476,9 +1547,16 @@ export class UIScene extends Phaser.Scene {
     this.time.delayedCall(tick * 3, () => {
       if (gen !== this.memeGen || this.memePopup !== pop) return;
       cd.destroy();
+      const pick = pickMeme(label, ctx);
+      // first-time-ever unlocks get their full celebration at day end, not
+      // mid-day — during play a new template just swaps the band label.
+      if (pick.isNew) {
+        bandLabel.setText('NEW MEME UNLOCKED!');
+        band.setSize(bandLabel.width + 24, band.height);
+      }
       const inner = this.add.container(0, 0);
       pop.add(inner);
-      renderMeme(this, inner, pickMeme(label, ctx), 300, LEFT_BOX.h - 70);
+      renderMeme(this, inner, pick, 300, LEFT_BOX.h - 70);
       if (settings.reducedMotion) {
         inner.setAlpha(0);
         this.tweens.add({ targets: inner, alpha: 1, duration: 200 });
@@ -1487,6 +1565,34 @@ export class UIScene extends Phaser.Scene {
         this.tweens.add({ targets: inner, scale: 1, duration: 380, ease: 'Back.easeOut' });
       }
       sfx.whoosh();
+
+      // SAVE chip: exports the whole popup rect (band + meme + this run's
+      // captions) as a watermarked PNG. Hidden while the snapshot is taken so
+      // the button itself never appears in the shared image.
+      const save = this.add.container(LEFT_BOX.w / 2 - 50, LEFT_BOX.h / 2 - 26);
+      save.add(this.add.rectangle(0, 0, 78, 32, PAL.gold).setStrokeStyle(3, PAL.ink));
+      save.add(
+        this.add
+          .text(0, 0, 'SAVE', { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: HEX.ink })
+          .setOrigin(0.5)
+      );
+      save.setSize(78, 32);
+      save.setInteractive({ useHandCursor: true });
+      save.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+        ev.stopPropagation();
+        sfx.tap();
+        save.setVisible(false);
+        void captureAndShare(
+          this.game,
+          { x: LEFT_BOX.x, y: LEFT_BOX.y, w: LEFT_BOX.w, h: LEFT_BOX.h },
+          `hormuz-meme-${pick.id}.png`,
+          "Live from the strait — HORMUZ HOLD'EM",
+          'meme_popup'
+        ).then(() => {
+          if (save.active) save.setVisible(true);
+        });
+      });
+      pop.add(save);
 
       // hold, then bounce out and drop the cutaway
       this.time.delayedCall(MEMES.settings.durationMs, () => {

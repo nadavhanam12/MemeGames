@@ -3,18 +3,33 @@ import { FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL } from '../core/palet
 import { settings } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
-import { MEMES } from '../core/memes';
+import { MEMES, MemePick, getMemeLog, renderMeme } from '../core/memes';
 import { getRunUnlocks, getUnlockedTemplates } from '../core/memeUnlocks';
 import { EASE, confetti, countTo } from '../core/juice';
 import { SessionStats, computeScore, freshStats } from '../core/state';
+import { captureAndShare } from '../core/share';
 import { leaderboard } from '../backend/leaderboard';
 import { openSubmitOverlay } from '../backend/submitOverlay';
 import { analytics } from '../backend/analytics';
 
-/** Minimal run recap: score + days survived + freshly unlocked memes, then
- *  three buttons. Everything lives in `root` so the whole screen can slide
- *  in/out as one unit; score submission still auto-flows into the
- *  leaderboard once per run (submitOverlay handles the form). */
+// The run recap styled as a newspaper front page — a self-contained "poster"
+// designed to be screenshotted or exported via the SHARE button (which
+// captures exactly this rect, watermarked, and opens the OS share sheet).
+const CARD = { x: GAME_W / 2, y: 300, w: 900, h: 480 } as const;
+const PAPER = 0xf6efdc;
+const PAPER_INK = HEX.ink;
+
+/** Every run ends the same way (market meltdown), so the headline only has to
+ *  vary by how long the player lasted. */
+function headlineFor(stats: SessionStats): string {
+  const d = stats.daysSurvived;
+  const price = Math.round(stats.oilPrice);
+  if (d <= 0) return 'OIL MARKET IMPLODES ON DAY ONE — INTERN BLAMED';
+  if (d <= 2) return `STRAIT FALLS ON DAY ${d} — OIL ROCKETS TO $${price}`;
+  if (d <= 5) return `DAY ${d} DISASTER: DEFENDER 'DID THEIR BEST', MARKET DISAGREES`;
+  return `LEGENDARY ${d}-DAY STAND ENDS IN FLAMES — OIL AT $${price}`;
+}
+
 export class ResultsScene extends Phaser.Scene {
   private leaving = false;
 
@@ -37,50 +52,9 @@ export class ResultsScene extends Phaser.Scene {
     const root = this.add.container(0, 0);
     const reduced = settings.reducedMotion;
 
-    // --- content -----------------------------------------------------------
-    const title = this.add
-      .text(GAME_W / 2, 88, 'MARKET CLOSE', {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '44px',
-        color: HEX.cream,
-        stroke: HEX.ink,
-        strokeThickness: 8
-      })
-      .setOrigin(0.5);
-
-    const scoreLabel = this.add
-      .text(GAME_W / 2, 168, 'FINAL SCORE', {
-        fontFamily: FONT_SANS,
-        fontSize: '20px',
-        fontStyle: 'bold',
-        color: HEX.gold
-      })
-      .setOrigin(0.5)
-      .setAlpha(0.9);
-
-    const scoreTxt = this.add
-      .text(GAME_W / 2, 238, '0', {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '92px',
-        color: HEX.gold,
-        stroke: HEX.ink,
-        strokeThickness: 10
-      })
-      .setOrigin(0.5);
-
-    const days = this.add
-      .text(GAME_W / 2, 322, `☀ ${stats.daysSurvived} ${stats.daysSurvived === 1 ? 'DAY' : 'DAYS'} SURVIVED`, {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '30px',
-        color: HEX.cream,
-        stroke: HEX.ink,
-        strokeThickness: 6
-      })
-      .setOrigin(0.5);
-
-    const memeRow = this.buildUnlockRow(430);
-
-    root.add([title, scoreLabel, scoreTxt, days, memeRow]);
+    // --- newspaper front page ----------------------------------------------
+    const { card, scoreTxt } = this.buildFrontPage(stats, finalScore);
+    root.add(card);
 
     // --- buttons -----------------------------------------------------------
     const mkButton = (
@@ -149,12 +123,45 @@ export class ResultsScene extends Phaser.Scene {
       });
     };
 
+    // Capture the front-page rect exactly (share.ts watermarks it), then hand
+    // it to the OS share sheet / download and confirm under the button.
+    let sharing = false;
+    const shareRun = async (btn: Phaser.GameObjects.Container): Promise<void> => {
+      if (sharing) return;
+      sharing = true;
+      const outcome = await captureAndShare(
+        this.game,
+        { x: CARD.x - CARD.w / 2, y: CARD.y - CARD.h / 2, w: CARD.w, h: CARD.h },
+        `hormuz-holdem-day-${stats.daysSurvived}.png`,
+        `HORMUZ HOLD'EM — I survived ${stats.daysSurvived} day${stats.daysSurvived === 1 ? '' : 's'} before crashing the oil market. Score: ${finalScore}. Think you can hold the strait?`,
+        'results'
+      );
+      sharing = false;
+      if (this.leaving || !this.scene.isActive()) return;
+      const msg =
+        outcome === 'shared' ? 'SHARED!' : outcome === 'downloaded' ? 'IMAGE SAVED!' : outcome === 'failed' ? 'SHARE FAILED' : '';
+      if (msg) {
+        const note = this.add
+          .text(btn.x, btn.y - 58, msg, {
+            fontFamily: FONT_DISPLAY,
+            fontSize: '20px',
+            color: outcome === 'failed' ? HEX.red : HEX.green,
+            stroke: HEX.ink,
+            strokeThickness: 5
+          })
+          .setOrigin(0.5);
+        root.add(note);
+        this.tweens.add({ targets: note, y: note.y - 16, alpha: 0, delay: 900, duration: 400, onComplete: () => note.destroy() });
+      }
+    };
+
     const totalMemes = Object.keys(MEMES.templates).length;
-    mkButton(GAME_W / 2 - 330, 260, PAL.ocean, 'LEADERBOARD', HEX.cream, () => void runSubmitFlow(true));
-    mkButton(GAME_W / 2, 320, PAL.green, 'DEFEND AGAIN', HEX.ink, () =>
+    mkButton(228, 250, PAL.ocean, 'LEADERBOARD', HEX.cream, () => void runSubmitFlow(true));
+    mkButton(521, 300, PAL.green, 'DEFEND AGAIN', HEX.ink, () =>
       this.exitTo(() => this.scene.start('Game'))
     );
-    mkButton(GAME_W / 2 + 330, 260, PAL.purple, `GALLERY ${getUnlockedTemplates().size}/${totalMemes}`, HEX.cream, () =>
+    const shareBtn = mkButton(799, 220, PAL.gold, 'SHARE', HEX.ink, () => void shareRun(shareBtn));
+    mkButton(1052, 250, PAL.purple, `GALLERY ${getUnlockedTemplates().size}/${totalMemes}`, HEX.cream, () =>
       this.exitTo(() => this.scene.start('Gallery', { from: 'Results' }))
     );
 
@@ -173,14 +180,10 @@ export class ResultsScene extends Phaser.Scene {
       });
     };
 
-    slideIn(title, 0, -24);
-    slideIn(scoreLabel, 120);
-    slideIn(scoreTxt, 180);
-    slideIn(days, 340);
-    slideIn(memeRow, 480);
+    slideIn(card, 0, -24);
     root.list
-      .filter((o): o is Phaser.GameObjects.Container => o instanceof Phaser.GameObjects.Container && o !== memeRow)
-      .forEach((btn, i) => slideIn(btn, 620 + i * 90, 40));
+      .filter((o): o is Phaser.GameObjects.Container => o instanceof Phaser.GameObjects.Container && o !== card)
+      .forEach((btn, i) => slideIn(btn, 380 + i * 90, 40));
 
     this.time.delayedCall(reduced ? 100 : 260, () => {
       countTo(this, scoreTxt, 0, finalScore, v => `${Math.round(v)}`, 900);
@@ -222,75 +225,225 @@ export class ResultsScene extends Phaser.Scene {
     });
   }
 
-  /** Centered row of memes unlocked for the first time this run; falls back
-   *  to a quiet collection-count line when there were none. */
-  private buildUnlockRow(y: number): Phaser.GameObjects.Container {
-    const c = this.add.container(GAME_W / 2, y);
-    const ids = getRunUnlocks().filter(id => MEMES.templates[id]);
+  /** The whole front page in one container centered on CARD — masthead,
+   *  headline, "photo" (last meme of the run, real captions), stat column and
+   *  oil-price sparkline. Returns the score text for the count-up tween. */
+  private buildFrontPage(
+    stats: SessionStats,
+    finalScore: number
+  ): { card: Phaser.GameObjects.Container; scoreTxt: Phaser.GameObjects.Text } {
+    const card = this.add.container(CARD.x, CARD.y);
+    const halfW = CARD.w / 2;
+    const halfH = CARD.h / 2;
 
-    if (!ids.length) {
-      c.add(
-        this.add
-          .text(0, 0, 'NO NEW MEMES THIS RUN', {
-            fontFamily: FONT_SANS,
-            fontSize: '18px',
-            fontStyle: 'bold',
-            color: HEX.cream
-          })
-          .setOrigin(0.5)
-          .setAlpha(0.55)
-      );
-      return c;
-    }
+    card.add(this.add.rectangle(0, 0, CARD.w, CARD.h, PAPER).setStrokeStyle(6, PAL.ink));
+    card.add(this.add.rectangle(0, 0, CARD.w - 16, CARD.h - 16).setStrokeStyle(2, PAL.ink, 0.35));
 
-    c.add(
+    // masthead + dateline
+    card.add(
       this.add
-        .text(0, -78, `★ ${ids.length} NEW MEME${ids.length === 1 ? '' : 'S'} UNLOCKED`, {
+        .text(0, -halfH + 34, "THE HORMUZ HOLD'EM TIMES", {
           fontFamily: FONT_DISPLAY,
-          fontSize: '22px',
-          color: HEX.purple,
-          stroke: HEX.ink,
-          strokeThickness: 5
+          fontSize: '34px',
+          color: PAPER_INK
         })
         .setOrigin(0.5)
     );
+    card.add(this.add.rectangle(0, -halfH + 58, CARD.w - 70, 3, PAL.ink));
+    card.add(
+      this.add
+        .text(0, -halfH + 72, `SPECIAL EDITION  ·  DAY ${stats.daysSurvived}  ·  OIL AT $${Math.round(stats.oilPrice)}/BBL`, {
+          fontFamily: FONT_SANS,
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: PAPER_INK
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.8)
+    );
+    card.add(this.add.rectangle(0, -halfH + 86, CARD.w - 70, 3, PAL.ink));
 
-    const shown = ids.slice(0, 6);
-    const H = 96;
-    const gap = 14;
-    const widths = shown.map(id => {
-      const tpl = MEMES.templates[id];
-      return Math.min(170, Math.max(48, Math.round(H / tpl.aspect)));
-    });
-    const extra = ids.length - shown.length;
-    const extraW = extra > 0 ? 60 : 0;
-    const rowW = widths.reduce((a, b) => a + b + gap, -gap) + (extra > 0 ? gap + extraW : 0);
+    // headline + eyewitness subhead
+    card.add(
+      this.add
+        .text(0, -halfH + 96, headlineFor(stats), {
+          fontFamily: FONT_DISPLAY,
+          fontSize: '38px',
+          color: PAPER_INK,
+          align: 'center',
+          wordWrap: { width: CARD.w - 60 }
+        })
+        .setOrigin(0.5, 0)
+    );
+    const subhead = stats.memeMoment
+      ? `EYEWITNESS MOMENT: “${stats.memeMoment}”`
+      : `${stats.tankersSafe} TANKERS ESCORTED SAFELY · ${stats.tankersLost} LOST AT SEA`;
+    card.add(
+      this.add
+        .text(0, -34, subhead, {
+          fontFamily: FONT_SANS,
+          fontSize: '16px',
+          fontStyle: 'bold',
+          color: PAPER_INK
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.85)
+    );
 
-    let x = -rowW / 2;
-    shown.forEach((id, i) => {
-      const tpl = MEMES.templates[id];
-      const w = widths[i];
-      const cx = x + w / 2;
-      if (hasArt(this, tpl.artKey)) {
-        c.add(this.add.image(cx, 0, tpl.artKey).setDisplaySize(w, H));
-      } else {
-        c.add(this.add.rectangle(cx, 0, w, H, 0x39424e));
-      }
-      c.add(this.add.rectangle(cx, 0, w, H).setStrokeStyle(4, PAL.purple));
-      x += w + gap;
-    });
-    if (extra > 0) {
-      c.add(this.add.rectangle(x + extraW / 2, 0, extraW, H, PAL.ink, 0.8).setStrokeStyle(4, PAL.purple));
-      c.add(
+    // left column — "photo": the last meme this run produced, real captions
+    const photoX = -233;
+    card.add(this.add.rectangle(photoX, 96, 344, 236, 0xffffff).setStrokeStyle(4, PAL.ink));
+    const lastMeme = this.lastMemePick();
+    if (lastMeme) {
+      const photo = this.add.container(photoX, 88);
+      renderMeme(this, photo, lastMeme, 320, 190);
+      card.add(photo);
+      card.add(
         this.add
-          .text(x + extraW / 2, 0, `+${extra}`, {
-            fontFamily: FONT_DISPLAY,
-            fontSize: '26px',
-            color: HEX.purple
+          .text(photoX, 198, 'PHOTO: MOMENTS BEFORE DISASTER', {
+            fontFamily: FONT_SANS,
+            fontSize: '11px',
+            fontStyle: 'bold',
+            color: PAPER_INK
           })
           .setOrigin(0.5)
+          .setAlpha(0.7)
+      );
+    } else {
+      card.add(
+        this.add
+          .text(photoX, 96, 'NO PHOTOS SURVIVED\nTHE BLAST', {
+            fontFamily: FONT_DISPLAY,
+            fontSize: '22px',
+            color: PAPER_INK,
+            align: 'center'
+          })
+          .setOrigin(0.5)
+          .setAlpha(0.5)
       );
     }
-    return c;
+
+    // classifieds strip under the photo — new unlocks or a filler joke
+    const unlocks = getRunUnlocks().filter(id => MEMES.templates[id]).length;
+    card.add(
+      this.add
+        .text(
+          photoX,
+          224,
+          unlocks > 0
+            ? `★ ${unlocks} NEW MEME${unlocks === 1 ? '' : 'S'} UNLOCKED — SEE GALLERY`
+            : 'CLASSIFIEDS: TANKER CAPTAIN SEEKS NEW LINE OF WORK',
+          {
+            fontFamily: FONT_SANS,
+            fontSize: '13px',
+            fontStyle: 'bold',
+            color: unlocks > 0 ? HEX.purple : PAPER_INK
+          }
+        )
+        .setOrigin(0.5)
+        .setAlpha(unlocks > 0 ? 1 : 0.6)
+    );
+
+    // right column — score + stat briefs + sparkline
+    const colX = 215;
+    card.add(
+      this.add
+        .text(colX, -8, 'FINAL SCORE', {
+          fontFamily: FONT_SANS,
+          fontSize: '14px',
+          fontStyle: 'bold',
+          color: PAPER_INK
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.75)
+    );
+    const scoreTxt = this.add
+      .text(colX, 38, '0', {
+        fontFamily: FONT_DISPLAY,
+        fontSize: '54px',
+        color: PAPER_INK
+      })
+      .setOrigin(0.5);
+    card.add(scoreTxt);
+
+    const statLines = [
+      `☀ ${stats.daysSurvived} DAY${stats.daysSurvived === 1 ? '' : 'S'} SURVIVED`,
+      `⛴ ${stats.tankersSafe} ESCORTED · ${stats.tankersLost} LOST`,
+      `✦ BEST COMBO x${stats.bestCombo} · ${stats.nearMisses} NEAR MISSES`
+    ];
+    statLines.forEach((line, i) => {
+      card.add(
+        this.add
+          .text(colX, 92 + i * 24, line, {
+            fontFamily: FONT_SANS,
+            fontSize: '15px',
+            fontStyle: 'bold',
+            color: PAPER_INK
+          })
+          .setOrigin(0.5)
+          .setAlpha(0.9)
+      );
+    });
+
+    this.drawSparkline(card, stats, colX, 186, 380, 60);
+
+    return { card, scoreTxt };
+  }
+
+  /** Rebuild a MemePick from the last memeLog entry (captions are already
+   *  token-substituted with this run's real numbers). */
+  private lastMemePick(): MemePick | null {
+    const log = getMemeLog();
+    for (let i = log.length - 1; i >= 0; i--) {
+      const tpl = MEMES.templates[log[i].t];
+      if (tpl) return { id: log[i].t, tpl, captions: [...log[i].c], isNew: false };
+    }
+    return null;
+  }
+
+  /** Oil-price line for the whole run (priceHistory samples every 0.5s),
+   *  scaled to its own min/max, with a red marker on the closing price. */
+  private drawSparkline(
+    card: Phaser.GameObjects.Container,
+    stats: SessionStats,
+    cx: number,
+    cy: number,
+    w: number,
+    h: number
+  ): void {
+    const hist = stats.priceHistory;
+    card.add(this.add.rectangle(cx, cy, w, h, 0xffffff, 0.55).setStrokeStyle(2, PAL.ink, 0.5));
+    if (hist.length >= 2) {
+      const min = Math.min(...hist);
+      const max = Math.max(...hist);
+      const span = Math.max(1, max - min);
+      const g = this.add.graphics();
+      g.lineStyle(3, PAL.ink, 0.9);
+      g.beginPath();
+      hist.forEach((p, i) => {
+        const px = cx - w / 2 + 8 + (i / (hist.length - 1)) * (w - 16);
+        const py = cy + h / 2 - 8 - ((p - min) / span) * (h - 16);
+        if (i === 0) g.moveTo(px, py);
+        else g.lineTo(px, py);
+      });
+      g.strokePath();
+      const lastY = cy + h / 2 - 8 - ((hist[hist.length - 1] - min) / span) * (h - 16);
+      g.fillStyle(PAL.red, 1);
+      g.fillCircle(cx + w / 2 - 8, lastY, 5);
+      card.add(g);
+    }
+    // left-aligned so the bottom-right corner stays clear for the export
+    // watermark share.ts stamps there
+    card.add(
+      this.add
+        .text(cx - w / 2 + 4, cy + h / 2 + 12, `OIL PRICE: $${Math.round(stats.startPrice)} → $${Math.round(stats.oilPrice)}`, {
+          fontFamily: FONT_SANS,
+          fontSize: '11px',
+          fontStyle: 'bold',
+          color: PAPER_INK
+        })
+        .setOrigin(0, 0.5)
+        .setAlpha(0.7)
+    );
   }
 }

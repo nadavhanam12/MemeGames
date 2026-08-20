@@ -97,6 +97,7 @@ export const EV = {
   DAY_END: 'day-end', // (DaySummary) — shown in the news band during the break
   DAY_BREAK: 'day-break', // (null) — fires when the player dismisses the frozen recap
   NEXT_DAY_REQUEST: 'next-day-request', // () — player clicked NEXT DAY on the recap card
+  WORLD_FREEZE: 'world-freeze', // (frozen: boolean) — pauses/resumes gameplay update for a mid-run interstitial (e.g. new-meme reveal)
   UPGRADE_REVEAL: 'upgrade-reveal', // (upgradeKey) — button unlocks in the shop
   MARKET_NUDGE: 'market-nudge', // (delta) — silent prediction-market push, no headline
   TIMER: 'timer', // (elapsedSeconds — survival time counts UP)
@@ -105,6 +106,8 @@ export const EV = {
   UPGRADE_DEMO: 'upgrade-demo', // (upgradeKey)
   DEV_FORCE_MEME: 'dev-force-meme' // () — dev panel: show a meme now, ignoring the cooldown
 } as const;
+// Dev console handle, e.g. bus.emit(EV.NEXT_DAY_REQUEST)
+if (import.meta.env.DEV) (window as any).EV = EV;
 
 export const COMBO_MILESTONES: Record<number, string> = {
   5: 'ALERT INTERN',

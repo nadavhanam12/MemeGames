@@ -103,6 +103,9 @@ export class GameScene extends Phaser.Scene {
   // click NEXT DAY (see onNextDayRequest)
   private day = 0;
   private awaitingNextDay = false;
+  // mid-run freeze for a full-screen interstitial (e.g. a new-meme reveal) —
+  // separate from awaitingNextDay so it doesn't touch day-boundary logic
+  private frozen = false;
   private mission: DayMission | null = null;
   private lastMissionType: MissionType | '' = '';
   private dayCounters = { priceAtStart: 0, safe: 0, lost: 0, intercepts: 0, bestCombo: 0 };
@@ -171,6 +174,7 @@ export class GameScene extends Phaser.Scene {
     this.elapsed = 0;
     this.day = 0;
     this.awaitingNextDay = false;
+    this.frozen = false;
     this.mission = null;
     this.lastMissionType = '';
     this.worldScale = 1;
@@ -247,6 +251,8 @@ export class GameScene extends Phaser.Scene {
     bus.on('buy-upgrade', (key: 'air' | 'hull' | 'gold', cost: number) => this.buyUpgrade(key, cost));
     bus.removeAllListeners(EV.NEXT_DAY_REQUEST);
     bus.on(EV.NEXT_DAY_REQUEST, this.onNextDayRequest, this);
+    bus.removeAllListeners(EV.WORLD_FREEZE);
+    bus.on(EV.WORLD_FREEZE, (frozen: boolean) => (this.frozen = frozen));
 
     this.events.on('shutdown', () => {
       bus.removeAllListeners('buy-upgrade');
@@ -1507,6 +1513,11 @@ export class GameScene extends Phaser.Scene {
     let bestScore = Infinity;
     for (const th of this.threats) {
       if (th.dead) continue;
+      // a real tap can only aim inside the visible map (fireShot's lock search
+      // is centered on the tap point, which the pointer-in-viewport check
+      // keeps within [0, GAME_W]x[0, GAME_H]) — skip threats still off-screen
+      // near their spawn edge so the bot can't snipe kills no player could get
+      if (th.sprite.x < 0 || th.sprite.x > GAME_W || th.sprite.y < 0 || th.sprite.y > GAME_H) continue;
       const score = th.target
         ? Phaser.Math.Distance.Between(th.sprite.x, th.sprite.y, th.target.sprite.x, th.target.sprite.y)
         : Phaser.Math.Distance.Between(th.sprite.x, th.sprite.y, tu.x, tu.y) + 400; // deprioritize idle threats
@@ -1537,7 +1548,7 @@ export class GameScene extends Phaser.Scene {
 
     // end-of-day break: the whole world freezes (ships, threats, prices, gun)
     // so the player can read the recap, until they click NEXT DAY
-    if (this.awaitingNextDay) return;
+    if (this.awaitingNextDay || this.frozen) return;
 
     this.elapsed += rawDt;
 

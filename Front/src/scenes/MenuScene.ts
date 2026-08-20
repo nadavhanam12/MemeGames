@@ -80,9 +80,9 @@ export class MenuScene extends Phaser.Scene {
 
     // static menu memes, bottom corners (fixed picks — not part of the run's meme log)
     const memeLeft = this.add.container(185, 560).setAngle(-4);
-    renderMeme(this, memeLeft, { tpl: MEMES.templates.rejectApproveKhamenei, captions: [] }, 280, 280);
+    renderMeme(this, memeLeft, { id: 'rejectApproveKhamenei', tpl: MEMES.templates.rejectApproveKhamenei, captions: [], isNew: false }, 280, 280);
     const memeRight = this.add.container(GAME_W - 185, 560).setAngle(4);
-    renderMeme(this, memeRight, { tpl: MEMES.templates.twoButtons2Trump, captions: [] }, 280, 280);
+    renderMeme(this, memeRight, { id: 'twoButtons2Trump', tpl: MEMES.templates.twoButtons2Trump, captions: [], isNew: false }, 280, 280);
 
     // start button
     const start = this.add.container(cx, 485);

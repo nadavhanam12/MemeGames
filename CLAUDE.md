@@ -30,11 +30,23 @@ server.
     day-end shop panel. `src/scenes/GalleryScene.ts` ('Gallery') is a paged
     grid of every template in `memes.json` — full color once unlocked, grey
     while locked — reachable from the Menu and from Results (`GALLERY x/y`
-    button). Results (`src/scenes/ResultsScene.ts`) is a minimal recap:
-    score + days survived + this run's new unlocks (`getRunUnlocks()` in
+    button); the zoom view has a SAVE MEME share/export button for unlocked
+    memes. Results (`src/scenes/ResultsScene.ts`) is a newspaper front page
+    ("THE HORMUZ HOLD'EM TIMES"): day-count headline, eyewitness subhead
+    (`stats.memeMoment`), the run's last meme from `getMemeLog()` as the
+    "photo", score/stat briefs, an oil-price sparkline from
+    `stats.priceHistory`, and this run's new unlocks (`getRunUnlocks()` in
     `memeUnlocks.ts`, reset at run start next to `resetMemeLog()`), with
     slide-in entrance and a shared slide-out exit before every scene change;
-    score submission auto-flows into the leaderboard once per run. The tile list is read live from `MEMES.templates`, so adding or
+    score submission auto-flows into the leaderboard once per run.
+  - **Share/export system**: `src/core/share.ts` — `captureAndShare()`
+    snapshots a logical-coordinate rect of the rendered frame
+    (`renderer.snapshotArea`, DPR-scaled), stamps a "HORMUZ HOLD'EM"
+    watermark bottom-right, then opens the OS share sheet (mobile web share
+    with files) or downloads the PNG (desktop fallback), tracking a `share`
+    analytics event. Used by the Results SHARE button (exports the newspaper
+    card), the in-game meme popup's SAVE chip (`UIScene.showMemeReaction`),
+    and the gallery zoom's SAVE MEME button. The tile list is read live from `MEMES.templates`, so adding or
     removing a meme in `memes.json` needs no code change to the gallery.
   - `src/config/` — `tuning.ts` + `tuning.json` (gameplay values),
     `layout.json` (UI layout), `memes.json` (meme reaction library: templates,
@@ -79,3 +91,23 @@ anything leaderboard-related. Summary:
 - TypeScript strict, Phaser 3 scene-based architecture.
 - Gameplay/UI numbers belong in `src/config/*.json`, not hardcoded.
 - Keep `src/backend/` free of game-specific imports so it stays portable.
+
+## Visual Verification Protocol
+
+Applies to any UI/gameplay change in `Front/`:
+
+1. Never claim a UI/gameplay change is done based on `tsc`/`npm run build` alone —
+   those only prove it compiles, not that it renders or behaves correctly.
+2. Start the dev server on a deterministic port, killing any stale Vite
+   instance first (duplicate-port collisions have caused false verification
+   against a stale build).
+3. Never rely on browser-automation clicks against the Phaser `<canvas>` —
+   they don't reach Phaser's input handler. Instead expose a `window.__dev`
+   scene handle (current scene instance + a way to trigger transitions/state
+   changes) and drive navigation/state through `javascript_tool` calls
+   against that handle.
+4. After every change: screenshot the affected screen, read console
+   messages, and confirm zero uncaught errors before reporting anything.
+5. If a screen renders blank or partial, debug it live (read console/network,
+   inspect the scene state) and fix it before reporting back — never hand a
+   broken screen to the user.

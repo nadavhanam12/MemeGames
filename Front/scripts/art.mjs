@@ -15,6 +15,20 @@ import sharp from 'sharp';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const RAW = path.join(root, 'assets', 'raw');
 const OUT = path.join(root, 'public', 'assets');
+const MEMES_OUT = path.join(OUT, 'Memes');
+
+// Meme reaction images (anything the game loads via a memes.json artFile)
+// live in public/assets/Memes/, separate from core game art in public/assets/.
+// The naming convention is airtight — every meme output is prefixed `meme_`.
+function isMemeFile(filename) {
+  return filename.startsWith('meme_');
+}
+function outFileFor(filename) {
+  return path.join(isMemeFile(filename) ? MEMES_OUT : OUT, filename);
+}
+function relOutFor(filename) {
+  return isMemeFile(filename) ? `Memes/${filename}` : filename;
+}
 
 // Final on-screen sizes for standalone images (game world is 1280x720).
 const IMAGE_TARGETS = {
@@ -52,11 +66,11 @@ async function processImage(asset) {
     return;
   }
   const target = IMAGE_TARGETS[asset.name] ?? {};
-  const outFile = path.join(OUT, `${asset.name}.png`);
+  const outFile = outFileFor(`${asset.name}.png`);
   let img = sharp(src);
   if (target.width || target.height) img = img.resize(target.width ?? null, target.height ?? null);
   await img.png({ compressionLevel: 9 }).toFile(outFile);
-  produced.push(`${asset.name}.png`);
+  produced.push(relOutFor(`${asset.name}.png`));
 }
 
 /** Turn a green-screen delivery into a transparent PNG buffer (with despill). */
@@ -98,9 +112,9 @@ async function processAtlas(asset) {
     const targetW = asset.targetWidths?.[frameName] ?? asset.targetWidth;
     let out = sharp(trimmed);
     if (targetW) out = out.resize({ width: targetW });
-    const outFile = path.join(OUT, `${frameName}.png`);
+    const outFile = outFileFor(`${frameName}.png`);
     const info = await out.png({ compressionLevel: 9 }).toFile(outFile);
-    produced.push(`${frameName}.png (${info.width}x${info.height})`);
+    produced.push(`${relOutFor(`${frameName}.png`)} (${info.width}x${info.height})`);
   }
 }
 
@@ -114,6 +128,7 @@ async function main() {
     process.exit(1);
   }
   await mkdir(OUT, { recursive: true });
+  await mkdir(MEMES_OUT, { recursive: true });
 
   for (const asset of manifest.assets) {
     if (only && asset.name !== only) continue;
@@ -131,14 +146,19 @@ async function main() {
   }
 
   // index of available generated assets, read by the game's loader.
-  // On --only runs, merge into the existing index instead of clobbering it.
+  // Merge with the existing index so outputs whose raw source is gone
+  // (skipped above) stay loadable — keep an old entry only if its processed
+  // file still exists in public/assets/.
   let index = produced.map(p => p.split(' ')[0]);
-  if (only) {
-    try {
-      const prev = JSON.parse(await readFile(path.join(OUT, 'index.json'), 'utf8'));
-      index = [...new Set([...prev, ...index])];
-    } catch { /* no existing index — fresh write */ }
-  }
+  try {
+    const prev = JSON.parse(await readFile(path.join(OUT, 'index.json'), 'utf8'));
+    const kept = [];
+    for (const f of prev) {
+      if (!index.includes(f) && (await exists(path.join(OUT, f)))) kept.push(f);
+    }
+    index = [...kept, ...index];
+  } catch { /* no existing index — fresh write */ }
+
   await writeFile(path.join(OUT, 'index.json'), JSON.stringify(index, null, 2));
 
   // canonical game texture keys -> generated file (keep in sync with src/core/art.ts).
@@ -153,7 +173,7 @@ async function main() {
     mine: 'threat_mine.png',
     patrol: 'threat_patrol.png',
     chyron: 'ui_chyron_frame.png',
-    memeFrame: 'meme_frame_broadcast.png',
+    memeFrame: 'Memes/meme_frame_broadcast.png',
     charCommander: 'char_commander.png',
     charDealmaker: 'char_dealmaker.png',
     trump_right_idle_1: 'trump_right_idle_1.png',

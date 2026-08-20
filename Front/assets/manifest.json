@@ -3,7 +3,7 @@
   "notes": [
     "v2: the art pack is delivered as ATLASES, not individual sprites (see assets/raw/ASSET_GUIDE.md, the authoritative delivery doc).",
     "Phase A flow: generate via ChatGPT using assets/CHATGPT_BRIEF.md -> drop PNGs into assets/raw/ -> `npm run art` slices atlases per the frames below, trims transparent padding, resizes, outputs to public/assets/.",
-    "map_labels_overlay was REJECTED/replaced — route labels and text are rendered by the game at runtime, never baked into PNGs (except meme template frames).",
+    "map_labels_overlay was REJECTED/replaced \u2014 route labels and text are rendered by the game at runtime, never baked into PNGs (except meme template frames).",
     "characters_atlas is OPAQUE (flat per-portrait backgrounds); the meme compositor crops cells and uses them as-is inside panels.",
     "All frame coordinates are top-left origin, in source-atlas pixels."
   ],
@@ -909,7 +909,7 @@
       "trim": false,
       "pivot": "center",
       "targetWidth": 220,
-      "use": "Player machine-gun turret at bottom-center: Trump caricature from behind. Delivered on a green screen (chromaKey strips it). 12 cells of 362x362, rows = aim direction (right/mid/left), cols = idle 1-2 then fire 1-2. trim:false on purpose — frames must keep identical geometry so pose swaps don't jitter.",
+      "use": "Player machine-gun turret at bottom-center: Trump caricature from behind. Delivered on a green screen (chromaKey strips it). 12 cells of 362x362, rows = aim direction (right/mid/left), cols = idle 1-2 then fire 1-2. trim:false on purpose \u2014 frames must keep identical geometry so pose swaps don't jitter.",
       "frames": {
         "trump_right_idle_1": {
           "x": 0,
@@ -982,6 +982,396 @@
           "y": 724,
           "w": 362,
           "h": 362
+        }
+      }
+    },
+    {
+      "name": "meme_expandingbrain_atlas",
+      "file": "Meme/meme_expandingbrain_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Expanding Brain nested 4-stage; runtime captions in blank left half-rows",
+      "frames": {
+        "meme_expandingbrain_win": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_expandingbrain_fail": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_expandingbrain_foe": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_expandingbrain_react": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_grusplan_atlas",
+      "file": "Meme/meme_grusplan_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Gru's Plan nested 4-panel; runtime captions on blank flip-boards",
+      "frames": {
+        "meme_grusplan_win": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_grusplan_fail": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_grusplan_foe": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_grusplan_react": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_panikkalm_atlas",
+      "file": "Meme/meme_panikkalm_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Panik/Kalm/Panik nested 3-row; runtime captions in blank right half-rows",
+      "frames": {
+        "meme_panikkalm_win": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_panikkalm_fail": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_panikkalm_foe": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_panikkalm_react": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_alwayshasbeen_atlas",
+      "file": "Meme/meme_alwayshasbeen_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Always Has Been astronauts; stroked captions top/bottom",
+      "frames": {
+        "meme_alwayshasbeen_win": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_alwayshasbeen_fail": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_alwayshasbeen_foe": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_alwayshasbeen_react": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_sideeye_puppet_atlas",
+      "file": "Meme/meme_sideeye_puppet_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Nervous side-eye puppet 2-panel; caption in blank top strip",
+      "frames": {
+        "meme_sideeye_win": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_sideeye_fail": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_sideeye_foe": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_sideeye_react": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_partycorner_atlas",
+      "file": "Meme/meme_partycorner_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "They-don't-know party corner; caption in blank thought bubble",
+      "frames": {
+        "meme_partycorner_win": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_partycorner_fail": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_partycorner_foe": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_partycorner_react": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_tradeoffer_atlas",
+      "file": "Meme/meme_tradeoffer_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Trade Offer presenter; two captions in blank top zone",
+      "frames": {
+        "meme_tradeoffer_win": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_tradeoffer_fail": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_tradeoffer_foe": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_tradeoffer_react": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_clownmakeup_atlas",
+      "file": "Meme/meme_clownmakeup_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Clown makeup nested 4-stage; runtime captions in blank right half-rows",
+      "frames": {
+        "meme_clownmakeup_win": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_clownmakeup_fail": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_clownmakeup_foe": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_clownmakeup_react": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_onceagainasking_atlas",
+      "file": "Meme/meme_onceagainasking_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "Once-again-asking seated figure; caption on blank bottom banner",
+      "frames": {
+        "meme_onceagain_win": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_onceagain_fail": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_onceagain_foe": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_onceagain_react": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        }
+      }
+    },
+    {
+      "name": "meme_forthebetter_atlas",
+      "file": "Meme/meme_forthebetter_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": false,
+      "trim": false,
+      "targetWidth": 720,
+      "use": "For-the-better-right nested 4-panel dialogue; captions in blank bottom strips",
+      "frames": {
+        "meme_forthebetter_win": {
+          "x": 0,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_forthebetter_fail": {
+          "x": 1024,
+          "y": 0,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_forthebetter_foe": {
+          "x": 0,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
+        },
+        "meme_forthebetter_react": {
+          "x": 1024,
+          "y": 1024,
+          "w": 1024,
+          "h": 1024
         }
       }
     }

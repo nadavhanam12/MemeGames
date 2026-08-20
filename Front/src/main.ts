@@ -58,6 +58,13 @@ game.events.once(Phaser.Core.Events.READY, () => {
   }
 });
 
+// iOS Safari toggles its address/toolbar chrome without firing a reliable
+// window `resize` (Phaser's default listener), leaving the canvas sized
+// against a stale viewport. `visualViewport` reports the true visible size.
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => game.scale.refresh());
+}
+
 initDevtools(game);
 
 // Dev console handle, e.g. phaserGame.scene.start('Game')

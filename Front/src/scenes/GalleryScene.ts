@@ -13,6 +13,8 @@ import { sfx } from '../core/sfx';
 import { pressPulse } from '../core/juice';
 import { MEMES } from '../core/memes';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
+import { captureAndShare, captureAndShareTo } from '../core/share';
+import { addExportButtonRow } from '../core/shareButtons';
 
 const COLS = 9;
 const TILE_W = 118;
@@ -240,6 +242,27 @@ export class GalleryScene extends Phaser.Scene {
         })
         .setOrigin(0.5)
     );
+
+    if (unlockedHere) {
+      // SAVE downloads the framed art rect as a watermarked PNG; the platform
+      // buttons download it too, then open that platform's share-compose
+      // window/app with a caption + link prefilled (see share.ts — no web
+      // API lets a page attach the image directly into WhatsApp/X/Facebook).
+      const frameRect = () => {
+        const frameW = w + 24;
+        const frameH = h + 24;
+        return { x: GAME_W / 2 - frameW / 2, y: GAME_H / 2 - 30 - frameH / 2, w: frameW, h: frameH };
+      };
+      addExportButtonRow(
+        this,
+        layer,
+        h / 2 + 96,
+        () =>
+          void captureAndShare(this.game, frameRect(), `hormuz-meme-${id}.png`, "From my HORMUZ HOLD'EM collection", 'gallery', 'download'),
+        platform =>
+          void captureAndShareTo(this.game, frameRect(), `hormuz-meme-${id}.png`, "From my HORMUZ HOLD'EM collection", 'gallery', platform)
+      );
+    }
 
     layer.setSize(GAME_W, GAME_H);
     layer.setInteractive({ useHandCursor: true });

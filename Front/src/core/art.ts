@@ -16,7 +16,7 @@ const CORE_ART: Record<string, string> = {
   mine: 'threat_mine.png',
   patrol: 'threat_patrol.png',
   chyron: 'ui_chyron_frame.png',
-  memeFrame: 'meme_frame_broadcast.png',
+  memeFrame: 'Memes/meme_frame_broadcast.png',
   charCommander: 'char_commander.png',
   charDealmaker: 'char_dealmaker.png',
   trump_right_idle_1: 'trump_right_idle_1.png',

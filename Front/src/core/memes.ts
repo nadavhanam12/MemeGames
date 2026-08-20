@@ -5,7 +5,7 @@
 import Phaser from 'phaser';
 import { hasArt } from './art';
 import { FONT_SANS } from './palette';
-import { recordMemeShown } from './memeUnlocks';
+import { getUnlockedTemplates, recordMemeShown } from './memeUnlocks';
 import DATA from '../config/memes.json';
 
 export interface MemeSlot {
@@ -83,10 +83,13 @@ interface MemeData {
 }
 
 export const MEMES = DATA as unknown as MemeData;
+if (import.meta.env.DEV) (window as any).MEMES = MEMES;
 
 export interface MemePick {
+  id: string;
   tpl: MemeTemplate;
   captions: string[];
+  isNew: boolean; // true the first time this template has ever fired
 }
 
 // Every meme shown during the current run, in order — the results screen
@@ -233,11 +236,12 @@ export function pickMeme(label: string, ctx?: MemeContext): MemePick {
 
   const v = weightedPick(eligible, ctx) ?? MEMES.fallback[0];
   lastTemplate = v.t;
+  const isNew = !getUnlockedTemplates().has(v.t);
   recordMemeShown(v.t);
   const captions = v.c.map(c => substituteTokens(c, ctx));
   memeLog.push({ t: v.t, c: captions });
   if (memeLog.length > 30) memeLog.shift();
-  return { tpl: MEMES.templates[v.t], captions };
+  return { id: v.t, tpl: MEMES.templates[v.t], captions, isNew };
 }
 
 /** Draws the picked meme (art or placeholder + captions) into `pop`, centered
@@ -275,7 +279,7 @@ export function renderMeme(
     const s = tpl.slots[i];
     const style: Phaser.Types.GameObjects.Text.TextStyle = {
       fontFamily: FONT_SANS,
-      fontSize: `${s.size ?? 13}px`,
+      fontSize: `${s.size ?? 17}px`,
       fontStyle: 'bold',
       color: s.stroke ? '#ffffff' : (s.color ?? '#1a1a1a'),
       align: 'center',

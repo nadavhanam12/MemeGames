@@ -1,14 +1,26 @@
 # Meme asset workflow (atlas-based, v2)
 
 The original "10 blank classic templates" brief is retired. Meme art is now
-generated as **2×2 character-variation atlases** — the generation-side rules live
-in `assets/raw/Meme/INSTRUCTIONS.md` and every approved atlas is documented in
-`assets/raw/Meme/MEME_CATALOG.md` (layout, cell contents, suggested triggers).
+generated as **2×2 character-variation atlases** — the generation-side rules are
+split into two files in `assets/raw/Meme/`:
+
+- `INSTRUCTIONS.md` — the **game-agnostic pipeline** (atlas format, composition
+  locking, text/symbol bans, normalization, versioning, QA). Reused unchanged
+  by every future MemeGames title.
+- `GAME_BRIEF.md` — the **per-game context** (game summary, gameplay-situation
+  palette, cast + likeness descriptions, approved style). Rewritten per game.
+- `MEME_SPEC_PACK.md` — **pre-written meme concepts** (format, tension, all
+  four cell scenarios, cast, caption zones locked upfront); the art chat
+  executes specs one at a time instead of inventing concepts. New batches are
+  authored per game.
+
+Every approved atlas is documented in `assets/raw/Meme/MEME_CATALOG.md`
+(layout, cell contents, suggested triggers).
 
 ## Generation (in the art chat)
 
-Follow `assets/raw/Meme/INSTRUCTIONS.md`. Summary of the contract the game
-relies on:
+Paste **both** `INSTRUCTIONS.md` and `GAME_BRIEF.md` into the art chat.
+Summary of the contract the game relies on:
 
 - One reference meme → one **2048×2048 opaque PNG**, a strict 2×2 grid of
   **1024×1024 cells** (four game-relevant character/situation variations).
@@ -24,11 +36,17 @@ relies on:
    If a sheet is letterboxed (black band at the bottom), measure the real
    content height and use it as the frame `h` for the bottom row.
 3. Add one template per cell in `src/config/memes.json` → `templates`
-   (`artKey` camelCase, `artFile` = `<frame name>.png`, `aspect` = h/w of the
-   frame, caption `slots`), then wire variants into `triggers` with captions.
-   No code changes needed — `src/core/art.ts` and `scripts/art.mjs` pick meme
-   art keys up from `memes.json` automatically.
+   (`artKey` camelCase, `artFile` = `Memes/<frame name>.png`, `aspect` = h/w of
+   the frame, caption `slots`), then wire variants into `triggers` with
+   captions. No code changes needed — `src/core/art.ts` and `scripts/art.mjs`
+   pick meme art keys up from `memes.json` automatically.
 4. Run `npm run art` (inside `Front/`) and reload the game.
+
+Processed meme art is written to `public/assets/Memes/`, kept separate from
+core game art in `public/assets/` — `scripts/art.mjs` routes any output
+filename starting with `meme_` there automatically (see `isMemeFile` in that
+script), so nothing extra is needed as long as new meme filenames keep that
+prefix.
 
 Slot geometry conventions used by existing templates (fractions of the rendered
 cell, origin at center):

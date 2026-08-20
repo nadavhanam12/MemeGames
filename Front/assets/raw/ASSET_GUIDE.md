@@ -1,4 +1,4 @@
-# Strait Shooter — Asset Guide
+# Hormuz Hold'em — Asset Guide
 
 ## Final assets
 

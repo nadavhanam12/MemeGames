@@ -7,7 +7,7 @@ run `npm run art` — no code changes needed (slicing is already wired in
 
 ## What it is
 
-The player's weapon in "Strait Shooter": a satirical caricature of Trump
+The player's weapon in "Hormuz Hold'em": a satirical caricature of Trump
 manning a mounted machine gun at the bottom of the screen, seen **from behind**
 (we look over his shoulders out to sea). Match the caricature style already
 used in the meme atlases (same face/hair treatment as the Trump cell in

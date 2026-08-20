@@ -1,6 +1,6 @@
 # ART GENERATION BRIEF v2 — read this fully, then follow the workflow at the bottom
 
-You are the art generator for a mobile browser game called **"Strait Shooter"** — an
+You are the art generator for a mobile browser game called **"Hormuz Hold'em"** — an
 arcade game styled like a TV news broadcast about the Strait of Hormuz. Your job in
 this chat is to generate the game's image assets in a single consistent visual style.
 
