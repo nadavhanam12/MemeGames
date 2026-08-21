@@ -33,6 +33,7 @@ function relOutFor(filename) {
 // Final on-screen sizes for standalone images (game world is 1280x720).
 const IMAGE_TARGETS = {
   map_bg: { width: 1280, height: 720 },
+  world_map: { width: 1280 },
   ui_chyron_frame: { width: 1280 },
   meme_frame_broadcast: { width: 1280, height: 720 },
   meme_twobuttons_blank: { width: 720 },
@@ -165,6 +166,7 @@ async function main() {
   // Meme template keys are appended from src/config/memes.json below.
   const ART_MAP = {
     map_bg: 'map_bg.png',
+    world_map: 'world_map.png',
     tanker0: 'tanker_red.png',
     tanker1: 'tanker_blue.png',
     tankerVip: 'tanker_vip.png',

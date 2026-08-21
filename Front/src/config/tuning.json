@@ -173,7 +173,7 @@
   "turret": {
     "x": 343,
     "y": 1173,
-    "bulletSpeed": 720,
+    "bulletSpeed": 1440,
     "fireInterval": 0.13,
     "lockRadius": 130,
     "bulletHitRadius": 30,

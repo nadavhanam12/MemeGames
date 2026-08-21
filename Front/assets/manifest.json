@@ -8,6 +8,7 @@
     "All frame coordinates are top-left origin, in source-atlas pixels."
   ],
   "received": [
+    "world_map.png",
     "map_bg.png",
     "tankers_atlas.png",
     "threats_atlas.png",
@@ -27,6 +28,18 @@
       ],
       "alpha": false,
       "use": "Main gameplay map background, scaled to the 1280x720 world",
+      "importFilter": "bilinear"
+    },
+    {
+      "name": "world_map",
+      "file": "world_map.png",
+      "kind": "image",
+      "size": [
+        2048,
+        1152
+      ],
+      "alpha": false,
+      "use": "Establishing world map for the Menu->Game intro zoom (IntroScene); zooms in on the Strait of Hormuz before cutting to gameplay",
       "importFilter": "bilinear"
     },
     {

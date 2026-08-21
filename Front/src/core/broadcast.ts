@@ -70,11 +70,29 @@ export function staticBlink(scene: Phaser.Scene, ms = 150, withSound = true): vo
   });
 }
 
+/** A world-space rect the static overlay should cover — defaults to the full
+ *  GAME_W×GAME_H frame, but a scene running its camera off the default
+ *  zoom/scroll (e.g. IntroScene's map zoom) must pass its current visible
+ *  world rect so the static actually covers the screen. */
+export interface StaticRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+const DEFAULT_RECT: StaticRect = { x: GAME_W / 2, y: GAME_H / 2, w: GAME_W, h: GAME_H };
+
 /** Outgoing half of the channel cut: a brief static shimmer → switch scenes.
  *  No white flash — just a soft camera-switch feel. ~200ms total; instant
  *  under reduced motion. The incoming scene should call broadcastReveal() in
  *  create() for the matching static-settle. */
 export function broadcastCut(scene: Phaser.Scene, go: () => void): void {
+  broadcastCutAt(scene, DEFAULT_RECT, go);
+}
+
+/** Same as broadcastCut, but sized/positioned to a specific world-space rect
+ *  instead of assuming the default full-canvas camera framing. */
+export function broadcastCutAt(scene: Phaser.Scene, rect: StaticRect, go: () => void): void {
   if (settings.reducedMotion) {
     go();
     return;
@@ -82,7 +100,7 @@ export function broadcastCut(scene: Phaser.Scene, go: () => void): void {
   ensureStatic(scene);
   sfx.staticBurst();
   const tile = scene.add
-    .tileSprite(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 'staticGen')
+    .tileSprite(rect.x, rect.y, rect.w, rect.h, 'staticGen')
     .setTileScale(3)
     .setDepth(CUT_DEPTH)
     .setAlpha(0);
@@ -98,10 +116,16 @@ export function broadcastCut(scene: Phaser.Scene, go: () => void): void {
 
 /** Incoming half: a static frame settling into the new "camera feed". */
 export function broadcastReveal(scene: Phaser.Scene): void {
+  broadcastRevealAt(scene, DEFAULT_RECT);
+}
+
+/** Same as broadcastReveal, but sized/positioned to a specific world-space
+ *  rect instead of assuming the default full-canvas camera framing. */
+export function broadcastRevealAt(scene: Phaser.Scene, rect: StaticRect): void {
   if (settings.reducedMotion) return;
   ensureStatic(scene);
   const tile = scene.add
-    .tileSprite(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 'staticGen')
+    .tileSprite(rect.x, rect.y, rect.w, rect.h, 'staticGen')
     .setTileScale(3)
     .setDepth(CUT_DEPTH)
     .setAlpha(0.55);

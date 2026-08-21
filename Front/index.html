@@ -28,15 +28,285 @@
         -webkit-user-select: none;
         user-select: none;
       }
-      #game {
+      #app-shell {
         width: 100%;
         height: 100%;
         height: 100dvh;
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+      }
+      #game {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
       }
       canvas { display: block; }
+
+      /* Desktop-only flanking panels — hidden by default (mobile/narrow),
+         shown once the window is wide enough that they don't crowd the
+         portrait canvas. Left = functional meme-collection grid, right =
+         preview of whichever meme was last clicked (ambient backdrop +
+         new-unlock toast when nothing is selected). */
+      .side-panel { display: none; height: 100%; box-sizing: border-box; position: relative; overflow: hidden; min-width: 0; }
+      @media (min-width: 1180px) {
+        /* #game no longer eats all leftover width — it's sized to exactly
+           what the portrait canvas needs (height-driven, 9:16), so the two
+           panels can grow to actually meet its edges instead of leaving a
+           dead black gap between the canvas and the cards. */
+        #game { flex: 0 0 auto; width: auto; aspect-ratio: 720 / 1280; }
+        .side-panel { display: block; flex: 1 1 0; }
+        #side-left { max-width: 460px; }
+        #side-right { max-width: 400px; }
+      }
+
+      .side-backdrop {
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(160deg, #0c1620 0%, #0e2a3a 45%, #123044 100%),
+          repeating-linear-gradient(-35deg, rgba(255, 243, 214, 0.05) 0px, rgba(255, 243, 214, 0.05) 2px, transparent 2px, transparent 64px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      .side-backdrop::before {
+        content: '';
+        position: absolute;
+        inset: -20%;
+        background:
+          radial-gradient(circle at 25% 20%, rgba(135, 202, 167, 0.22), transparent 45%),
+          radial-gradient(circle at 75% 80%, rgba(244, 185, 66, 0.20), transparent 45%);
+      }
+      .side-backdrop-mark {
+        position: relative;
+        transform: rotate(-90deg);
+        font-family: 'Anton', 'Arial Black', Impact, sans-serif;
+        font-size: 46px;
+        letter-spacing: 4px;
+        color: rgba(255, 243, 214, 0.14);
+        white-space: nowrap;
+        -webkit-text-stroke: 1px rgba(255, 243, 214, 0.1);
+      }
+      .side-toast {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: 28px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        background: rgba(23, 32, 42, 0.95);
+        border: 2px solid #F4B942;
+        border-radius: 12px;
+        opacity: 0;
+        transform: translateY(12px);
+        pointer-events: none;
+      }
+      .side-toast.show {
+        animation: side-toast-in-out 2.6s ease forwards;
+      }
+      .side-toast img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; flex: none; }
+      .side-toast-text {
+        font-family: 'Chakra Petch', 'Helvetica Neue', Arial, sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        color: #FFF3D6;
+      }
+      @keyframes side-toast-in-out {
+        0% { opacity: 0; transform: translateY(12px); }
+        10% { opacity: 1; transform: translateY(0); }
+        85% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(12px); }
+      }
+
+      .gallery-card {
+        position: absolute;
+        inset: 24px 20px;
+        background: rgba(23, 32, 42, 0.9);
+        border: 2px solid #2f3336;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .gallery-card-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 14px 16px 10px;
+        border-bottom: 2px solid #2f3336;
+        flex: none;
+      }
+      .gallery-card-title {
+        font-family: 'Anton', 'Arial Black', Impact, sans-serif;
+        font-size: 15px;
+        letter-spacing: 0.5px;
+        color: #F4B942;
+      }
+      .gallery-card-count {
+        font-family: 'Chakra Petch', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 12px;
+        color: #71767B;
+      }
+      .gallery-card-grid {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 88px 10px;
+        padding: 14px;
+      }
+      .gallery-tile {
+        position: relative;
+        aspect-ratio: 1 / 1;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #0e161e;
+        border: 2px solid #39424e;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .gallery-tile.unlocked { border-color: #F4B942; cursor: pointer; }
+      .gallery-tile.selected { border-color: #9B5DE5; box-shadow: 0 0 0 2px rgba(155, 93, 229, 0.6); }
+      .gallery-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .gallery-tile.locked img { filter: grayscale(1) brightness(0.4); }
+      .gallery-tile-label {
+        font-family: 'Chakra Petch', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 9px;
+        color: #71767B;
+        text-align: center;
+        padding: 4px;
+      }
+      .gallery-tile-badge {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        background: #35D07F;
+        color: #17202A;
+        font-family: 'Chakra Petch', 'Helvetica Neue', Arial, sans-serif;
+        font-weight: 700;
+        font-size: 8px;
+        letter-spacing: 0.5px;
+        padding: 2px 4px;
+        border-radius: 4px;
+        opacity: 0;
+      }
+      .gallery-tile-new .gallery-tile-badge { opacity: 1; }
+      .gallery-tile-new { animation: gallery-tile-glow 2.6s ease; }
+      @keyframes gallery-tile-glow {
+        0% { box-shadow: 0 0 0 0 rgba(244, 185, 66, 0.9); }
+        30% { box-shadow: 0 0 0 6px rgba(244, 185, 66, 0.35); }
+        100% { box-shadow: 0 0 0 0 rgba(244, 185, 66, 0); }
+      }
+
+      .preview-hint {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        text-align: center;
+        padding: 0 24px;
+        pointer-events: none;
+      }
+      .preview-hint-title {
+        font-family: 'Anton', 'Arial Black', Impact, sans-serif;
+        font-size: 15px;
+        letter-spacing: 0.5px;
+        color: rgba(255, 243, 214, 0.55);
+      }
+      .preview-hint-sub {
+        font-family: 'Chakra Petch', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 12px;
+        color: rgba(255, 243, 214, 0.35);
+      }
+      .preview-card {
+        position: absolute;
+        inset: 24px 20px;
+        background: rgba(23, 32, 42, 0.96);
+        border: 2px solid #2f3336;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 16px;
+        overflow-y: auto;
+      }
+      .preview-close {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 2px solid #39424e;
+        background: rgba(0, 0, 0, 0.4);
+        color: #FFF3D6;
+        font-family: 'Chakra Petch', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .preview-img {
+        max-width: 100%;
+        max-height: 42vh;
+        border-radius: 8px;
+        border: 4px solid #F4B942;
+        flex: none;
+      }
+      .preview-fallback {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #2a323b;
+        color: #9aa4ad;
+        font-family: 'Chakra Petch', 'Helvetica Neue', Arial, sans-serif;
+        border-radius: 8px;
+        flex: none;
+      }
+      .preview-share-title {
+        font-family: 'Chakra Petch', 'Helvetica Neue', Arial, sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+        color: #AAB4BD;
+      }
+      .preview-share-row {
+        display: flex;
+        gap: 14px;
+      }
+      .preview-share-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        background: transparent;
+      }
+      .preview-share-btn img { width: 100%; height: 100%; border-radius: 50%; display: block; }
+      .preview-download {
+        font-family: 'Anton', 'Arial Black', Impact, sans-serif;
+        font-size: 15px;
+        color: #17202A;
+        background: #35D07F;
+        border: 3px solid #17202A;
+        border-radius: 8px;
+        padding: 10px 24px;
+        cursor: pointer;
+      }
       /* Landscape blocker: touch devices only — desktop landscape windows stay playable */
       #rotate-overlay {
         display: none;
@@ -73,7 +343,11 @@
     </style>
   </head>
   <body>
-    <div id="game"></div>
+    <div id="app-shell">
+      <div id="side-left" class="side-panel"></div>
+      <div id="game"></div>
+      <div id="side-right" class="side-panel"></div>
+    </div>
     <div id="rotate-overlay">
       <div class="icon">📱</div>
       <div class="title">ROTATE YOUR DEVICE</div>

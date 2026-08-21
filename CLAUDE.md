@@ -91,23 +91,88 @@ scope). Working from a phased plan; status as of the last session:
      confirmed by forcing final positions and re-screenshotting clean. No
      real layout issues found on any screen.
 
-**To continue this work**: Phase 4 (and the whole portrait/feed-chrome
+- **Phase 5 (day-end curtain: manual step-through + collect screen) —
+  DONE.** The Phase 3 day-end sequence auto-played on timers; reworked into
+  a player-paced flow. `UIScene.onDayEnd`/`requestNextDay` no longer call
+  `staticBlink` (that channel-cut flash is gone from this sequence — it's
+  still used elsewhere, e.g. `GalleryScene`'s zoom transitions, so
+  `broadcast.ts`'s `staticBlink` itself wasn't touched). All curtain/panel
+  scroll tweens (`showFeedCurtain`'s slot-to-slot scroll, `onDayBreak`'s
+  exit scroll) switched from `EASE.snap`/`EASE.pop` to `EASE.inOut`
+  (`Sine.easeInOut`, symmetric ease in+out, already defined in `juice.ts`).
+  `showFeedCurtain` (`UIScene.ts`) is now always exactly 2 slots — snapshot,
+  then collect — after the old "Trending in Markets"/"Suggested for you"
+  filler slots were cut per Nadav's follow-up request; the collect slot
+  always shows (previously gated on `newMemesUnlocked.length`), rendering
+  either the collect flow or a plain "no new memes today" + CONTINUE screen
+  when there's nothing to collect. `createTrendingPill`/`createSuggestedCard`
+  (`feedChrome.ts`) are unused by the day-end curtain now but still power
+  other call sites (`buildDaySummaryPanel`'s suggested card, the danger
+  pill), so they weren't removed. Each slot holds until the player taps a
+  CONTINUE pill or swipes up (new `curtainIndex`/`curtainSlotCount`/
+  `curtainReady`/`curtainBaseY`/`curtainAdvance` fields on `UIScene`; the
+  swipe handlers `onSwipePointerDown/Move/Up` now branch between the
+  curtain and the summary panel). The collect slot shows thumbnails of
+  every meme unlocked that day and a gold COLLECT button; tapping it flies
+  each thumbnail into a running tally (staggered tween, confetti on the
+  last one), then auto-advances — no swipe-skip on that slot, so the
+  reward can't be scrolled past. Per Nadav's call, this collect screen is
+  additive: the summary panel's existing inline "new memes unlocked"
+  section (`buildUnlocksSection`) still shows the same list too, on
+  purpose (redundant by design, not an oversight).
+  **The summary panel itself now also enters with the same scroll motion as
+  every slot before it**, instead of just being uncovered by the departing
+  curtain: `enterDaySummary` stages it one `GAME_H` below its resting
+  `summaryPanelFinalY` right after building (non-reducedMotion path only),
+  and the curtain's final `curtainAdvance` (in `showFeedCurtain`) fires a
+  second tween — same 420ms `EASE.inOut` as the curtain's own scroll — that
+  animates the panel back up to `summaryPanelFinalY` in sync with the
+  curtain scrolling away, so the two read as one continuous strip rather
+  than a wipe-reveal. `revealDaySummary` now force-snaps `panel.y =
+  summaryPanelFinalY` as a safety net, since the reducedMotion path and the
+  snapshot-timeout/error fallback (both skip the curtain, and therefore
+  this new tween, entirely) still need the panel to land at the right spot.
+  The exit side (`onDayBreak`'s scroll-up-and-destroy) already matched this
+  motion from earlier in Phase 5 — no change needed there.
+  **The summary panel's MEMES card (`buildMemesCard`) now marks new
+  unlocks.** It already only ever showed that day's fired templates
+  (`s.memesToday` = `getDayFired()`, deduped, first-fired order) — no
+  change needed there. Added a small gold "NEW" badge (top-right corner of
+  the thumbnail) for any id also in `s.newMemesUnlocked`, so a repeat-fire
+  of an already-unlocked meme reads differently from a fresh unlock within
+  the same row. `buildMemesCard` takes a new `newIds: string[]` param.
+
+**To continue this work**: Phase 5 (and the whole portrait/feed-chrome
 pivot) is done — no more phases queued. Pick up wherever Nadav points next.
 Dev server quirk worth keeping in mind for any future UI verification in
 this browser pane — the sandboxed/headless preview pane throttles Phaser's
-tween/timer loop heavily while backgrounded (`document.hidden === true`),
-which can look like broken layout (elements/positions stuck mid-animation,
-or alpha stuck at 0) when it's actually just paused timers;
-`scene.tweens.getTweens()` will report `state`/`progress` as already
-complete without the property having actually been applied, so
-`t.complete()` does NOT reliably force it — instead read the tween's
-intended end value from your own code and assign it to the object directly
-(e.g. `container.y = finalY; rect.alpha = 1;`) before trusting a
-screenshot. Also: when driving scenes directly via `window.phaserGame.
-scene.start(...)` for testing, stop every other scene first
-(`scene.stop(key)` for each of Boot/Menu/Game/UI/Results/Leaderboard/
+tween/timer loop heavily while backgrounded (`document.hidden === true`
+even when the tab is frontmost — this reads as a permanent property of the
+pane in this environment, not something togglable), which can look like
+broken layout (elements/positions stuck mid-animation, or alpha stuck at
+0, or chained `delayedCall`s inside tween `onComplete`s simply never
+firing) when it's actually just paused timers; `scene.tweens.getTweens()`
+will report `state`/`progress` as already complete without the property
+having actually been applied, so `t.complete()` does NOT reliably force it
+— instead read the tween's intended end value from your own code and
+assign it to the object directly (e.g. `container.y = finalY; rect.alpha =
+1;`) before trusting a screenshot. Also: when driving scenes directly via
+`window.phaserGame.scene.start(...)` for testing, stop every other scene
+first (`scene.stop(key)` for each of Boot/Menu/Game/UI/Results/Leaderboard/
 Gallery) — scenes render in registration order regardless of start order,
-so a stale scene can visually stack on top of the one you meant to inspect.
+so a stale scene can visually stack on top of the one you meant to
+inspect; also, if `GameScene` is left running, its own day-system logic
+(e.g. `startDay` firing `EV.DAY_START` on create) can race a UIScene test
+harness and tear down state (e.g. `summaryPanel`) out from under you — for
+a UI-only test, stop `Game` too and drive `UIScene`'s bus handlers
+directly (`ui.onDayEnd(mockSummary)` etc.), not through GameScene.
+`vite.config.ts` runs the dev server on `https` (via `@vitejs/plugin-basic-
+ssl`'s self-signed cert) — this browser pane's `navigate` refuses that
+cert outright with no click-through, so it can't open `localhost:5173` at
+all as configured; verifying UI changes in this pane requires temporarily
+flipping `server.https` to `false` in `vite.config.ts`, restarting the
+dev-server process, verifying, then reverting the config (never leave it
+reverted-to-http — Nadav's own long-running dev server expects https).
 
 ## Repo layout
 

@@ -11,6 +11,7 @@ export const PAL = {
   ink: 0x17202a,
   purple: 0x9b5de5,
   black: 0x000000,
+  white: 0xffffff,
   muted: 0x71767b
 } as const;
 
@@ -26,6 +27,7 @@ export const HEX = {
   ink: '#17202A',
   purple: '#9B5DE5',
   black: '#000000',
+  white: '#FFFFFF',
   muted: '#71767B'
 } as const;
 

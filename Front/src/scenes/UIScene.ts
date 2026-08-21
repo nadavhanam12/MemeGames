@@ -2,16 +2,16 @@ import Phaser from 'phaser';
 import { COMMENTS, ENGAGEMENT, FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEADER, HEX, PAL, VIEW } from '../core/palette';
 import { settings } from '../core/settings';
 import { sfx } from '../core/sfx';
-import { MemeContext, MEMES, pickMeme, renderMeme } from '../core/memes';
-import { captureAndShare, captureAndShareTo } from '../core/share';
+import { MemeContext, MEMES, pickMeme } from '../core/memes';
+import { captureAndShare, captureAndShareTo, captureArea } from '../core/share';
 import { addExportButtonRow } from '../core/shareButtons';
 import { hasArt } from '../core/art';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
 import { EASE, confetti, countTo, floatText, popIn, pressPulse } from '../core/juice';
-import { staticBlink } from '../core/broadcast';
 import { createCommentRow, createEngagementBar, createPostHeader, createSuggestedCard, createTrendingPill } from '../core/feedChrome';
 import { ENGAGEMENT_ICON_KEYS } from '../core/engagementIcons';
 import { DayMission, DaySummary, EV, SessionStats, bus } from '../core/state';
+import { dayPerfScore, repercussionHeadline, repercussionSubhead } from '../core/repercussions';
 import { TUNING } from '../config/tuning';
 import { registerLayout } from '../dev/layout';
 import { devState } from '../dev/state';
@@ -108,9 +108,23 @@ export class UIScene extends Phaser.Scene {
   private mission: DayMission | null = null;
   private hourText!: Phaser.GameObjects.Text;
   private summaryPanel?: Phaser.GameObjects.Container;
-  private summaryBackdrop?: Phaser.GameObjects.Rectangle;
   private summaryCashText?: Phaser.GameObjects.Text;
   private summaryNextDay = 2;
+  // day-end feed-scroll curtain: a frozen gameplay snapshot + 1-2 filler
+  // "feed" cards that scroll up and off, revealing the (already fully built,
+  // already-resting) day-summary panel underneath — see enterDaySummary().
+  // token guards against a stale async snapshot capture landing after the
+  // day has already advanced again.
+  private feedCurtain?: Phaser.GameObjects.Container;
+  private dayEndToken = 0;
+  // curtain slot the player is currently viewing, and whether it accepts a
+  // swipe-up/CONTINUE input right now (false mid-transition, and false on
+  // the collect slot until its own animation finishes and auto-advances)
+  private curtainIndex = 0;
+  private curtainSlotCount = 0;
+  private curtainReady = false;
+  private curtainBaseY = 0;
+  private curtainAdvance?: () => void;
   // feed-scroll swipe-to-dismiss on the day summary: finalY is the panel's
   // resting position (drag offsets it from there), ready gates swipes until
   // the entrance beat (stamp + slide-in) has actually finished
@@ -130,8 +144,6 @@ export class UIScene extends Phaser.Scene {
   private dangerVignette?: Phaser.GameObjects.Image;
   private upgradeLevels: Record<string, number> = { air: 0, hull: 0, gold: 0 };
   private upgradeButtons: Record<string, Phaser.GameObjects.Container> = {};
-  private memePopup?: Phaser.GameObjects.Container;
-  private memeGen = 0;
   private lastMemeAt = -Infinity;
 
   // engagement bar (reply=day, retweet=combo, heart=cash, bar-chart=oil
@@ -602,8 +614,10 @@ export class UIScene extends Phaser.Scene {
     const group = this.add.container(0, 0).setDepth(1001);
     this.missionText = this.add.text(HEADER.x + 16, HEADER.h + 10, 'day 1 mission: incoming orders…', {
       fontFamily: FONT_SANS,
-      fontSize: '14px',
-      color: HEX.muted,
+      fontSize: '26px',
+      color: HEX.white,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      padding: { x: 8, y: 4 },
       wordWrap: { width: GAME_W - 32 }
     });
     group.add(this.missionText);
@@ -614,7 +628,7 @@ export class UIScene extends Phaser.Scene {
     const m = this.mission;
     if (!m) return;
     let suffix = '';
-    let color: string = HEX.muted;
+    let color: string = HEX.white;
     if (m.done) {
       suffix = ' ✓';
       color = HEX.green;
@@ -642,10 +656,12 @@ export class UIScene extends Phaser.Scene {
 
   private onDayStart(day: number, missionText: string, reveals: Array<'air' | 'hull' | 'gold'>): void {
     // safety: the recap/shop screen never outlives the break
+    this.dayEndToken++; // invalidate any in-flight snapshot capture/curtain
     this.summaryPanel?.destroy();
     this.summaryPanel = undefined;
-    this.summaryBackdrop?.destroy();
-    this.summaryBackdrop = undefined;
+    this.feedCurtain?.destroy();
+    this.feedCurtain = undefined;
+    this.curtainReady = false;
     this.upgradeButtons = {};
     this.registry.set('ui-modal', false);
     this.dayShareStart = this.shareCount;
@@ -657,7 +673,6 @@ export class UIScene extends Phaser.Scene {
   }
 
   private onDayEnd(s: DaySummary): void {
-    staticBlink(this, 130); // channel-cut into the recap segment
     const mission = s.missionDone ? `MISSION COMPLETE +$${s.rewardCredits}` : 'MISSION FAILED';
     const delta = s.priceDelta >= 0 ? `+$${s.priceDelta}` : `−$${Math.abs(s.priceDelta)}`;
     this.onHeadline(
@@ -670,65 +685,286 @@ export class UIScene extends Phaser.Scene {
     // performance-based roll for how much the share count climbs during the
     // day that follows — a clean day (mission done, nothing lost) earns the
     // top of the range, a rough one the bottom
-    const safeRatio = s.safe + s.lost > 0 ? s.safe / (s.safe + s.lost) : 1;
-    const performance = (s.missionDone ? 0.5 : 0) + safeRatio * 0.5;
+    const performance = dayPerfScore(s.missionDone, s.safe, s.lost);
     const { shareGrowthMin, shareGrowthMax } = TUNING.social;
     this.dayShareTarget = Math.round(shareGrowthMin + (shareGrowthMax - shareGrowthMin) * performance);
-    this.showDayEndedStamp(s);
+    this.enterDaySummary(s);
   }
 
-  /** First beat of the day-end sequence: a brief "DAY X ENDED" stamp over the
-   *  dimmed feed before the full recap scrolls up from below — the pause
-   *  before a feed post's content finishes loading in. Skipped under
-   *  reducedMotion, which jumps straight to the full panel. */
-  private showDayEndedStamp(s: DaySummary): void {
-    this.summaryPanel?.destroy();
-    this.summaryBackdrop?.destroy();
-    this.summaryPanelReady = false;
-    const backdrop = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0.7).setDepth(1699);
-    this.summaryBackdrop = backdrop;
-    this.registry.set('ui-modal', true);
+  /** Day-end entrance: the recap/shop panel is built immediately, full-bleed,
+   *  already resting in place — but hidden behind a "feed curtain" (a frozen
+   *  snapshot of the just-ended gameplay frame, then 1-2 filler feed cards,
+   *  plus a dedicated collect card on a day with new unlocks) that the player
+   *  steps through one screen at a time — CONTINUE/COLLECT button or swipe-up
+   *  — the way flicking past posts on a social feed reveals the next one
+   *  underneath. Skipped under reducedMotion, which reveals the panel
+   *  immediately. */
+  private enterDaySummary(s: DaySummary): void {
+    this.dayEndToken++;
+    const token = this.dayEndToken;
+    this.feedCurtain?.destroy();
+    this.feedCurtain = undefined;
+    this.buildDaySummaryPanel(s);
 
     if (settings.reducedMotion) {
-      this.showDaySummaryPanel(s, backdrop);
+      this.revealDaySummary();
       return;
     }
 
-    const stamp = this.add.container(GAME_W / 2, GAME_H / 2).setDepth(1700).setAlpha(0).setScale(0.9);
-    stamp.add(
-      this.add
-        .text(0, -18, `DAY ${s.day}`, { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.muted })
-        .setOrigin(0.5)
-    );
-    stamp.add(
-      this.add
-        .text(0, 24, 'ENDED', { fontFamily: FONT_DISPLAY, fontSize: '46px', color: HEX.gold })
-        .setOrigin(0.5)
-    );
+    // stage the panel one screen-height below its resting position — the
+    // final curtain transition scrolls it up into place in sync with the
+    // curtain scrolling away, so it enters with the same continuous
+    // scroll-up motion as every slot before it, not an instant reveal
+    if (this.summaryPanel) this.summaryPanel.y = this.summaryPanelFinalY + GAME_H;
 
-    backdrop.setAlpha(0);
+    // captureArea's callback fires on "the next render pass" — if the tab is
+    // backgrounded right as the day ends (locked phone, switched tabs) that
+    // pass may not come for a long time, so race it against a real (non-
+    // Phaser-timer, since the scene clock itself can be paused while hidden)
+    // setTimeout — never leave the player stuck on a frozen curtain.
+    const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 1500));
+    Promise.race([captureArea(this.game, 0, 0, GAME_W, GAME_H), timeout])
+      .then(canvas => {
+        if (token !== this.dayEndToken) return; // day already advanced/restarted
+        if (canvas) this.showFeedCurtain(s, canvas, token);
+        else this.revealDaySummary(); // snapshot timed out — reveal without the curtain
+      })
+      .catch(() => {
+        if (token === this.dayEndToken) this.revealDaySummary(); // fail open
+      });
+  }
+
+  /** Builds the curtain — snapshot+stamp, two filler feed cards, and (only on
+   *  a day with new unlocks) a collect card — and wires a CONTINUE/COLLECT
+   *  button plus a swipe-up gesture on each slot so the player advances one
+   *  screen at a time instead of it auto-playing. The final advance scrolls
+   *  the whole curtain off, revealing the already-resting summary panel
+   *  underneath. */
+  private showFeedCurtain(s: DaySummary, snapCanvas: HTMLCanvasElement, token: number): void {
+    if (token !== this.dayEndToken) return;
+    const textureKey = `day-end-snap-${token}`;
+    if (this.textures.exists(textureKey)) this.textures.remove(textureKey);
+    this.textures.addCanvas(textureKey, snapCanvas);
+
+    const curtain = this.add.container(0, 0).setDepth(2600);
+    this.feedCurtain = curtain;
+    const slotY = (i: number) => i * GAME_H + GAME_H / 2;
+    const collectIdx = 1;
+    this.curtainSlotCount = 2;
+    this.curtainIndex = 0;
+    this.curtainReady = false;
+    this.curtainBaseY = 0;
+
+    // slot 0 — the frozen gameplay frame, with a brief "DAY X ENDED" stamp
+    const snapImg = this.add.image(GAME_W / 2, slotY(0), textureKey).setDisplaySize(GAME_W, GAME_H);
+    const stamp = this.add.container(GAME_W / 2, slotY(0)).setAlpha(0).setScale(0.9);
+    stamp.add(this.add.text(0, -18, `DAY ${s.day}`, { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.muted }).setOrigin(0.5));
+    stamp.add(this.add.text(0, 24, 'ENDED', { fontFamily: FONT_DISPLAY, fontSize: '46px', color: HEX.gold }).setOrigin(0.5));
+    curtain.add([snapImg, stamp]);
+
+    // reusable pill button, faded in once its slot is the active one
+    const ctaBtn = (i: number, label: string, gold: boolean, onTap: () => void): Phaser.GameObjects.Container => {
+      const btn = this.add.container(GAME_W / 2, slotY(i) + GAME_H / 2 - 90).setAlpha(0);
+      const bg = this.add.graphics();
+      bg.fillStyle(PAL.black, 1);
+      bg.fillRoundedRect(-115, -27, 230, 54, 15);
+      bg.lineStyle(2, gold ? PAL.gold : DIVIDER, 1);
+      bg.strokeRoundedRect(-115, -27, 230, 54, 15);
+      const txt = this.add
+        .text(0, 0, label, { fontFamily: FONT_DISPLAY, fontSize: '18px', color: gold ? HEX.gold : HEX.cream })
+        .setOrigin(0.5);
+      btn.add([bg, txt]);
+      btn.setSize(230, 54);
+      btn.setInteractive({ useHandCursor: true });
+      btn.on('pointerover', () => this.tweens.add({ targets: btn, scale: 1.05, duration: 100 }));
+      btn.on('pointerout', () => this.tweens.add({ targets: btn, scale: 1, duration: 100 }));
+      btn.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+        ev.stopPropagation();
+        onTap();
+      });
+      curtain.add(btn);
+      return btn;
+    };
+    const swipeHint = (i: number) => {
+      curtain.add(
+        this.add
+          .text(GAME_W / 2, slotY(i) + GAME_H / 2 - 44, 'or swipe up ↑', { fontFamily: FONT_SANS, fontSize: '13px', color: '#8B98A5' })
+          .setOrigin(0.5)
+      );
+    };
+    const continueBtn0 = ctaBtn(0, 'CONTINUE', false, () => this.curtainReady && this.curtainAdvance?.());
+    swipeHint(0);
+
+    // slot 1 (always shown) — thumbnails of every meme unlocked today, flown
+    // one at a time into a running tally on COLLECT; on a day with nothing
+    // unlocked it's a plain "no new memes today" screen with a CONTINUE
+    // button instead (still a beat the player steps through, just nothing to collect)
+    let runCollect: (() => void) | undefined;
+    const hasUnlocks = s.newMemesUnlocked.length > 0;
+    const fillerBg1 = this.add.rectangle(GAME_W / 2, slotY(1), GAME_W, GAME_H, PAL.ink, 1);
+    curtain.add(fillerBg1);
+    if (hasUnlocks) {
+      const collectLabel = this.add
+        .text(GAME_W / 2, slotY(1) - 190, '🎉 NEW MEMES UNLOCKED', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.gold })
+        .setOrigin(0.5);
+      curtain.add(collectLabel);
+
+      const shown = s.newMemesUnlocked.slice(0, 6);
+      const cols = Math.min(shown.length, 3) || 1;
+      const cellW = 96;
+      const cellH = 96;
+      const gap = 14;
+      const rowW = cols * cellW + (cols - 1) * gap;
+      const startX = GAME_W / 2 - rowW / 2 + cellW / 2;
+      const startY = slotY(1) - 120;
+      const cards: Phaser.GameObjects.Container[] = shown.map((id, i) => {
+        const tpl = MEMES.templates[id];
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const c = this.add.container(startX + col * (cellW + gap), startY + row * (cellH + gap));
+        c.add(this.add.rectangle(0, 0, cellW, cellH, PAL.ink).setStrokeStyle(3, PAL.gold));
+        if (tpl && hasArt(this, tpl.artKey)) {
+          c.add(this.add.image(0, 0, tpl.artKey).setDisplaySize(cellW - 8, cellH - 8));
+        } else {
+          c.add(
+            this.add
+              .text(0, 0, tpl?.label ?? id, {
+                fontFamily: FONT_SANS,
+                fontSize: '11px',
+                color: '#AAB4BD',
+                align: 'center',
+                wordWrap: { width: cellW - 12 }
+              })
+              .setOrigin(0.5)
+          );
+        }
+        curtain.add(c);
+        return c;
+      });
+      const trayY = startY + Math.ceil(shown.length / cols) * (cellH + gap) + 34;
+      const trayText = this.add
+        .text(GAME_W / 2, trayY, `📥 0/${shown.length} collected`, { fontFamily: FONT_DISPLAY, fontSize: '18px', color: HEX.cream })
+        .setOrigin(0.5);
+      curtain.add(trayText);
+      if (s.newMemesUnlocked.length > shown.length) {
+        curtain.add(
+          this.add
+            .text(GAME_W / 2, trayY + 26, `+${s.newMemesUnlocked.length - shown.length} more`, { fontFamily: FONT_SANS, fontSize: '13px', color: HEX.muted })
+            .setOrigin(0.5)
+        );
+      }
+
+      const collectBtn = ctaBtn(1, 'COLLECT', true, () => runCollect?.());
+      this.tweens.add({ targets: collectBtn, alpha: 1, duration: 220, delay: 200 });
+
+      runCollect = () => {
+        collectBtn.disableInteractive();
+        pressPulse(this, collectBtn);
+        sfx.tap();
+        this.tweens.add({ targets: collectBtn, alpha: 0, duration: 150 });
+        let collected = 0;
+        cards.forEach((c, i) => {
+          this.time.delayedCall(i * 90, () => {
+            if (this.feedCurtain !== curtain) return;
+            this.tweens.add({
+              targets: c,
+              x: GAME_W / 2,
+              y: trayY,
+              scale: 0.15,
+              alpha: 0,
+              duration: 320,
+              ease: EASE.inOut,
+              onComplete: () => {
+                collected++;
+                trayText.setText(`📥 ${collected}/${shown.length} collected`);
+                pressPulse(this, trayText, 1.15);
+                if (collected === shown.length) {
+                  confetti(this, GAME_W / 2, trayY, 16);
+                  this.time.delayedCall(350, () => this.curtainAdvance?.());
+                }
+              }
+            });
+          });
+        });
+      };
+    } else {
+      curtain.add(
+        this.add
+          .text(GAME_W / 2, slotY(1) - 30, 'no new memes today', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.muted })
+          .setOrigin(0.5)
+      );
+      const continueBtn1 = ctaBtn(1, 'CONTINUE', false, () => this.curtainReady && this.curtainAdvance?.());
+      this.tweens.add({ targets: continueBtn1, alpha: 1, duration: 220, delay: 200 });
+      swipeHint(1);
+    }
+
     sfx.tap();
-    this.tweens.add({ targets: backdrop, alpha: 0.7, duration: 220 });
+
+    // scroll from the current slot to slot i, cubic/sine ease-in-out both ways
+    const goToSlot = (i: number, onDone: () => void) => {
+      if (this.feedCurtain !== curtain) return; // superseded mid-sequence
+      this.tweens.add({ targets: curtain, y: -GAME_H * i, duration: 420, ease: EASE.inOut, onComplete: onDone });
+    };
+    const finish = () => {
+      curtain.destroy();
+      this.textures.remove(textureKey);
+      if (this.feedCurtain === curtain) this.feedCurtain = undefined;
+      this.revealDaySummary();
+    };
+    const enterSlot = (i: number) => {
+      this.curtainIndex = i;
+      this.curtainBaseY = -GAME_H * i;
+      const isCollect = i === collectIdx && hasUnlocks;
+      // the collect slot only advances once its own animation finishes —
+      // swipe-up is disabled there so the reward can't be scrolled past
+      this.curtainReady = !isCollect;
+      this.curtainAdvance = () => {
+        this.curtainReady = false;
+        const isLast = i + 1 >= this.curtainSlotCount;
+        // last transition: scroll the summary panel up into place at the same
+        // time the curtain scrolls away, so the two read as one continuous strip
+        if (isLast && this.summaryPanel) {
+          this.tweens.add({ targets: this.summaryPanel, y: this.summaryPanelFinalY, duration: 420, ease: EASE.inOut });
+        }
+        goToSlot(i + 1, () => (isLast ? finish() : enterSlot(i + 1)));
+      };
+      // slot 0's CONTINUE fades in here; slot 1's own button (COLLECT or its
+      // no-unlocks CONTINUE) already fades itself in at build time
+      if (i === 0) this.tweens.add({ targets: continueBtn0, alpha: 1, duration: 220 });
+    };
+
+    // slot 0's stamp plays first; its CONTINUE button appears once it settles
     this.tweens.add({
       targets: stamp,
       alpha: 1,
       scale: 1,
       duration: 220,
       ease: EASE.pop,
-      onComplete: () => {
-        this.time.delayedCall(500, () => {
-          if (this.summaryBackdrop !== backdrop) return; // dismissed mid-beat
-          this.tweens.add({
-            targets: stamp,
-            alpha: 0,
-            y: stamp.y - 40,
-            duration: 220,
-            onComplete: () => stamp.destroy()
-          });
-          this.showDaySummaryPanel(s, backdrop);
-        });
-      }
+      onComplete: () => this.time.delayedCall(300, () => this.feedCurtain === curtain && enterSlot(0))
     });
+  }
+
+  /** Reveals the summary panel: fanfare, unlock confetti, unlocks input
+   *  (button + swipe-to-dismiss), and — under full autoplay — schedules the
+   *  auto-advance. Shared by the reducedMotion fast path, the snapshot-
+   *  timeout fallback (both skip the curtain entirely), and the end of the
+   *  feed-curtain scroll sequence (where the panel's own scroll-in tween
+   *  has already landed it at rest) — the explicit snap below is a safety
+   *  net for the first two paths, where no entrance tween ever ran. */
+  private revealDaySummary(): void {
+    const panel = this.summaryPanel;
+    if (!panel) return;
+    panel.y = this.summaryPanelFinalY;
+    this.summaryPanelReady = true;
+    sfx.fanfare();
+    if (panel.getData('newUnlocks')) confetti(this, GAME_W / 2, GAME_H / 2 - 60, 20);
+    if (import.meta.env.DEV && devState.autoPlay === 'full') {
+      this.time.delayedCall(500 / devState.speedMultiplier, () => {
+        if (this.summaryPanel !== panel) return; // already advanced elsewhere
+        this.devAutoSpendCredits();
+        this.requestNextDay();
+      });
+    }
   }
 
   /** New-unlocks block folded into the top of the day-summary stack: a stack of
@@ -910,7 +1146,8 @@ export class UIScene extends Phaser.Scene {
     parent: Phaser.GameObjects.Container,
     y: number,
     width: number,
-    todayIds: string[]
+    todayIds: string[],
+    newIds: string[]
   ): number {
     const shown = todayIds.filter(id => MEMES.templates[id]).slice(0, 8);
     const gap = 12;
@@ -949,6 +1186,18 @@ export class UIScene extends Phaser.Scene {
           thumb.add(this.add.rectangle(0, 0, w, thumbH, 0x39424e));
         }
         thumb.add(this.add.rectangle(0, 0, w, thumbH).setStrokeStyle(2, PAL.gold));
+        if (newIds.includes(id)) {
+          const badge = this.add.container(w / 2, -thumbH / 2);
+          const badgeW = 34;
+          const badgeH = 16;
+          badge.add(this.add.rectangle(0, 0, badgeW, badgeH, PAL.gold));
+          badge.add(
+            this.add
+              .text(0, 0, 'NEW', { fontFamily: FONT_SANS, fontSize: '10px', fontStyle: 'bold', color: '#1A2027' })
+              .setOrigin(0.5)
+          );
+          thumb.add(badge);
+        }
         thumb.setSize(w, thumbH);
         thumb.setInteractive({ useHandCursor: true });
         thumb.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
@@ -980,31 +1229,66 @@ export class UIScene extends Phaser.Scene {
     return h;
   }
 
-  /** Frozen-world recap + shop screen, covering 80% of the game window; the only
-   *  time upgrades are purchasable. Waits for the player to click NEXT DAY. */
-  private showDaySummaryPanel(s: DaySummary, existingBackdrop?: Phaser.GameObjects.Rectangle): void {
+  /** Frozen-world recap + shop screen — the next full-screen "post" in the
+   *  feed, built and settled in place immediately (no entrance tween of its
+   *  own; see enterDaySummary/showFeedCurtain for how it's revealed). The
+   *  only time upgrades are purchasable. Waits for the player to click NEXT
+   *  DAY (or swipe up) once revealed. */
+  private buildDaySummaryPanel(s: DaySummary): void {
     this.summaryPanel?.destroy();
-    if (this.summaryBackdrop && this.summaryBackdrop !== existingBackdrop) this.summaryBackdrop.destroy();
     this.upgradeButtons = {};
     this.summaryNextDay = s.day + 1;
-    const W = GAME_W * 0.8;
-    const H = GAME_H * 0.8;
-    const backdrop = existingBackdrop ?? this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0.7).setDepth(1699);
-    this.summaryBackdrop = backdrop;
+    const W = GAME_W;
+    const H = GAME_H;
     const panel = this.add.container(GAME_W / 2, GAME_H / 2).setDepth(1700);
+    panel.setData('newUnlocks', s.newMemesUnlocked.length > 0);
     this.summaryPanel = panel;
     this.registry.set('ui-modal', true);
-    const bg = this.add.rectangle(0, 0, W, H, PAL.black, 0.97).setStrokeStyle(2, DIVIDER);
+    // fully opaque — this bg is now the only thing standing between the
+    // panel and the live HUD underneath (no dim backdrop layer any more)
+    const bg = this.add.rectangle(0, 0, W, H, PAL.black, 1).setStrokeStyle(2, DIVIDER);
     panel.add(bg);
     let y = -H / 2 + 20;
+    const cardW = W - 80;
     panel.add(
       this.add
-        .text(0, y + 24, `DAY ${s.day} COMPLETE`, { fontFamily: FONT_DISPLAY, fontSize: '32px', color: HEX.gold })
-        .setOrigin(0.5)
+        .text(0, y, `DAY ${s.day} COMPLETE`, { fontFamily: FONT_SANS, fontSize: '13px', fontStyle: 'bold', color: HEX.muted })
+        .setOrigin(0.5, 0)
     );
-    y += 56;
+    y += 20;
+    // "global repercussions" — a big bizarre/tabloid headline picked from
+    // this day's price swing + how well it went, real numbers underneath
+    const perf = dayPerfScore(s.missionDone, s.safe, s.lost);
+    const headlineTxt = this.add
+      .text(0, y, repercussionHeadline(s.priceDelta, perf), {
+        fontFamily: FONT_DISPLAY,
+        fontSize: '26px',
+        color: HEX.gold,
+        align: 'center',
+        wordWrap: { width: cardW }
+      })
+      .setOrigin(0.5, 0);
+    panel.add(headlineTxt);
+    y += headlineTxt.height + 8;
+    panel.add(
+      this.add
+        .text(
+          0,
+          y,
+          repercussionSubhead({
+            label: `DAY ${s.day}`,
+            price: s.price,
+            priceDelta: s.priceDelta,
+            priceBefore: s.price - s.priceDelta,
+            safe: s.safe,
+            lost: s.lost
+          }),
+          { fontFamily: FONT_SANS, fontSize: '13px', color: '#AAB4BD' }
+        )
+        .setOrigin(0.5, 0)
+    );
+    y += 30;
 
-    const cardW = W - 80;
     // new unlocks — folded into the top of the stack instead of a separate popup
     if (s.newMemesUnlocked.length) {
       y += this.buildUnlocksSection(panel, y, cardW, s.newMemesUnlocked);
@@ -1026,7 +1310,7 @@ export class UIScene extends Phaser.Scene {
     y += 24;
 
     // section 2 — memes: every template that fired today + overall collection tally
-    y += this.buildMemesCard(panel, y, cardW, s.memesToday);
+    y += this.buildMemesCard(panel, y, cardW, s.memesToday, s.newMemesUnlocked);
     y += 24;
 
     // section 3 — intel (warnings), only when there's something to show
@@ -1070,10 +1354,12 @@ export class UIScene extends Phaser.Scene {
     );
 
     const nextBtnY = upgradeCardsY + upgradeCardH / 2 + 40;
-    // size the backdrop to however far the content actually ran (+ the swipe
-    // hint under the button) instead of a fixed box — a short day's recap
-    // shouldn't leave a dead gap before the button — then re-center on screen
-    const bgH = Math.max(500, nextBtnY + 29 + 44 - (-H / 2));
+    // size the panel's own opaque background to however far the content
+    // actually ran (+ the swipe hint under the button), floored at a full
+    // screen — this panel is the next full-bleed "post" replacing the game
+    // screen entirely, so it must never leave a gap exposing the live HUD
+    // underneath, even on a short day's recap — then re-center on screen
+    const bgH = Math.max(GAME_H, nextBtnY + 29 + 44 - (-H / 2));
     bg.setSize(W, bgH);
     bg.setPosition(0, -H / 2 + bgH / 2);
     panel.setY(GAME_H / 2 - bg.y);
@@ -1096,6 +1382,7 @@ export class UIScene extends Phaser.Scene {
     nextBtn.on('pointerover', () => this.tweens.add({ targets: nextBtn, scale: 1.05, duration: 100 }));
     nextBtn.on('pointerout', () => this.tweens.add({ targets: nextBtn, scale: 1, duration: 100 }));
     const advanceToNextDay = () => {
+      if (!this.summaryPanelReady) return; // still hidden behind the feed curtain
       nextBtn.disableInteractive();
       pressPulse(this, nextBtn);
       this.requestNextDay();
@@ -1117,58 +1404,35 @@ export class UIScene extends Phaser.Scene {
         .setOrigin(0.5)
     );
 
-    // feed scroll: the whole recap+shop stack slides in from below as one
-    // motion instead of a chain of separate scale-in popups. When arriving
-    // from the day-ended stamp, the backdrop is already faded in — only
-    // fade it here on a cold start (e.g. reducedMotion skips the stamp).
-    const finalY = panel.y;
-    this.summaryPanelFinalY = finalY;
+    // panel rests in place immediately — the feed curtain (see
+    // showFeedCurtain) handles the reveal motion, not this panel itself
+    this.summaryPanelFinalY = panel.y;
     this.summaryPanelReady = false;
-    sfx.fanfare();
-    if (settings.reducedMotion) {
-      backdrop.setAlpha(0.7);
-      this.summaryPanelReady = true;
-    } else {
-      if (!existingBackdrop) {
-        backdrop.setAlpha(0);
-        this.tweens.add({ targets: backdrop, alpha: 0.7, duration: 220 });
-      }
-      panel.setY(finalY + GAME_H);
-      this.tweens.add({
-        targets: panel,
-        y: finalY,
-        duration: 320,
-        ease: EASE.pop,
-        onComplete: () => {
-          this.summaryPanelReady = true;
-        }
-      });
-    }
-    if (s.newMemesUnlocked.length) confetti(this, GAME_W / 2, GAME_H / 2 - 60, 20);
     this.refreshUpgradeAffordability();
-
-    // full autoplay: spend whatever's affordable, then click through itself
-    if (import.meta.env.DEV && devState.autoPlay === 'full') {
-      this.time.delayedCall(500 / devState.speedMultiplier, () => {
-        if (this.summaryPanel !== panel) return; // already advanced elsewhere
-        this.devAutoSpendCredits();
-        advanceToNextDay();
-      });
-    }
   }
 
-  // ------------------------------------------------ swipe-to-dismiss (day summary)
+  // ------------------------------------------------ swipe-to-dismiss (day summary + curtain)
   private onSwipePointerDown(pointer: Phaser.Input.Pointer): void {
+    if (this.feedCurtain?.active && this.curtainReady) {
+      this.swipeStartX = pointer.x;
+      this.swipeStartY = pointer.y;
+      return;
+    }
     if (!this.summaryPanel?.active || !this.summaryPanelReady) return;
     this.swipeStartX = pointer.x;
     this.swipeStartY = pointer.y;
   }
 
   private onSwipePointerMove(pointer: Phaser.Input.Pointer): void {
-    if (this.swipeStartY == null || !this.summaryPanel?.active) return;
+    if (this.swipeStartY == null) return;
     const dy = pointer.y - this.swipeStartY;
     const dx = Math.abs(pointer.x - (this.swipeStartX ?? pointer.x));
     if (dy >= 0 || dx > 60) return; // only follow mostly-vertical, upward drags
+    if (this.feedCurtain?.active && this.curtainReady) {
+      this.feedCurtain.y = this.curtainBaseY + Math.max(dy, -GAME_H);
+      return;
+    }
+    if (!this.summaryPanel?.active) return;
     this.summaryPanel.y = this.summaryPanelFinalY + Math.max(dy, -GAME_H);
   }
 
@@ -1178,10 +1442,18 @@ export class UIScene extends Phaser.Scene {
     const startY = this.swipeStartY;
     this.swipeStartX = null;
     this.swipeStartY = null;
-    if (!this.summaryPanel?.active) return;
     const dy = pointer.y - startY;
     const dx = Math.abs(pointer.x - startX);
     const SWIPE_THRESHOLD = 70;
+    if (this.feedCurtain?.active && this.curtainReady) {
+      if (dy < -SWIPE_THRESHOLD && dx < 80) {
+        this.curtainAdvance?.();
+      } else if (this.feedCurtain.y !== this.curtainBaseY) {
+        this.tweens.add({ targets: this.feedCurtain, y: this.curtainBaseY, duration: 220, ease: EASE.pop });
+      }
+      return;
+    }
+    if (!this.summaryPanel?.active) return;
     if (dy < -SWIPE_THRESHOLD && dx < 80) {
       this.requestNextDay();
     } else if (this.summaryPanel.y !== this.summaryPanelFinalY) {
@@ -1194,7 +1466,6 @@ export class UIScene extends Phaser.Scene {
   private requestNextDay(): void {
     if (!this.summaryPanel?.active) return;
     sfx.tap();
-    staticBlink(this, 130); // channel-cut back to the live feed
     bus.emit(EV.NEXT_DAY_REQUEST);
   }
 
@@ -1216,10 +1487,12 @@ export class UIScene extends Phaser.Scene {
   }
 
   private onDayBreak(_remaining: null): void {
+    this.dayEndToken++; // invalidate any in-flight snapshot capture/curtain
     const panel = this.summaryPanel;
-    const backdrop = this.summaryBackdrop;
+    this.feedCurtain?.destroy();
+    this.feedCurtain = undefined;
+    this.curtainReady = false;
     this.summaryPanel = undefined;
-    this.summaryBackdrop = undefined;
     this.summaryPanelReady = false;
     this.swipeStartX = null;
     this.swipeStartY = null;
@@ -1228,21 +1501,18 @@ export class UIScene extends Phaser.Scene {
     if (!panel) return;
     if (settings.reducedMotion) {
       panel.destroy();
-      backdrop?.destroy();
       return;
     }
-    // feed scroll out: the stack scrolls up and off the top, mirroring the
-    // scroll-in — instead of the old scale+fade shrink
+    // feed scroll out: the panel (the next day's live gameplay is already
+    // rendering underneath, same as it was hidden underneath the whole time)
+    // continues scrolling up and off the top, mirroring the scroll-in
     this.tweens.add({
       targets: panel,
       y: panel.y - GAME_H,
       duration: 260,
-      ease: EASE.pop,
+      ease: EASE.inOut,
       onComplete: () => panel.destroy()
     });
-    if (backdrop) {
-      this.tweens.add({ targets: backdrop, alpha: 0, duration: 260, onComplete: () => backdrop.destroy() });
-    }
   }
 
   private onUpgradeReveal(key: string): void {
@@ -1259,9 +1529,6 @@ export class UIScene extends Phaser.Scene {
   private nudgeMarket(_delta: number): void {}
   private onEventProb(_label: string, _prob: number, _active: boolean): void {}
 
-  /** Breaking-meme cutaway: "MEME UPDATE IN 3..2..1" over the price graph,
-   *  then the meme (picked from src/config/memes.json) bounces in, holds,
-   *  and bounces back out. */
   /** Dev panel: fire a random meme trigger right now, bypassing the cooldown. */
   private onDevForceMeme(): void {
     const labels = Object.keys(MEMES.triggers);
@@ -1269,106 +1536,19 @@ export class UIScene extends Phaser.Scene {
     this.showMemeReaction(label, undefined, true);
   }
 
+  /** Meme moments no longer interrupt play with a center-screen cutaway —
+   *  they record into the day's meme log (pickMeme) and surface as a brief
+   *  headline ping; the actual reveal (art + caption) happens in the
+   *  day-end summary's MEMES card (buildMemesCard) and unlocks section
+   *  (buildUnlocksSection), so the player isn't pulled off the play field. */
   private showMemeReaction(label: string, ctx?: MemeContext, force = false): void {
     // memes react to game moments, but sparingly — respect the cooldown so
     // back-to-back moments don't turn the feed into a meme channel
     if (!force && this.time.now - this.lastMemeAt < MEMES.settings.minGapMs) return;
     this.lastMemeAt = this.time.now;
-    // ticker caption announces the cutaway for as long as it runs
-    const cutawayMs = MEMES.settings.countdownTickMs * 3 + MEMES.settings.durationMs;
-    this.onHeadline('MEME BREAK • MEME BREAK • MEME BREAK', 'event', cutawayMs);
-    const gen = ++this.memeGen; // cancels any countdown/popup still running
-    this.memePopup?.destroy();
-    this.memePopup = undefined;
-
-    const tick = settings.reducedMotion ? 260 : MEMES.settings.countdownTickMs;
-    // tilted "photo card" floating over VIEW, clear of the price card below
-    const popW = 320;
-    const popH = 300;
-    const rotationDeg = Phaser.Math.RND.pick([-4, -3, 3, 4]);
-    const pop = this.add
-      .container(VIEW.x + VIEW.w / 2, VIEW.y + VIEW.h / 2)
-      .setDepth(1200)
-      .setRotation(Phaser.Math.DegToRad(rotationDeg));
-    this.memePopup = pop;
-
-    const cardBg = this.add.graphics();
-    cardBg.fillStyle(PAL.cream, 1);
-    cardBg.fillRoundedRect(-popW / 2, -popH / 2, popW, popH, 16);
-    pop.add(cardBg);
-    const captionText = this.add
-      .text(0, popH / 2 - 26, '', {
-        fontFamily: FONT_SANS,
-        fontSize: '13px',
-        fontStyle: 'bold',
-        color: HEX.ink,
-        align: 'center',
-        wordWrap: { width: popW - 30 }
-      })
-      .setOrigin(0.5);
-    pop.add(captionText);
-
-    // -- countdown teaser
-    const cd = this.add.container(0, -20);
-    pop.add(cd);
-    cd.add(
-      this.add
-        .text(0, -46, 'meme update in', {
-          fontFamily: FONT_SANS,
-          fontSize: '15px',
-          fontStyle: 'bold',
-          color: HEX.ink
-        })
-        .setOrigin(0.5)
-    );
-    const num = this.add
-      .text(0, 18, '3', { fontFamily: FONT_DISPLAY, fontSize: '64px', color: HEX.ink })
-      .setOrigin(0.5);
-    cd.add(num);
-    const setNum = (n: number): void => {
-      num.setText(String(n));
-      sfx.tick(n === 1);
-      if (!settings.reducedMotion) {
-        num.setScale(0.4);
-        this.tweens.add({ targets: num, scale: 1, duration: tick * 0.6, ease: 'Back.easeOut' });
-      }
-    };
-    setNum(3);
-    this.time.delayedCall(tick, () => gen === this.memeGen && setNum(2));
-    this.time.delayedCall(tick * 2, () => gen === this.memeGen && setNum(1));
-
-    // -- the meme itself, bouncing in after the countdown
-    this.time.delayedCall(tick * 3, () => {
-      if (gen !== this.memeGen || this.memePopup !== pop) return;
-      cd.destroy();
-      const pick = pickMeme(label, ctx);
-      // first-time-ever unlocks get their full celebration at day end, not
-      // mid-day — during play a new template shows its normal caption, no
-      // "NEW MEME UNLOCKED!" tell.
-      captionText.setText(pick.captions[0] ?? '');
-      const inner = this.add.container(0, -20);
-      pop.add(inner);
-      renderMeme(this, inner, pick, popW - 40, popH - 90);
-      if (settings.reducedMotion) {
-        inner.setAlpha(0);
-        this.tweens.add({ targets: inner, alpha: 1, duration: 200 });
-      } else {
-        inner.setScale(0);
-        this.tweens.add({ targets: inner, scale: 1, duration: 380, ease: 'Back.easeOut' });
-      }
-      sfx.whoosh();
-
-      // hold, then bounce out and drop the cutaway
-      this.time.delayedCall(MEMES.settings.durationMs, () => {
-        if (gen !== this.memeGen || this.memePopup !== pop) return;
-        this.memePopup = undefined;
-        const done = (): void => {
-          this.tweens.add({ targets: pop, alpha: 0, duration: 180, onComplete: () => pop.destroy() });
-        };
-        if (settings.reducedMotion) done();
-        else this.tweens.add({ targets: inner, scale: 0, duration: 260, ease: 'Back.easeIn', onComplete: done });
-      });
-    });
+    pickMeme(label, ctx);
+    this.onHeadline('📸 new post added to today’s feed', 'event', 2000);
+    sfx.tap();
   }
 
   private onTimer(elapsed: number): void {

@@ -9,6 +9,7 @@ import { EASE, confetti, countTo } from '../core/juice';
 import { broadcastCut, broadcastReveal } from '../core/broadcast';
 import { createPostHeader } from '../core/feedChrome';
 import { SessionStats, computeScore, freshStats } from '../core/state';
+import { repercussionHeadline, repercussionSubhead, runPerfScore } from '../core/repercussions';
 import { captureAndShare } from '../core/share';
 import { leaderboard } from '../backend/leaderboard';
 import { openSubmitOverlay } from '../backend/submitOverlay';
@@ -22,17 +23,6 @@ const CARD_BG = PAL.black;
 const CARD_INK = HEX.cream;
 // Hairline divider color shared with feedChrome's card borders.
 const DIVIDER = 0x2f3336;
-
-/** Every run ends the same way (market meltdown), so the headline only has to
- *  vary by how long the player lasted. */
-function headlineFor(stats: SessionStats): string {
-  const d = stats.daysSurvived;
-  const price = Math.round(stats.oilPrice);
-  if (d <= 0) return 'OIL MARKET IMPLODES ON DAY ONE — INTERN BLAMED';
-  if (d <= 2) return `STRAIT FALLS ON DAY ${d} — OIL ROCKETS TO $${price}`;
-  if (d <= 5) return `DAY ${d} DISASTER: DEFENDER 'DID THEIR BEST', MARKET DISAGREES`;
-  return `LEGENDARY ${d}-DAY STAND ENDS IN FLAMES — OIL AT $${price}`;
-}
 
 export class ResultsScene extends Phaser.Scene {
   private leaving = false;
@@ -253,10 +243,12 @@ export class ResultsScene extends Phaser.Scene {
     );
     card.add(this.add.rectangle(0, -halfH + 86, CARD.w - 40, 2, DIVIDER));
 
-    // headline as the tweet's caption text (not a newspaper headline treatment)
+    // "global repercussions" headline — bizarre/tabloid title picked from the
+    // whole run's price swing + overall performance, real numbers underneath
+    const totalDelta = Math.round(stats.oilPrice - stats.startPrice);
     card.add(
       this.add
-        .text(0, -halfH + 100, headlineFor(stats), {
+        .text(0, -halfH + 100, repercussionHeadline(totalDelta, runPerfScore(stats)), {
           fontFamily: FONT_SANS,
           fontSize: '20px',
           fontStyle: 'bold',
@@ -266,9 +258,14 @@ export class ResultsScene extends Phaser.Scene {
         })
         .setOrigin(0.5, 0)
     );
-    const subhead = stats.memeMoment
-      ? `eyewitness moment: “${stats.memeMoment}”`
-      : `${stats.tankersSafe} tankers escorted safely · ${stats.tankersLost} lost at sea`;
+    const subhead = repercussionSubhead({
+      label: 'FINAL',
+      price: Math.round(stats.oilPrice),
+      priceDelta: totalDelta,
+      priceBefore: stats.startPrice,
+      safe: stats.tankersSafe,
+      lost: stats.tankersLost
+    });
     card.add(
       this.add
         .text(0, -halfH + 230, subhead, {

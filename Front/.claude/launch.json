@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hormuz-holdem",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173,
+      "url": "https://localhost:5173"
+    },
+    {
+      "name": "hormuz-holdem-attach",
+      "port": 5173,
+      "url": "https://localhost:5173"
+    }
+  ]
+}

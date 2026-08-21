@@ -45,7 +45,7 @@ export function captureArea(
   });
 }
 
-function drawWatermark(cx: CanvasRenderingContext2D, w: number, h: number): void {
+export function drawWatermark(cx: CanvasRenderingContext2D, w: number, h: number): void {
   const size = Math.max(14, Math.round(w * 0.032));
   const pad = Math.round(size * 0.55);
   cx.font = `${size}px "Anton", "Arial Black", "Impact", sans-serif`;
@@ -138,17 +138,16 @@ function pageUrl(): string {
  *  web API can target one named app). If the device can't share files, try
  *  a text-only native share. If neither native path exists (older desktop
  *  browsers), fall back to that platform's own compose window with the
- *  caption + link prefilled — never a forced download. */
-export async function captureAndShareTo(
-  game: Phaser.Game,
-  rect: { x: number; y: number; w: number; h: number },
+ *  caption + link prefilled — never a forced download. Canvas-based so it
+ *  works from any watermarked PNG, Phaser-captured or plain DOM `<img>`. */
+export async function shareCanvasTo(
+  canvas: HTMLCanvasElement,
   filename: string,
   text: string,
   kind: string,
   platform: SharePlatform
 ): Promise<ShareOutcome> {
   try {
-    const canvas = await captureArea(game, rect.x, rect.y, rect.w, rect.h);
     const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
     if (blob) {
       const file = new File([blob], filename, { type: 'image/png' });
@@ -178,6 +177,22 @@ export async function captureAndShareTo(
     window.open(INTENT_URL[platform](text, pageUrl()), '_blank', 'noopener');
     analytics.track('share_intent', { kind, platform, method: 'intent' });
     return 'shared';
+  } catch {
+    return 'failed';
+  }
+}
+
+export async function captureAndShareTo(
+  game: Phaser.Game,
+  rect: { x: number; y: number; w: number; h: number },
+  filename: string,
+  text: string,
+  kind: string,
+  platform: SharePlatform
+): Promise<ShareOutcome> {
+  try {
+    const canvas = await captureArea(game, rect.x, rect.y, rect.w, rect.h);
+    return await shareCanvasTo(canvas, filename, text, kind, platform);
   } catch {
     return 'failed';
   }

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DPR, GAME_H, GAME_W, PAL } from './core/palette';
 import { BootScene } from './scenes/BootScene';
 import { MenuScene } from './scenes/MenuScene';
+import { IntroScene } from './scenes/IntroScene';
 import { GameScene } from './scenes/GameScene';
 import { UIScene } from './scenes/UIScene';
 import { ResultsScene } from './scenes/ResultsScene';
@@ -9,8 +10,10 @@ import { LeaderboardScene } from './scenes/LeaderboardScene';
 import { GalleryScene } from './scenes/GalleryScene';
 import { initDevtools } from './dev/devtools';
 import { setupPortraitLock } from './core/orientation';
+import { initSidePanels } from './core/sidePanels';
 
 setupPortraitLock();
+void initSidePanels();
 
 // Hi-DPI: every add.text() renders its glyph texture at DPR× so text stays
 // crisp under the DPR camera zoom. Explicit style.resolution still wins.
@@ -41,7 +44,7 @@ const game = new Phaser.Game({
   input: {
     activePointers: 3
   },
-  scene: [BootScene, MenuScene, GameScene, UIScene, ResultsScene, LeaderboardScene, GalleryScene]
+  scene: [BootScene, MenuScene, IntroScene, GameScene, UIScene, ResultsScene, LeaderboardScene, GalleryScene]
 });
 
 // Hi-DPI: the canvas backing store is DPR× larger than the 1280×720 logical
@@ -49,7 +52,7 @@ const game = new Phaser.Game({
 // it runs its world camera in a sub-viewport and applies DPR itself.
 game.events.once(Phaser.Core.Events.READY, () => {
   for (const scene of game.scene.scenes) {
-    if (scene.scene.key === 'Game') continue;
+    if (scene.scene.key === 'Game' || scene.scene.key === 'Intro') continue;
     const applyZoom = () =>
       scene.cameras.main.setZoom(DPR).centerOn(GAME_W / 2, GAME_H / 2);
     scene.events.on(Phaser.Scenes.Events.START, applyZoom);

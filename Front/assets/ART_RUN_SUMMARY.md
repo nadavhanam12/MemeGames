@@ -1,10 +1,11 @@
 # Art run summary
 
-- Date: 2026-08-20T06:09:51.033Z
-- Written: 65 • Skipped: 20 • Errors: 0
+- Date: 2026-08-21T19:06:02.572Z
+- Written: 66 • Skipped: 20 • Errors: 0
 
 ## Produced (public/assets/)
 - map_bg.png
+- world_map.png
 - tanker_red.png (220x52)
 - tanker_blue.png (200x68)
 - tanker_vip.png (240x62)

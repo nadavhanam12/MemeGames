@@ -8,6 +8,7 @@ import MEMES_DATA from '../config/memes.json';
 // (each template's artKey/artFile pair), so adding a meme needs no code change.
 const CORE_ART: Record<string, string> = {
   map_bg: 'map_bg.png',
+  world_map: 'world_map.png',
   tanker0: 'tanker_red.png',
   tanker1: 'tanker_blue.png',
   tankerVip: 'tanker_vip.png',

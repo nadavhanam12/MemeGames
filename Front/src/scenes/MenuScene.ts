@@ -149,21 +149,37 @@ export class MenuScene extends Phaser.Scene {
     gallery.setSize(250, 70);
 
     // player count (backend-driven; hidden until the fetch succeeds)
-    const playersTxt = this.add
+    const playersNumTxt = this.add
       .text(cx, 715, '', {
         fontFamily: FONT_SANS,
-        fontSize: '18px',
+        fontSize: '34px',
+        fontStyle: 'bold',
+        color: HEX.cream,
+        stroke: HEX.ink,
+        strokeThickness: 4
+      })
+      .setOrigin(0.5);
+    const playersLabelTxt = this.add
+      .text(cx, 715, '', {
+        fontFamily: FONT_SANS,
+        fontSize: '24px',
         fontStyle: 'bold',
         color: HEX.cream,
         stroke: HEX.ink,
         strokeThickness: 3
       })
-      .setOrigin(0.5);
+      .setOrigin(0, 0.5);
     fetchLeaderboard({ period: 'all', pageSize: 1 })
       .then(res => {
         if (!this.scene.isActive()) return;
         if (res.total > 0) {
-          playersTxt.setText(`${res.total.toLocaleString()} ${res.total === 1 ? 'person has' : 'people have'} already played`);
+          const numStr = res.total.toLocaleString();
+          const labelStr = ` ${res.total === 1 ? 'person has' : 'people have'} already played`;
+          playersNumTxt.setText(numStr).setOrigin(0.5);
+          playersLabelTxt.setText(labelStr);
+          const totalWidth = playersNumTxt.width + playersLabelTxt.width;
+          playersNumTxt.setX(cx - totalWidth / 2 + playersNumTxt.width / 2);
+          playersLabelTxt.setX(playersNumTxt.x + playersNumTxt.width / 2);
         }
       })
       .catch(() => {
@@ -192,7 +208,7 @@ export class MenuScene extends Phaser.Scene {
       sfx.unlock();
       sfx.fanfare();
       pressPulse(this, start);
-      this.time.delayedCall(150, () => broadcastCut(this, () => this.scene.start('Game')));
+      this.time.delayedCall(150, () => broadcastCut(this, () => this.scene.start('Intro')));
     });
 
     // staggered fly-ins: buttons and studio memes enter like graphics packages
