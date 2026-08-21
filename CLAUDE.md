@@ -85,6 +85,28 @@ anything leaderboard-related. Summary:
 - The whole `src/backend/` folder is designed to be copied into future
   MemeGames titles unchanged (each game uses its own localStorage key).
 
+## Parallel agent workflow
+
+Nadav keeps one dev server (`npm run dev`, in `Front/`) running from the
+**main repo checkout** at all times to test changes. When multiple agents
+work in parallel (git worktrees, or agents spawned via Agent/Workflow), each
+gets its own directory and often its own dev server on its own port — that
+port is only for the agent's own verification, never the one Nadav is
+watching.
+
+When an agent's work is done and verified (typecheck at minimum):
+
+1. Commit it on the worktree branch.
+2. Merge that branch into `main` **in the main repo checkout** (standing
+   authorization for commit+merge — no need to ask; still don't push unless
+   asked). See global feedback memory `merge-to-main-when-done`.
+3. Do not tell Nadav to restart or switch servers — merging into `main`
+   updates the files on disk in the main checkout, and the already-running
+   dev server there picks it up via Vite's file watcher/HMR. Nadav just
+   refreshes his existing tab.
+4. Clean up the worktree once merged; don't leave finished worktrees mounted
+   ("no parallel worktrees" — see the same memory rule).
+
 ## Commands (run inside `Front/`)
 
 - `npm run dev` — Vite dev server.
