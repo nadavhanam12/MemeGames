@@ -235,6 +235,7 @@ export class GameScene extends Phaser.Scene {
     // larger, so both the viewport rect and the zoom carry the DPR factor.
     this.baseZoom = Math.min(VIEW.w / GAME_W, VIEW.h / GAME_H) * DPR;
     this.cameras.main.setViewport(VIEW.x * DPR, VIEW.y * DPR, VIEW.w * DPR, VIEW.h * DPR);
+    this.cameras.main.setBackgroundColor(0x000000);
     this.cameras.main.setZoom(this.baseZoom);
     this.cameras.main.centerOn(GAME_W / 2, GAME_H / 2);
     this.cameras.main.fadeIn(250, 7, 59, 92);
@@ -327,7 +328,27 @@ export class GameScene extends Phaser.Scene {
     if (!import.meta.env.DEV) return;
     this.routeHandles.forEach(h => h.destroy());
     this.routeHandles = [];
-    if (!on) return;
+    if (!on) {
+      // restore normal gameplay framing
+      this.cameras.main.setZoom(this.baseZoom);
+      this.cameras.main.centerOn(GAME_W / 2, GAME_H / 2);
+      return;
+    }
+    // zoom out so off-screen spawn/exit waypoints (which sit outside the
+    // normal gameplay viewport on purpose) are visible and draggable too
+    const allPts = this.routeSets().flat();
+    const xs = allPts.map(p => p[0]);
+    const ys = allPts.map(p => p[1]);
+    const minX = Math.min(...xs, 0);
+    const maxX = Math.max(...xs, GAME_W);
+    const minY = Math.min(...ys, 0);
+    const maxY = Math.max(...ys, GAME_H);
+    const pad = 60;
+    const boundsW = maxX - minX + pad * 2;
+    const boundsH = maxY - minY + pad * 2;
+    const fitZoom = Math.min(VIEW.w / boundsW, VIEW.h / boundsH, this.baseZoom);
+    this.cameras.main.setZoom(fitZoom);
+    this.cameras.main.centerOn((minX + maxX) / 2, (minY + maxY) / 2);
     // one-time densify: insert a midpoint between every pair of waypoints so
     // the editor offers twice the control nodes
     if (!devState.routeDensified) {
@@ -367,9 +388,26 @@ export class GameScene extends Phaser.Scene {
     // the broadcast window is wider than the 1280x720 world at the fit zoom,
     // so scale the backdrop uniformly to cover the camera's visible area
     const zoom = Math.min(VIEW.w / GAME_W, VIEW.h / GAME_H);
-    const cover = Math.max(VIEW.w / zoom / GAME_W, VIEW.h / zoom / GAME_H);
+    const camW = VIEW.w / zoom;
+    const camH = VIEW.h / zoom;
     if (this.mapArt) {
-      this.add.image(GAME_W / 2, GAME_H / 2, 'map_bg').setDisplaySize(GAME_W * cover, GAME_H * cover).setDepth(0);
+      // map_bg is authored landscape (1280x720) for the old TV layout; only the
+      // middle half of its width reads well in the portrait world, so crop to
+      // that before stretching to cover the camera's visible area. setCrop()
+      // cuts the source in raw texture pixels, so the cover scale has to be
+      // computed against the CROPPED dimensions, not the full 1280x720 frame —
+      // sizing against the full frame (as before) left the crop's drawn region
+      // narrower than the camera's visible width, showing bare background on
+      // both sides of the art.
+      const src = this.textures.get('map_bg').getSourceImage() as HTMLImageElement;
+      const cropW = src.width / 2;
+      const cropX = (src.width - cropW) / 2;
+      const scale = Math.max(camW / cropW, camH / src.height);
+      this.add
+        .image(GAME_W / 2, GAME_H / 2, 'map_bg')
+        .setCrop(cropX, 0, cropW, src.height)
+        .setDisplaySize(src.width * scale, src.height * scale)
+        .setDepth(0);
     } else {
       this.drawFallbackWorld();
     }

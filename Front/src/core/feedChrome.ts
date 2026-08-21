@@ -106,10 +106,11 @@ export function createPostHeader(scene: Phaser.Scene, opts: PostHeaderOpts): Pha
 }
 
 export interface EngagementIconOpts {
-  /** Unicode/emoji glyph drawn as text (no icon font in this project). */
-  glyph: string;
+  /** Texture key from ENGAGEMENT_ICON_KEYS (core/engagementIcons.ts) — white
+   *  source art, tinted per-icon below rather than drawn as an emoji glyph. */
+  textureKey: string;
   count: number;
-  /** Defaults to muted gray; pass PAL.green (or similar) for the "hot" icon. */
+  /** Defaults to muted gray; pass PAL.red (or similar) for the "hot" icon. */
   color?: number;
 }
 
@@ -138,10 +139,9 @@ export function createEngagementBar(scene: Phaser.Scene, opts: EngagementBarOpts
 
   opts.icons.forEach((icon, i) => {
     const cx = slot * i + slot / 2;
-    const color = toHex(icon.color ?? PAL.muted);
-    const glyph = scene.add
-      .text(cx, -7, icon.glyph, { fontFamily: FONT_SANS, fontSize: '20px', color })
-      .setOrigin(0.5);
+    const tint = icon.color ?? PAL.muted;
+    const color = toHex(tint);
+    const glyph = scene.add.image(cx, -7, icon.textureKey).setDisplaySize(20, 20).setTint(tint).setOrigin(0.5);
     const countTxt = scene.add
       .text(cx, 15, formatCount(icon.count), {
         fontFamily: FONT_SANS,

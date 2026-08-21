@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { PAL } from '../core/palette';
 import { hasArt, loadGeneratedArt } from '../core/art';
 import { loadShareIcons } from '../core/shareIcons';
+import { loadEngagementIcons } from '../core/engagementIcons';
 
 const OUTLINE = 5; // shared outline thickness (art consistency rule)
 
@@ -14,7 +15,7 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     this.makeParticles();
-    void Promise.all([this.loadFonts(), loadGeneratedArt(this), loadShareIcons(this)]).then(() => {
+    void Promise.all([this.loadFonts(), loadGeneratedArt(this), loadShareIcons(this), loadEngagementIcons(this)]).then(() => {
       // programmatic fallbacks only for keys with no generated texture
       this.makeTankers();
       this.makeThreats();

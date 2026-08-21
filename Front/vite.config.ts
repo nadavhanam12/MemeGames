@@ -1,6 +1,7 @@
 import { defineConfig, Plugin } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // Dev-only endpoint: the in-game dev panel POSTs tuning + layout here and we
 // write them into src/config/*.json so tweaks become committed defaults.
@@ -35,10 +36,11 @@ function saveConfigPlugin(): Plugin {
 
 export default defineConfig({
   base: './',
-  plugins: [saveConfigPlugin()],
+  plugins: [saveConfigPlugin(), basicSsl()],
   server: {
     port: 5173,
-    host: true
+    host: true,
+    https: true
   },
   build: {
     target: 'es2020'

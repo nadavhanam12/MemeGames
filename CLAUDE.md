@@ -39,23 +39,75 @@ scope). Working from a phased plan; status as of the last session:
   Two old animations were dropped as no-longer-applicable to the new HUD
   (combo-lost "crumple" effect, delayed cash-reveal-on-coin-landing) —
   flagged for the user's opinion, not yet resolved either way.
-- **Phase 3 (scroll-down day-break transition) — NOT STARTED.** Replace
-  `UIScene`'s `onDayEnd → showDayCompletePanel → showNewUnlocksPopup →
-  showDaySummaryPanel` (scale+fade popup chain) with one vertical
-  container-tween "feed scroll" — outgoing content scrolls up/off, incoming
-  day-summary stack scrolls in from below. No `EV.*`/`DaySummary` contract
-  changes needed, this is purely how `UIScene`'s day-break methods animate.
-  Respect `settings.reducedMotion` (snap instead of tween).
-- **Phase 4 (polish pass) — NOT STARTED.** Tune engagement-count growth
-  (50–100/day, performance-based), QA all screens at real mobile aspect
-  ratios, reduced-motion audit across Phase 2/3 additions.
+- **Phase 3 (scroll-down day-break transition) — DONE, verified.** The old
+  `showDayCompletePanel`/`showNewUnlocksPopup`/`fadeOutModal` tap-through
+  chain is gone. `onDayEnd` now calls `showDaySummaryPanel(s)` directly,
+  which builds ONE stack (day-complete header → new-unlocks rows, folded in
+  via the new `buildUnlocksSection` → mission/memes/intel cards → shop →
+  NEXT DAY button) inside `panel`, plus a separate static full-screen
+  `summaryBackdrop` rectangle (dims in, doesn't move). The stack slides in
+  as a single tween from `finalY + GAME_H` up to `finalY` (below the growth
+  logic that resizes `bg`/repositions `panel` for tall content), backdrop
+  alpha tweens in alongside. `onDayBreak` mirrors it: `panel.y -= GAME_H`
+  while `summaryBackdrop` fades out, both destroyed on complete. `settings.
+  reducedMotion` skips both tweens (backdrop snaps to 0.7 alpha, panel
+  stays at `finalY`). No `EV.*`/`DaySummary` contract changes.
+  **Verified live** (not play-mode — see global no-play-mode-testing rule;
+  this was inline JS driving `UIScene` methods directly via
+  `window.phaserGame`, not gameplay): fired `showDaySummaryPanel` with mock
+  `DaySummary`s (with and without `newMemesUnlocked`) and confirmed no
+  overlap across the merged stack, then called `onDayBreak` and confirmed
+  it tears down cleanly. Screenshots caught the entrance tween mid-flight,
+  confirming the slide-from-below direction. Hit the browser-pane's
+  documented `document.hidden` RAF-throttle quirk (tweens report
+  `progress:1` but don't apply) while verifying — worked around by manually
+  setting the end values, per the existing workaround note in this file;
+  not a code bug.
+- **Phase 4 (polish pass) — DONE, verified.** Three parts:
+  1. **Engagement-count growth.** The ↗ share icon in `UIScene`'s
+     engagement bar (`buildEngagementBar`/`pushEngagementCounts`) was a
+     static placeholder (`0`, forever) — see the comment it used to carry.
+     Added `TUNING.social.shareGrowthMin/Max` (50/100), `UIScene.shareCount`/
+     `dayShareStart`/`dayShareTarget`: `onDayEnd` rolls next day's growth
+     target from that day's performance (mission done + safe/lost ratio),
+     `onDayStart` freezes `dayShareStart` at the current count, `onTimer`
+     eases `shareCount` from `dayShareStart` toward `dayShareStart +
+     dayShareTarget` across the day (ease-out, so it reads as early
+     traction). Verified live: fired `onTimer` with synthetic elapsed
+     values and confirmed the 0→25→44→54 ease-out curve, then confirmed the
+     rendered ↗ count updates in the HUD.
+  2. **Reduced-motion audit (Phase 2/3 additions).** Checked every
+     `tweens.add` in `feedChrome.ts` and `UIScene.ts`'s day-summary/
+     unlocks code (incl. Phase 3's new slide-in/out) — all correctly gated
+     on `settings.reducedMotion`. The only unguarded tweens are the
+     pre-existing hover-scale/quick-shake/toast conventions used
+     consistently everywhere else in the codebase (not new Phase 2/3 gaps).
+     No changes needed.
+  3. **Mobile-aspect QA.** Screenshotted Menu, Gallery, Leaderboard,
+     Results, and the Game+UI HUD (incl. the Phase 3 day-summary stack) at
+     375×812. One apparent bug (Menu's "N people have played" text
+     overlapping the LEADERBOARD/GALLERY row) turned out to be the
+     `document.hidden` tween-freeze artifact below, not a real layout bug —
+     confirmed by forcing final positions and re-screenshotting clean. No
+     real layout issues found on any screen.
 
-**To continue this work**: pick up at Phase 3. The dev server's Vite HMR
-quirk to know about — the sandboxed/headless browser preview pane throttles
-Phaser's tween/timer loop heavily while backgrounded, which can look like
-broken layout (elements stuck mid-animation) when it's actually just paused
-timers; force-settle with `scene.tweens.getTweens().forEach(t=>t.complete())`
-and manually set `alpha=1` on scene children before trusting a screenshot.
+**To continue this work**: Phase 4 (and the whole portrait/feed-chrome
+pivot) is done — no more phases queued. Pick up wherever Nadav points next.
+Dev server quirk worth keeping in mind for any future UI verification in
+this browser pane — the sandboxed/headless preview pane throttles Phaser's
+tween/timer loop heavily while backgrounded (`document.hidden === true`),
+which can look like broken layout (elements/positions stuck mid-animation,
+or alpha stuck at 0) when it's actually just paused timers;
+`scene.tweens.getTweens()` will report `state`/`progress` as already
+complete without the property having actually been applied, so
+`t.complete()` does NOT reliably force it — instead read the tween's
+intended end value from your own code and assign it to the object directly
+(e.g. `container.y = finalY; rect.alpha = 1;`) before trusting a
+screenshot. Also: when driving scenes directly via `window.phaserGame.
+scene.start(...)` for testing, stop every other scene first
+(`scene.stop(key)` for each of Boot/Menu/Game/UI/Results/Leaderboard/
+Gallery) — scenes render in registration order regardless of start order,
+so a stale scene can visually stack on top of the one you meant to inspect.
 
 ## Repo layout
 

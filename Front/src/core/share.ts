@@ -132,10 +132,13 @@ function pageUrl(): string {
   return window.location.origin + window.location.pathname;
 }
 
-/** Downloads the watermarked PNG (so it's ready to attach), then opens the
- *  platform's own share-compose window/app with the caption + a link back
- *  to the game prefilled. The image still needs a manual attach — see the
- *  INTENT_URL comment for why no web API can skip that step. */
+/** Tries the native OS share sheet with the watermarked PNG attached first
+ *  (same mechanism as the main SHARE button — the sheet lists whichever
+ *  apps the OS offers, not necessarily `platform` specifically, since no
+ *  web API can target one named app). If the device can't share files, try
+ *  a text-only native share. If neither native path exists (older desktop
+ *  browsers), fall back to that platform's own compose window with the
+ *  caption + link prefilled — never a forced download. */
 export async function captureAndShareTo(
   game: Phaser.Game,
   rect: { x: number; y: number; w: number; h: number },
@@ -146,10 +149,35 @@ export async function captureAndShareTo(
 ): Promise<ShareOutcome> {
   try {
     const canvas = await captureArea(game, rect.x, rect.y, rect.w, rect.h);
-    const outcome = await shareImage(canvas, filename, text, kind, 'download');
+    const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
+    if (blob) {
+      const file = new File([blob], filename, { type: 'image/png' });
+      if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: GAME_NAME, text });
+          analytics.track('share_intent', { kind, platform, method: 'webshare_file' });
+          return 'shared';
+        } catch (e) {
+          if ((e as DOMException)?.name === 'AbortError') return 'cancelled';
+          // file share unavailable after all — fall through to text-only paths
+        }
+      }
+    }
+
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: GAME_NAME, text, url: pageUrl() });
+        analytics.track('share_intent', { kind, platform, method: 'webshare_text' });
+        return 'shared';
+      } catch (e) {
+        if ((e as DOMException)?.name === 'AbortError') return 'cancelled';
+        // no native share at all — fall through to the compose-window fallback
+      }
+    }
+
     window.open(INTENT_URL[platform](text, pageUrl()), '_blank', 'noopener');
-    analytics.track('share_intent', { kind, platform });
-    return outcome;
+    analytics.track('share_intent', { kind, platform, method: 'intent' });
+    return 'shared';
   } catch {
     return 'failed';
   }

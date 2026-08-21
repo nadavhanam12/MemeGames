@@ -6,6 +6,7 @@ import { TUNING, persistTuningLocal, resetTuningLocal, saveToDisk } from '../con
 import { layoutData, setLayoutEdit } from './layout';
 import { devState } from './state';
 import { bus, EV } from '../core/state';
+import { settings, saveSettings } from '../core/settings';
 
 let gui: any = null;
 let visible = false;
@@ -62,6 +63,7 @@ const TIPS: Record<string, string> = {
   'Editors.layoutEdit': 'Drag HUD groups to move them; mouse-wheel over one to scale. Gameplay taps are disabled while on.',
   'Editors.routeEdit': 'Drag the purple waypoints to reshape the tanker shipping route live.',
   'Editors.speedX2': 'Doubles the gameplay simulation speed (spawns, movement, day timer). Visual FX stay normal speed.',
+  'Editors.sound': 'Mutes/unmutes game SFX. Persisted to this browser only (localStorage) — does not affect other players or machines.',
   'Editors.autoPlay':
     'off = manual play. gameplay = bot auto-fires at threats but leaves each day-summary screen (shop, next day) to you. full = bot also buys upgrades and clicks through days on its own.',
   '_.saveToDisk': 'Write current tuning + layout into src/config/*.json — makes tweaks permanent project defaults.',
@@ -214,7 +216,8 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
     layoutEdit: devState.layoutEdit,
     routeEdit: devState.routeEdit,
     speedX2: devState.speedMultiplier === 2,
-    autoPlay: devState.autoPlay
+    autoPlay: devState.autoPlay,
+    sound: settings.sound
   };
   tipped(
     editors
@@ -262,6 +265,17 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
       }),
     'Editors',
     'autoPlay'
+  );
+  tipped(
+    editors
+      .add(editorState, 'sound')
+      .name('🔊 Sound')
+      .onChange((v: boolean) => {
+        settings.sound = v;
+        saveSettings();
+      }),
+    'Editors',
+    'sound'
   );
 
   const actions = {

@@ -239,8 +239,8 @@ export class GalleryScene extends Phaser.Scene {
       this.tweens.add({ targets: layer, scale: 1, alpha: 1, duration: 220, ease: 'Back.easeOut' });
     }
 
-    const maxW = 700;
-    const maxH = 440;
+    const maxW = 660;
+    const maxH = 820;
     let w = maxW;
     let h = w * tpl.aspect;
     if (h > maxH) {
@@ -267,10 +267,11 @@ export class GalleryScene extends Phaser.Scene {
       // "✓ UNLOCKED" / "TAP TO CLOSE" are hidden here (rather than for the
       // locked state below) to give the share block below the frame more
       // room — the share buttons are the point of this state.
-      // SAVE downloads the framed art rect as a watermarked PNG; the platform
-      // buttons download it too, then open that platform's share-compose
-      // window/app with a caption + link prefilled (see share.ts — no web
-      // API lets a page attach the image directly into WhatsApp/X/Facebook).
+      // SAVE downloads the framed art rect as a watermarked PNG. The platform
+      // buttons try the native OS share sheet with the image attached first,
+      // then fall back to a text-only share/compose window (see share.ts —
+      // no web API can target one specific named app, or attach a file to a
+      // platform's own compose window when the native sheet isn't available).
       const frameRect = () => {
         const frameW = w + 24;
         const frameH = h + 24;
@@ -283,7 +284,8 @@ export class GalleryScene extends Phaser.Scene {
         () =>
           void captureAndShare(this.game, frameRect(), `hormuz-meme-${id}.png`, "From my HORMUZ HOLD'EM collection", 'gallery', 'download'),
         platform =>
-          void captureAndShareTo(this.game, frameRect(), `hormuz-meme-${id}.png`, "From my HORMUZ HOLD'EM collection", 'gallery', platform)
+          void captureAndShareTo(this.game, frameRect(), `hormuz-meme-${id}.png`, "From my HORMUZ HOLD'EM collection", 'gallery', platform),
+        { iconSize: 84, gap: 26, titleFontSize: '18px', downloadFontSize: '24px', downloadHeight: 58 }
       );
     } else {
       layer.add(

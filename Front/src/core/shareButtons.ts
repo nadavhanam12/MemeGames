@@ -23,13 +23,17 @@ export function addExportButtonRow(
   parent: Phaser.GameObjects.Container,
   y: number,
   onSave: () => void,
-  onPlatform: (platform: SharePlatform) => void
+  onPlatform: (platform: SharePlatform) => void,
+  opts?: { iconSize?: number; gap?: number; titleFontSize?: string; downloadFontSize?: string; downloadHeight?: number }
 ): void {
-  const iconBtnSize = 56;
-  const gap = 18;
+  const iconBtnSize = opts?.iconSize ?? 56;
+  const gap = opts?.gap ?? 18;
+  const titleFontSize = opts?.titleFontSize ?? '13px';
+  const downloadFontSize = opts?.downloadFontSize ?? '17px';
+  const downloadHeight = opts?.downloadHeight ?? 40;
 
   const title = scene.add
-    .text(0, y, 'SHARE TO', { fontFamily: FONT_SANS, fontSize: '13px', fontStyle: 'bold', color: '#AAB4BD' })
+    .text(0, y, 'SHARE TO', { fontFamily: FONT_SANS, fontSize: titleFontSize, fontStyle: 'bold', color: '#AAB4BD' })
     .setOrigin(0.5);
   parent.add(title);
 
@@ -56,13 +60,13 @@ export function addExportButtonRow(
 
   const downloadY = rowY + iconBtnSize / 2 + 16 + 20;
   const download = scene.add.container(0, downloadY);
-  download.add(scene.add.rectangle(0, 0, totalW, 40, PAL.green).setStrokeStyle(3, PAL.ink));
+  download.add(scene.add.rectangle(0, 0, totalW, downloadHeight, PAL.green).setStrokeStyle(3, PAL.ink));
   download.add(
     scene.add
-      .text(0, 0, 'DOWNLOAD', { fontFamily: FONT_DISPLAY, fontSize: '17px', color: HEX.ink })
+      .text(0, 0, 'DOWNLOAD', { fontFamily: FONT_DISPLAY, fontSize: downloadFontSize, color: HEX.ink })
       .setOrigin(0.5)
   );
-  download.setSize(totalW, 40);
+  download.setSize(totalW, downloadHeight);
   download.setInteractive({ useHandCursor: true });
   download.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) =>
     ev.stopPropagation()

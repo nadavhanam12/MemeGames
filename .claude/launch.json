@@ -10,7 +10,7 @@
     },
     {
       "name": "hormuz-holdem-attach",
-      "url": "http://localhost:5173"
+      "url": "https://localhost:5173"
     }
   ]
 }
