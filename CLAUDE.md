@@ -5,6 +5,58 @@ Monorepo for small meme-themed web games. First title: **Hormuz Hold'em**
 expected to get its own folder; they all share the same backend leaderboard
 server.
 
+## IN PROGRESS: portrait + "X/Twitter feed" art direction pivot
+
+The game is mid-rewrite from landscape/TV-broadcast art direction to a
+**portrait, social-feed-native** look (the whole game reads as an X/Twitter
+post — see approved mockups discussed in the session that started this;
+no mockup files are saved anywhere, this doc is the source of truth for
+scope). Working from a phased plan; status as of the last session:
+
+- **Phase 0 (portrait canvas) — DONE.** `GAME_W/GAME_H` flipped to
+  `720×1280` in `src/core/palette.ts`; `VIEW`/`HEADER`/`ENGAGEMENT`/`COMMENTS`
+  replaced the old landscape `VIEW`/`LEFT_BOX`/`BAND`/`STRIP` rects (stacked
+  vertically instead of side-by-side). `src/core/orientation.ts`'s lock and
+  `index.html`'s CSS rotate-overlay flipped from landscape-only to
+  portrait-only.
+- **Phase 1 (geometry migration) — DONE, verified.** All 6 scenes
+  (`GameScene`, `UIScene`, `GalleryScene`, `MenuScene`, `ResultsScene`,
+  `LeaderboardScene`) reflow correctly into the portrait frame. Old TV-art
+  was still in place at this checkpoint (art came in Phase 2).
+- **Phase 2 (feed-chrome reskin) — DONE, verified.** New
+  `src/core/feedChrome.ts` (sibling to `broadcast.ts`) exports
+  `createPostHeader`/`createEngagementBar`/`createCommentRow`/
+  `createSuggestedCard`/`createTrendingPill` — every scene now composes the
+  feed look from these instead of hand-rolled TV chrome. `broadcast.ts`'s
+  `broadcastCut`/`broadcastReveal` (hard "static cut" scene-swap transition)
+  were deliberately KEPT as-is per requirements — only `lowerThird`/
+  `createTicker` call sites were dropped in favor of feed chrome.
+  **Caught and fixed during verification**: `UIScene.buildChrome()` was
+  painting an opaque full-canvas background over the gameplay viewport
+  (UIScene renders on top of GameScene) — fixed by punching a `VIEW`-shaped
+  hole in the fill instead of `fillRect(0,0,GAME_W,GAME_H)`. If gameplay
+  ever renders as a blank/black box again, check that fill logic first.
+  Two old animations were dropped as no-longer-applicable to the new HUD
+  (combo-lost "crumple" effect, delayed cash-reveal-on-coin-landing) —
+  flagged for the user's opinion, not yet resolved either way.
+- **Phase 3 (scroll-down day-break transition) — NOT STARTED.** Replace
+  `UIScene`'s `onDayEnd → showDayCompletePanel → showNewUnlocksPopup →
+  showDaySummaryPanel` (scale+fade popup chain) with one vertical
+  container-tween "feed scroll" — outgoing content scrolls up/off, incoming
+  day-summary stack scrolls in from below. No `EV.*`/`DaySummary` contract
+  changes needed, this is purely how `UIScene`'s day-break methods animate.
+  Respect `settings.reducedMotion` (snap instead of tween).
+- **Phase 4 (polish pass) — NOT STARTED.** Tune engagement-count growth
+  (50–100/day, performance-based), QA all screens at real mobile aspect
+  ratios, reduced-motion audit across Phase 2/3 additions.
+
+**To continue this work**: pick up at Phase 3. The dev server's Vite HMR
+quirk to know about — the sandboxed/headless browser preview pane throttles
+Phaser's tween/timer loop heavily while backgrounded, which can look like
+broken layout (elements stuck mid-animation) when it's actually just paused
+timers; force-settle with `scene.tweens.getTweens().forEach(t=>t.complete())`
+and manually set `alpha=1` on scene children before trusting a screenshot.
+
 ## Repo layout
 
 - `Front/` — Hormuz Hold'em client (the only game so far).

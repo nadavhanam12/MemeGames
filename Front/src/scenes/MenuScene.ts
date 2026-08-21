@@ -6,8 +6,12 @@ import { hasArt } from '../core/art';
 import { pressPulse } from '../core/juice';
 import { MEMES, renderMeme } from '../core/memes';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
-import { broadcastCut, broadcastReveal, createTicker } from '../core/broadcast';
+import { broadcastCut, broadcastReveal } from '../core/broadcast';
+import { createPostHeader } from '../core/feedChrome';
 import { fetchLeaderboard } from '../backend/api';
+
+// Hairline divider color shared with feedChrome's card borders.
+const DIVIDER = 0x2f3336;
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -51,48 +55,27 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    const banner = this.add.container(cx, 120);
-    const bg = this.add.rectangle(0, 0, 700, 130, PAL.red).setStrokeStyle(6, PAL.ink);
-    const t1 = this.add
-      .text(0, -24, "HORMUZ HOLD'EM", {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '58px',
-        color: HEX.cream,
-        stroke: HEX.ink,
-        strokeThickness: 8
-      })
-      .setOrigin(0.5);
-    const t2 = this.add
-      .text(0, 32, 'HORMUZ MARKET DEFENSE — LIVE', {
-        fontFamily: FONT_SANS,
-        fontSize: '22px',
-        fontStyle: 'bold',
-        color: HEX.cream
-      })
-      .setOrigin(0.5);
-    banner.add([bg, t1, t2]);
-    // kicker tab + blinking LIVE dot: the title reads as a news lower-third
-    const kick = this.add
-      .text(-318, -80, 'LIVE FROM THE STRAIT', {
-        fontFamily: FONT_SANS,
-        fontSize: '15px',
-        fontStyle: 'bold',
-        color: HEX.ink
-      })
-      .setOrigin(0, 0.5);
-    const kickBg = this.add
-      .rectangle(-346 + (kick.width + 46) / 2, -80, kick.width + 46, 26, PAL.cream)
-      .setStrokeStyle(3, PAL.ink);
-    const dot = this.add
-      .text(-336, -81, '●', { fontFamily: FONT_SANS, fontSize: '14px', color: HEX.red })
-      .setOrigin(0, 0.5);
-    banner.add([kickBg, dot, kick]);
+    // profile header — bigger avatar for prominence, still the feed idiom.
+    // Scaled up from a narrower w so the right-aligned LIVE badge still lands
+    // inside the canvas after the scale multiplies every local offset.
+    const BANNER_SCALE = 1.3;
+    const BANNER_W = 420;
+    const bannerX = cx - (BANNER_W * BANNER_SCALE) / 2;
+    const banner = createPostHeader(this, {
+      x: bannerX,
+      y: 110,
+      w: BANNER_W,
+      handle: "Hormuz Hold'em",
+      subtext: '@hormuz_holdem',
+      live: true
+    });
+    banner.setScale(BANNER_SCALE);
     if (!settings.reducedMotion) {
-      this.tweens.add({ targets: dot, alpha: 0.15, duration: 600, yoyo: true, repeat: -1 });
       // graphics package slide-in from the left
       banner.setAlpha(0);
-      banner.x = cx - 360;
-      this.tweens.add({ targets: banner, x: cx, alpha: 1, duration: 320, ease: 'Cubic.easeOut' });
+      const targetX = banner.x;
+      banner.x = targetX - 60;
+      this.tweens.add({ targets: banner, x: targetX, alpha: 1, duration: 320, ease: 'Cubic.easeOut' });
     }
 
     // the situation, in plain english
@@ -103,29 +86,17 @@ export class MenuScene extends Phaser.Scene {
       'HOLD for a full burst — but DON’T OVERHEAT the gun!',
       'KEEP THE TANKERS SAFE and complete each day’s MISSION for bonus cash.'
     ];
-    this.add.rectangle(cx, 319, 900, 200, PAL.ink, 0.75).setStrokeStyle(3, PAL.gold, 0.6);
-    // "VIEWER GUIDE" tab on the box's top edge — the blurb as a news card
-    const guideTxt = this.add
-      .text(cx - 438, 219, 'VIEWER GUIDE', {
-        fontFamily: FONT_SANS,
-        fontSize: '14px',
-        fontStyle: 'bold',
-        color: HEX.ink
-      })
-      .setOrigin(0, 0.5);
-    this.add
-      .rectangle(cx - 450 + (guideTxt.width + 44) / 2, 219, guideTxt.width + 44, 24, PAL.gold)
-      .setStrokeStyle(3, PAL.ink);
-    guideTxt.setDepth(1);
+    const BLURB_W = 680;
+    const BLURB_Y = 330;
+    const BLURB_H = 230;
+    this.add.rectangle(cx, BLURB_Y, BLURB_W, BLURB_H, PAL.black, 0.85).setStrokeStyle(2, DIVIDER);
     blurb.forEach((line, i) => {
       const t = this.add
-        .text(cx, 254 + i * 34, line, {
+        .text(cx, BLURB_Y - 70 + i * 26, line, {
           fontFamily: FONT_SANS,
-          fontSize: '22px',
-          fontStyle: 'bold',
+          fontSize: '15px',
           color: HEX.cream,
-          stroke: HEX.ink,
-          strokeThickness: 3
+          wordWrap: { width: BLURB_W - 40 }
         })
         .setOrigin(0.5);
       if (!settings.reducedMotion) {
@@ -135,17 +106,12 @@ export class MenuScene extends Phaser.Scene {
       }
     });
 
-    // static menu memes, bottom corners (fixed picks — not part of the run's meme log)
-    const memeLeft = this.add.container(185, 560).setAngle(-4);
-    renderMeme(this, memeLeft, { id: 'rejectApproveKhamenei', tpl: MEMES.templates.rejectApproveKhamenei, captions: [], isNew: false }, 280, 280);
-    const memeRight = this.add.container(GAME_W - 185, 560).setAngle(4);
-    renderMeme(this, memeRight, { id: 'twoButtons2Trump', tpl: MEMES.templates.twoButtons2Trump, captions: [], isNew: false }, 280, 280);
-
     // start button
-    const start = this.add.container(cx, 485);
-    const sb = this.add.rectangle(0, 0, 440, 100, PAL.green).setStrokeStyle(6, PAL.ink);
+    const START_Y = 530;
+    const start = this.add.container(cx, START_Y);
+    const sb = this.add.rectangle(0, 0, 440, 100, PAL.black, 0.9).setStrokeStyle(2, PAL.green);
     const st = this.add
-      .text(0, 0, 'DEFEND THE STRAIT', { fontFamily: FONT_DISPLAY, fontSize: '34px', color: HEX.ink })
+      .text(0, 0, 'DEFEND THE STRAIT', { fontFamily: FONT_DISPLAY, fontSize: '34px', color: HEX.green })
       .setOrigin(0.5);
     start.add([sb, st]);
     start.setSize(440, 100);
@@ -153,11 +119,40 @@ export class MenuScene extends Phaser.Scene {
     if (!settings.reducedMotion) {
       this.tweens.add({ targets: start, scale: 1.04, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     }
+
+    // global leaderboard + meme gallery buttons, side by side below the CTA
+    const ROW_Y = 650;
+    const lb = this.add.container(cx - 140, ROW_Y);
+    const lbBg = this.add.rectangle(0, 0, 250, 70, PAL.black, 0.9).setStrokeStyle(2, PAL.ocean);
+    const lbTxt = this.add
+      .text(0, 0, 'LEADERBOARD', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.ocean })
+      .setOrigin(0.5);
+    lb.add([lbBg, lbTxt]);
+    lb.setSize(250, 70);
+    lb.setInteractive({ useHandCursor: true });
+    lb.on('pointerdown', () => {
+      if (leaving) return;
+      leaving = true;
+      sfx.unlock();
+      sfx.tap();
+      pressPulse(this, lb);
+      broadcastCut(this, () => this.scene.start('Leaderboard', { from: 'Menu' }));
+    });
+
+    // meme collection gallery
+    const gallery = this.add.container(cx + 140, ROW_Y);
+    const galleryBg = this.add.rectangle(0, 0, 250, 70, PAL.black, 0.9).setStrokeStyle(2, PAL.purple);
+    const galleryTxt = this.add
+      .text(0, 0, 'MEME GALLERY', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.purple })
+      .setOrigin(0.5);
+    gallery.add([galleryBg, galleryTxt]);
+    gallery.setSize(250, 70);
+
     // player count (backend-driven; hidden until the fetch succeeds)
     const playersTxt = this.add
-      .text(cx, 668, '', {
+      .text(cx, 715, '', {
         fontFamily: FONT_SANS,
-        fontSize: '20px',
+        fontSize: '18px',
         fontStyle: 'bold',
         color: HEX.cream,
         stroke: HEX.ink,
@@ -175,32 +170,12 @@ export class MenuScene extends Phaser.Scene {
         /* server unreachable — leave the line empty */
       });
 
-    // global leaderboard (backend-driven)
-    const lb = this.add.container(cx - 140, 600);
-    const lbBg = this.add.rectangle(0, 0, 250, 70, PAL.ocean).setStrokeStyle(6, PAL.ink);
-    const lbTxt = this.add
-      .text(0, 0, 'LEADERBOARD', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.cream })
-      .setOrigin(0.5);
-    lb.add([lbBg, lbTxt]);
-    lb.setSize(250, 70);
-    lb.setInteractive({ useHandCursor: true });
-    lb.on('pointerdown', () => {
-      if (leaving) return;
-      leaving = true;
-      sfx.unlock();
-      sfx.tap();
-      pressPulse(this, lb);
-      broadcastCut(this, () => this.scene.start('Leaderboard', { from: 'Menu' }));
-    });
-
-    // meme collection gallery
-    const gallery = this.add.container(cx + 140, 600);
-    const galleryBg = this.add.rectangle(0, 0, 250, 70, PAL.purple).setStrokeStyle(6, PAL.ink);
-    const galleryTxt = this.add
-      .text(0, 0, 'MEME GALLERY', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.cream })
-      .setOrigin(0.5);
-    gallery.add([galleryBg, galleryTxt]);
-    gallery.setSize(250, 70);
+    // static menu memes (fixed picks — not part of the run's meme log)
+    const MEME_Y = 900;
+    const memeLeft = this.add.container(190, MEME_Y).setAngle(-4);
+    renderMeme(this, memeLeft, { id: 'rejectApproveKhamenei', tpl: MEMES.templates.rejectApproveKhamenei, captions: [], isNew: false }, 280, 280);
+    const memeRight = this.add.container(GAME_W - 190, MEME_Y).setAngle(4);
+    renderMeme(this, memeRight, { id: 'twoButtons2Trump', tpl: MEMES.templates.twoButtons2Trump, captions: [], isNew: false }, 280, 280);
     gallery.setInteractive({ useHandCursor: true });
     gallery.on('pointerdown', () => {
       if (leaving) return;
@@ -234,10 +209,14 @@ export class MenuScene extends Phaser.Scene {
     flyIn(memeLeft, 590, 30);
     flyIn(memeRight, 650, 30);
 
-    // bottom ticker crawl — live archive stat woven in ahead of the canned pool
-    createTicker(this, 702, [
-      `MEME ARCHIVE: ${getUnlockedTemplates().size}/${Object.keys(MEMES.templates).length} COLLECTED`
-    ]);
+    // static muted stat line replacing the old scrolling ticker crawl
+    this.add
+      .text(cx, 1256, `🔓 ${getUnlockedTemplates().size}/${Object.keys(MEMES.templates).length} memes collected`, {
+        fontFamily: FONT_SANS,
+        fontSize: '16px',
+        color: HEX.muted
+      })
+      .setOrigin(0.5);
   }
 
 }

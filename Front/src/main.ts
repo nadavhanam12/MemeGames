@@ -8,9 +8,9 @@ import { ResultsScene } from './scenes/ResultsScene';
 import { LeaderboardScene } from './scenes/LeaderboardScene';
 import { GalleryScene } from './scenes/GalleryScene';
 import { initDevtools } from './dev/devtools';
-import { setupLandscapeLock } from './core/orientation';
+import { setupPortraitLock } from './core/orientation';
 
-setupLandscapeLock();
+setupPortraitLock();
 
 // Hi-DPI: every add.text() renders its glyph texture at DPR× so text stays
 // crisp under the DPR camera zoom. Explicit style.resolution still wins.

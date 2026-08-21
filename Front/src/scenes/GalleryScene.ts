@@ -11,21 +11,25 @@ import { DPR, FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEX, PAL } from '../core/
 import { hasArt } from '../core/art';
 import { sfx } from '../core/sfx';
 import { pressPulse } from '../core/juice';
-import { broadcastCut, broadcastReveal, lowerThird, staticBlink } from '../core/broadcast';
+import { broadcastCut, broadcastReveal, staticBlink } from '../core/broadcast';
+import { createPostHeader } from '../core/feedChrome';
 import { MEMES } from '../core/memes';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
 import { captureAndShare, captureAndShareTo } from '../core/share';
 import { addExportButtonRow } from '../core/shareButtons';
 import { settings } from '../core/settings';
 
-const COLS = 9;
-const TILE_W = 118;
-const TILE_H = 118;
-const GAP_X = 14;
-const GAP_Y = 12;
+const COLS = 4;
+const TILE_W = 150;
+const TILE_H = 150;
+const GAP_X = 16;
+const GAP_Y = 16;
 const VIEWPORT_TOP = 116;
-const VIEWPORT_BOTTOM = 638; // above the BACK button
+const VIEWPORT_BOTTOM = 1150; // above the BACK button
 const CLICK_DRAG_THRESHOLD = 8; // px of movement below which a release counts as a tap, not a scroll
+
+// Hairline divider color shared with feedChrome's card borders.
+const DIVIDER = 0x2f3336;
 
 export class GalleryScene extends Phaser.Scene {
   private from: string = 'Menu';
@@ -58,21 +62,20 @@ export class GalleryScene extends Phaser.Scene {
     const cx = GAME_W / 2;
     this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, PAL.navy);
     broadcastReveal(this);
-    const headerBar = this.add.rectangle(cx, 52, GAME_W, 88, PAL.ink).setStrokeStyle(4, PAL.gold, 0.5);
-    lowerThird(this, {
-      x: 90,
+    const headerBar = this.add.rectangle(cx, 52, GAME_W, 88, PAL.black, 0.9).setStrokeStyle(2, DIVIDER);
+    createPostHeader(this, {
+      x: 24,
       y: 44,
-      kicker: 'HHN ARCHIVE',
-      main: 'MEME COLLECTION',
-      mainSize: 30,
-      color: PAL.purple
+      w: GAME_W - 48,
+      avatarColor: PAL.purple,
+      handle: 'Meme collection',
+      subtext: 'Media · your saved posts'
     });
     const countTxt = this.add
-      .text(cx, 78, `${getUnlockedTemplates().size} / ${this.ids.length} UNLOCKED — TAP AN UNLOCKED MEME TO ZOOM`, {
+      .text(cx, 78, `${getUnlockedTemplates().size} / ${this.ids.length} unlocked — tap an unlocked meme to zoom`, {
         fontFamily: FONT_SANS,
         fontSize: '15px',
-        fontStyle: 'bold',
-        color: HEX.gold
+        color: HEX.muted
       })
       .setOrigin(0.5);
 
@@ -85,7 +88,7 @@ export class GalleryScene extends Phaser.Scene {
     maskShape.fillRect(0, VIEWPORT_TOP, GAME_W, VIEWPORT_BOTTOM - VIEWPORT_TOP);
     this.grid.setMask(maskShape.createGeometryMask());
 
-    const back = this.makeButton(150, 668, 200, '← BACK', PAL.red, () => this.exitTo(this.from));
+    const back = this.makeButton(cx, 1220, 220, '← BACK', PAL.red, () => this.exitTo(this.from));
 
     this.setupScrollInput();
 
@@ -327,7 +330,7 @@ export class GalleryScene extends Phaser.Scene {
     onClick: () => void
   ): Phaser.GameObjects.Container {
     const c = this.add.container(x, y);
-    const bg = this.add.rectangle(0, 0, w, 56, color).setStrokeStyle(4, PAL.ink);
+    const bg = this.add.rectangle(0, 0, w, 56, PAL.black, 0.9).setStrokeStyle(2, color);
     const t = this.add
       .text(0, 0, label, { fontFamily: FONT_SANS, fontSize: '20px', fontStyle: 'bold', color: HEX.cream })
       .setOrigin(0.5);

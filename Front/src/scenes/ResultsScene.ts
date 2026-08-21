@@ -6,19 +6,22 @@ import { hasArt } from '../core/art';
 import { MEMES, MemePick, getMemeLog, renderMeme } from '../core/memes';
 import { getRunUnlocks, getUnlockedTemplates } from '../core/memeUnlocks';
 import { EASE, confetti, countTo } from '../core/juice';
-import { broadcastCut, broadcastReveal, stampIn } from '../core/broadcast';
+import { broadcastCut, broadcastReveal } from '../core/broadcast';
+import { createPostHeader } from '../core/feedChrome';
 import { SessionStats, computeScore, freshStats } from '../core/state';
 import { captureAndShare } from '../core/share';
 import { leaderboard } from '../backend/leaderboard';
 import { openSubmitOverlay } from '../backend/submitOverlay';
 import { analytics } from '../backend/analytics';
 
-// The run recap styled as a newspaper front page — a self-contained "poster"
-// designed to be screenshotted or exported via the SHARE button (which
+// The run recap styled as a single feed "tweet" card — a self-contained
+// post designed to be screenshotted or exported via the SHARE button (which
 // captures exactly this rect, watermarked, and opens the OS share sheet).
-const CARD = { x: GAME_W / 2, y: 300, w: 900, h: 480 } as const;
-const PAPER = 0xf6efdc;
-const PAPER_INK = HEX.ink;
+const CARD = { x: GAME_W / 2, y: 500, w: 660, h: 960 } as const;
+const CARD_BG = PAL.black;
+const CARD_INK = HEX.cream;
+// Hairline divider color shared with feedChrome's card borders.
+const DIVIDER = 0x2f3336;
 
 /** Every run ends the same way (market meltdown), so the headline only has to
  *  vary by how long the player lasted. */
@@ -59,16 +62,19 @@ export class ResultsScene extends Phaser.Scene {
     root.add(card);
 
     // --- buttons -----------------------------------------------------------
+    // Thinner feed-native buttons: dark card + colored accent border/text
+    // (was solid bright fills with a thick cartoon outline).
     const mkButton = (
       x: number,
+      y: number,
       w: number,
-      fill: number,
+      accent: number,
       label: string,
       labelColor: string,
       onClick: () => void
     ): Phaser.GameObjects.Container => {
-      const c = this.add.container(x, 610);
-      const bg = this.add.rectangle(0, 0, w, 76, fill).setStrokeStyle(6, PAL.ink);
+      const c = this.add.container(x, y);
+      const bg = this.add.rectangle(0, 0, w, 76, PAL.black, 0.9).setStrokeStyle(2, accent);
       const t = this.add
         .text(0, 0, label, {
           fontFamily: FONT_DISPLAY,
@@ -111,7 +117,7 @@ export class ResultsScene extends Phaser.Scene {
           analytics.track('score_submitted', { accepted: outcome.response.accepted, saved: outcome.response.saved });
           if (outcome.response.saved) {
             sfx.fanfare();
-            confetti(this, GAME_W / 2, 240, 24);
+            confetti(this, GAME_W / 2, 200, 24);
           }
         } else {
           analytics.track('score_submit_skipped');
@@ -157,13 +163,18 @@ export class ResultsScene extends Phaser.Scene {
       }
     };
 
+    // 2x2 button grid below the front page (was one wide row in landscape)
     const totalMemes = Object.keys(MEMES.templates).length;
-    mkButton(228, 250, PAL.ocean, 'LEADERBOARD', HEX.cream, () => void runSubmitFlow(true));
-    mkButton(521, 300, PAL.green, 'DEFEND AGAIN', HEX.ink, () =>
+    const BTN_ROW1_Y = 1030;
+    const BTN_ROW2_Y = 1130;
+    const BTN_L_X = GAME_W / 2 - 170;
+    const BTN_R_X = GAME_W / 2 + 170;
+    mkButton(BTN_L_X, BTN_ROW1_Y, 320, PAL.ocean, 'LEADERBOARD', HEX.ocean, () => void runSubmitFlow(true));
+    mkButton(BTN_R_X, BTN_ROW1_Y, 320, PAL.green, 'DEFEND AGAIN', HEX.green, () =>
       this.exitTo(() => this.scene.start('Game'))
     );
-    const shareBtn = mkButton(799, 220, PAL.gold, 'SHARE', HEX.ink, () => void shareRun(shareBtn));
-    mkButton(1052, 250, PAL.purple, `GALLERY ${getUnlockedTemplates().size}/${totalMemes}`, HEX.cream, () =>
+    const shareBtn = mkButton(BTN_L_X, BTN_ROW2_Y, 320, PAL.gold, 'SHARE', HEX.gold, () => void shareRun(shareBtn));
+    mkButton(BTN_R_X, BTN_ROW2_Y, 320, PAL.purple, `GALLERY ${getUnlockedTemplates().size}/${totalMemes}`, HEX.purple, () =>
       this.exitTo(() => this.scene.start('Gallery', { from: 'Results' }))
     );
 
@@ -196,22 +207,9 @@ export class ResultsScene extends Phaser.Scene {
       sfx.priceDown();
     });
 
-    // certification stamp slams on once the score finishes counting up
-    const stamp = this.add
-      .text(GAME_W / 2 + 262, 198, 'OFFICIAL — HHN', {
-        fontFamily: FONT_DISPLAY,
-        fontSize: '22px',
-        color: HEX.gold,
-        stroke: HEX.ink,
-        strokeThickness: 5
-      })
-      .setOrigin(0.5)
-      .setAngle(-9);
-    root.add(stamp);
-    stampIn(this, stamp, reduced ? 400 : 1250);
     this.time.delayedCall(reduced ? 500 : 1200, () => {
       sfx.fanfare();
-      confetti(this, GAME_W / 2, 250, 26);
+      confetti(this, GAME_W / 2, 210, 26);
     });
 
     // let the recap land, then roll into submit → leaderboard (once per run)
@@ -240,86 +238,74 @@ export class ResultsScene extends Phaser.Scene {
     const halfW = CARD.w / 2;
     const halfH = CARD.h / 2;
 
-    card.add(this.add.rectangle(0, 0, CARD.w, CARD.h, PAPER).setStrokeStyle(6, PAL.ink));
-    card.add(this.add.rectangle(0, 0, CARD.w - 16, CARD.h - 16).setStrokeStyle(2, PAL.ink, 0.35));
+    card.add(this.add.rectangle(0, 0, CARD.w, CARD.h, CARD_BG, 0.92).setStrokeStyle(2, DIVIDER));
 
-    // masthead + dateline
+    // post header — this run's recap as a single tweet
     card.add(
-      this.add
-        .text(0, -halfH + 34, "THE HORMUZ HOLD'EM TIMES", {
-          fontFamily: FONT_DISPLAY,
-          fontSize: '34px',
-          color: PAPER_INK
-        })
-        .setOrigin(0.5)
+      createPostHeader(this, {
+        x: -halfW + 20,
+        y: -halfH + 44,
+        w: CARD.w - 40,
+        handle: "Hormuz Hold'em",
+        subtext: 'just now',
+        live: false
+      })
     );
-    card.add(this.add.rectangle(0, -halfH + 58, CARD.w - 70, 3, PAL.ink));
+    card.add(this.add.rectangle(0, -halfH + 86, CARD.w - 40, 2, DIVIDER));
+
+    // headline as the tweet's caption text (not a newspaper headline treatment)
     card.add(
       this.add
-        .text(0, -halfH + 72, `SPECIAL EDITION  ·  DAY ${stats.daysSurvived}  ·  OIL AT $${Math.round(stats.oilPrice)}/BBL`, {
+        .text(0, -halfH + 100, headlineFor(stats), {
           fontFamily: FONT_SANS,
-          fontSize: '13px',
+          fontSize: '20px',
           fontStyle: 'bold',
-          color: PAPER_INK
-        })
-        .setOrigin(0.5)
-        .setAlpha(0.8)
-    );
-    card.add(this.add.rectangle(0, -halfH + 86, CARD.w - 70, 3, PAL.ink));
-
-    // headline + eyewitness subhead
-    card.add(
-      this.add
-        .text(0, -halfH + 96, headlineFor(stats), {
-          fontFamily: FONT_DISPLAY,
-          fontSize: '38px',
-          color: PAPER_INK,
+          color: CARD_INK,
           align: 'center',
           wordWrap: { width: CARD.w - 60 }
         })
         .setOrigin(0.5, 0)
     );
     const subhead = stats.memeMoment
-      ? `EYEWITNESS MOMENT: “${stats.memeMoment}”`
-      : `${stats.tankersSafe} TANKERS ESCORTED SAFELY · ${stats.tankersLost} LOST AT SEA`;
+      ? `eyewitness moment: “${stats.memeMoment}”`
+      : `${stats.tankersSafe} tankers escorted safely · ${stats.tankersLost} lost at sea`;
     card.add(
       this.add
-        .text(0, -34, subhead, {
+        .text(0, -halfH + 230, subhead, {
           fontFamily: FONT_SANS,
-          fontSize: '16px',
-          fontStyle: 'bold',
-          color: PAPER_INK
+          fontSize: '14px',
+          color: HEX.muted,
+          align: 'center',
+          wordWrap: { width: CARD.w - 60 }
         })
         .setOrigin(0.5)
-        .setAlpha(0.85)
     );
 
-    // left column — "photo": the last meme this run produced, real captions
-    const photoX = -233;
-    card.add(this.add.rectangle(photoX, 96, 344, 236, 0xffffff).setStrokeStyle(4, PAL.ink));
+    // "photo": the last meme this run produced, real captions — single
+    // centered column now (was a left column beside the stats in landscape)
+    const photoY = -halfH + 410;
+    card.add(this.add.rectangle(0, photoY, 460, 300, 0x0e161e).setStrokeStyle(2, DIVIDER));
     const lastMeme = this.lastMemePick();
     if (lastMeme) {
-      const photo = this.add.container(photoX, 88);
-      renderMeme(this, photo, lastMeme, 320, 190);
+      const photo = this.add.container(0, photoY - 8);
+      renderMeme(this, photo, lastMeme, 420, 260);
       card.add(photo);
       card.add(
         this.add
-          .text(photoX, 198, 'PHOTO: MOMENTS BEFORE DISASTER', {
+          .text(0, photoY + 164, 'moments before disaster', {
             fontFamily: FONT_SANS,
-            fontSize: '11px',
-            fontStyle: 'bold',
-            color: PAPER_INK
+            fontSize: '12px',
+            color: HEX.muted
           })
           .setOrigin(0.5)
-          .setAlpha(0.7)
       );
     } else {
       card.add(
         this.add
-          .text(photoX, 96, 'NO PHOTOS SURVIVED\nTHE BLAST', {
+          .text(0, photoY, 'NO PHOTOS SURVIVED\nTHE BLAST', {
             fontFamily: FONT_DISPLAY,
             fontSize: '22px',
-            color: PAPER_INK,
+            color: CARD_INK,
             align: 'center'
           })
           .setOrigin(0.5)
@@ -332,40 +318,38 @@ export class ResultsScene extends Phaser.Scene {
     card.add(
       this.add
         .text(
-          photoX,
-          224,
+          0,
+          photoY + 198,
           unlocks > 0
-            ? `★ ${unlocks} NEW MEME${unlocks === 1 ? '' : 'S'} UNLOCKED — SEE GALLERY`
-            : 'CLASSIFIEDS: TANKER CAPTAIN SEEKS NEW LINE OF WORK',
+            ? `★ ${unlocks} new meme${unlocks === 1 ? '' : 's'} unlocked — see gallery`
+            : 'tanker captain seeks new line of work',
           {
             fontFamily: FONT_SANS,
             fontSize: '13px',
             fontStyle: 'bold',
-            color: unlocks > 0 ? HEX.purple : PAPER_INK
+            color: unlocks > 0 ? HEX.purple : HEX.muted
           }
         )
         .setOrigin(0.5)
-        .setAlpha(unlocks > 0 ? 1 : 0.6)
     );
 
-    // right column — score + stat briefs + sparkline
-    const colX = 215;
+    // score + stat briefs + sparkline — stacked below the photo (was a right
+    // column beside it in landscape)
     card.add(
       this.add
-        .text(colX, -8, 'FINAL SCORE', {
+        .text(0, halfH - 316, 'FINAL SCORE', {
           fontFamily: FONT_SANS,
           fontSize: '14px',
           fontStyle: 'bold',
-          color: PAPER_INK
+          color: HEX.muted
         })
         .setOrigin(0.5)
-        .setAlpha(0.75)
     );
     const scoreTxt = this.add
-      .text(colX, 38, '0', {
+      .text(0, halfH - 270, '0', {
         fontFamily: FONT_DISPLAY,
-        fontSize: '54px',
-        color: PAPER_INK
+        fontSize: '56px',
+        color: CARD_INK
       })
       .setOrigin(0.5);
     card.add(scoreTxt);
@@ -378,18 +362,18 @@ export class ResultsScene extends Phaser.Scene {
     statLines.forEach((line, i) => {
       card.add(
         this.add
-          .text(colX, 92 + i * 24, line, {
+          .text(0, halfH - 210 + i * 26, line, {
             fontFamily: FONT_SANS,
             fontSize: '15px',
             fontStyle: 'bold',
-            color: PAPER_INK
+            color: CARD_INK
           })
           .setOrigin(0.5)
           .setAlpha(0.9)
       );
     });
 
-    this.drawSparkline(card, stats, colX, 186, 380, 60);
+    this.drawSparkline(card, stats, 0, halfH - 73, 500, 70);
 
     return { card, scoreTxt };
   }
@@ -416,13 +400,13 @@ export class ResultsScene extends Phaser.Scene {
     h: number
   ): void {
     const hist = stats.priceHistory;
-    card.add(this.add.rectangle(cx, cy, w, h, 0xffffff, 0.55).setStrokeStyle(2, PAL.ink, 0.5));
+    card.add(this.add.rectangle(cx, cy, w, h, 0x0e161e, 0.7).setStrokeStyle(2, DIVIDER));
     if (hist.length >= 2) {
       const min = Math.min(...hist);
       const max = Math.max(...hist);
       const span = Math.max(1, max - min);
       const g = this.add.graphics();
-      g.lineStyle(3, PAL.ink, 0.9);
+      g.lineStyle(3, PAL.ocean, 0.9);
       g.beginPath();
       hist.forEach((p, i) => {
         const px = cx - w / 2 + 8 + (i / (hist.length - 1)) * (w - 16);
@@ -444,10 +428,9 @@ export class ResultsScene extends Phaser.Scene {
           fontFamily: FONT_SANS,
           fontSize: '11px',
           fontStyle: 'bold',
-          color: PAPER_INK
+          color: HEX.muted
         })
         .setOrigin(0, 0.5)
-        .setAlpha(0.7)
     );
   }
 }

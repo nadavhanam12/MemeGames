@@ -7,7 +7,8 @@ import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
 import { pressPulse } from '../core/juice';
 import { settings } from '../core/settings';
-import { broadcastCut, broadcastReveal, lowerThird } from '../core/broadcast';
+import { broadcastCut, broadcastReveal } from '../core/broadcast';
+import { createPostHeader } from '../core/feedChrome';
 import { LeaderboardPeriod, LeaderboardResponse } from '../backend/api';
 import { leaderboard } from '../backend/leaderboard';
 
@@ -19,6 +20,9 @@ const PERIODS: Array<{ key: LeaderboardPeriod; label: string }> = [
 ];
 
 const PAGE_SIZE = 10;
+
+// Hairline divider color shared with feedChrome's card borders.
+const DIVIDER = 0x2f3336;
 
 export class LeaderboardScene extends Phaser.Scene {
   private period: LeaderboardPeriod = 'all';
@@ -49,19 +53,21 @@ export class LeaderboardScene extends Phaser.Scene {
     }
 
     broadcastReveal(this);
-    this.add.rectangle(cx, 52, GAME_W, 88, PAL.ink).setStrokeStyle(4, PAL.gold, 0.5);
-    lowerThird(this, {
-      x: 90,
-      y: 58,
-      kicker: 'MARKET CLOSE RANKINGS',
-      main: 'GLOBAL LEADERBOARD',
-      mainSize: 34
+    this.add.rectangle(cx, 52, GAME_W, 88, PAL.black, 0.9).setStrokeStyle(2, DIVIDER);
+    createPostHeader(this, {
+      x: 24,
+      y: 52,
+      w: GAME_W - 48,
+      handle: 'Trending in oil markets',
+      subtext: 'Leaderboard · updated live'
     });
 
-    // period tabs
+    // period tabs — 2x2 grid (was a single row of 4 spanning a 1280px canvas)
     PERIODS.forEach((p, i) => {
-      const c = this.add.container(cx - 330 + i * 220, 130);
-      const bg = this.add.rectangle(0, 0, 200, 52, PAL.ocean).setStrokeStyle(4, PAL.ink);
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const c = this.add.container(cx + (col === 0 ? -120 : 120), 130 + row * 65);
+      const bg = this.add.rectangle(0, 0, 200, 52, PAL.black, 0.9).setStrokeStyle(2, PAL.ocean);
       const t = this.add
         .text(0, 0, p.label, { fontFamily: FONT_SANS, fontSize: '20px', fontStyle: 'bold', color: HEX.cream })
         .setOrigin(0.5);
@@ -82,16 +88,17 @@ export class LeaderboardScene extends Phaser.Scene {
 
     this.rows = this.add.container(0, 0);
     this.statusTxt = this.add
-      .text(cx, 380, '', { fontFamily: FONT_SANS, fontSize: '24px', fontStyle: 'bold', color: HEX.gold })
+      .text(cx, 245, '', { fontFamily: FONT_SANS, fontSize: '22px', fontStyle: 'bold', color: HEX.gold })
       .setOrigin(0.5);
 
-    // pager + back
-    this.makeButton(cx - 190, 668, 150, '◀ PREV', PAL.ocean, () => this.turnPage(-1));
+    // pager (its own row) + back (below it) — stacked now instead of sharing
+    // one row, since PREV/BACK collided once the canvas narrowed to 720px
+    this.makeButton(cx - 160, 1160, 140, '◀ PREV', PAL.ocean, () => this.turnPage(-1));
     this.pageTxt = this.add
-      .text(cx, 668, '', { fontFamily: FONT_SANS, fontSize: '20px', fontStyle: 'bold', color: HEX.cream })
+      .text(cx, 1160, '', { fontFamily: FONT_SANS, fontSize: '20px', fontStyle: 'bold', color: HEX.cream })
       .setOrigin(0.5);
-    this.makeButton(cx + 190, 668, 150, 'NEXT ▶', PAL.ocean, () => this.turnPage(1));
-    this.makeButton(150, 668, 200, '← BACK', PAL.red, () => broadcastCut(this, () => this.scene.start(this.from)));
+    this.makeButton(cx + 160, 1160, 140, 'NEXT ▶', PAL.ocean, () => this.turnPage(1));
+    this.makeButton(cx, 1230, 220, '← BACK', PAL.red, () => broadcastCut(this, () => this.scene.start(this.from)));
 
     this.refreshTabs();
     this.loadPage();
@@ -99,7 +106,9 @@ export class LeaderboardScene extends Phaser.Scene {
 
   private refreshTabs(): void {
     for (const t of this.tabs) {
-      t.bg.setFillStyle(t.key === this.period ? PAL.gold : PAL.ocean);
+      const active = t.key === this.period;
+      t.bg.setFillStyle(active ? PAL.ocean : PAL.black, active ? 0.35 : 0.9);
+      t.bg.setStrokeStyle(2, active ? PAL.gold : PAL.ocean);
     }
   }
 
@@ -112,7 +121,7 @@ export class LeaderboardScene extends Phaser.Scene {
 
   private makeButton(x: number, y: number, w: number, label: string, color: number, onClick: () => void): void {
     const c = this.add.container(x, y);
-    const bg = this.add.rectangle(0, 0, w, 56, color).setStrokeStyle(4, PAL.ink);
+    const bg = this.add.rectangle(0, 0, w, 56, PAL.black, 0.9).setStrokeStyle(2, color);
     const t = this.add
       .text(0, 0, label, { fontFamily: FONT_SANS, fontSize: '20px', fontStyle: 'bold', color: HEX.cream })
       .setOrigin(0.5);
@@ -149,8 +158,9 @@ export class LeaderboardScene extends Phaser.Scene {
     this.pageTxt.setText(`PAGE ${res.page} / ${Math.max(1, res.totalPages)}`);
 
     const cx = GAME_W / 2;
-    const top = 196;
-    const rowH = 40;
+    const top = 300; // below the 2-row tab grid
+    const rowH = 42;
+    const rowW = 660; // was 900, wider than the 720px portrait canvas
     const myRank = res.myRanking?.rank;
 
     // podium accents: gold / silver / bronze for the top three
@@ -165,13 +175,13 @@ export class LeaderboardScene extends Phaser.Scene {
       const medal = MEDALS[e.rank];
       const rowC = this.add.container(0, 0);
       const bg = this.add
-        .rectangle(cx, y, 900, rowH - 6, mine ? PAL.gold : PAL.ink, mine ? 0.9 : 0.7)
-        .setStrokeStyle(2, mine ? PAL.cream : medal ? medal.stroke : PAL.gold, mine || medal ? 1 : 0.35);
-      const color = mine ? HEX.ink : medal ? medal.color : HEX.cream;
-      const style = { fontFamily: FONT_SANS, fontSize: '21px', fontStyle: 'bold', color };
-      const rankT = this.add.text(cx - 420, y, `#${e.rank}`, style).setOrigin(0, 0.5);
-      const nameT = this.add.text(cx - 320, y, e.name.toUpperCase().slice(0, 24), style).setOrigin(0, 0.5);
-      const scoreT = this.add.text(cx + 420, y, `${e.score}`, style).setOrigin(1, 0.5);
+        .rectangle(cx, y, rowW, rowH - 6, mine ? PAL.ocean : PAL.black, mine ? 0.25 : 0.85)
+        .setStrokeStyle(2, mine ? PAL.ocean : medal ? medal.stroke : DIVIDER, mine || medal ? 1 : 0.6);
+      const color = mine ? HEX.ocean : medal ? medal.color : HEX.cream;
+      const style = { fontFamily: FONT_SANS, fontSize: '19px', fontStyle: 'bold', color };
+      const rankT = this.add.text(cx - rowW / 2 + 30, y, `#${e.rank}`, style).setOrigin(0, 0.5);
+      const nameT = this.add.text(cx - rowW / 2 + 130, y, e.name.toUpperCase().slice(0, 20), style).setOrigin(0, 0.5);
+      const scoreT = this.add.text(cx + rowW / 2 - 30, y, `${e.score}`, style).setOrigin(1, 0.5);
       rowC.add([bg, rankT, nameT, scoreT]);
       this.rows.add(rowC);
       // chart-rundown stagger: each row slides in off the right edge
@@ -185,11 +195,11 @@ export class LeaderboardScene extends Phaser.Scene {
     // player's own rank, pinned below the list when outside the current page
     if (res.myRanking && !res.entries.some(e => e.rank === res.myRanking!.rank)) {
       const y = top + res.entries.length * rowH + 16;
-      const bg = this.add.rectangle(cx, y, 900, rowH - 4, PAL.gold, 0.95).setStrokeStyle(3, PAL.ink);
-      const style = { fontFamily: FONT_SANS, fontSize: '21px', fontStyle: 'bold', color: HEX.ink };
-      const rankT = this.add.text(cx - 420, y, `#${res.myRanking.rank}`, style).setOrigin(0, 0.5);
-      const nameT = this.add.text(cx - 320, y, `${res.myRanking.name.toUpperCase().slice(0, 20)} (YOU)`, style).setOrigin(0, 0.5);
-      const scoreT = this.add.text(cx + 420, y, `${res.myRanking.score}`, style).setOrigin(1, 0.5);
+      const bg = this.add.rectangle(cx, y, rowW, rowH - 4, PAL.ocean, 0.25).setStrokeStyle(2, PAL.ocean);
+      const style = { fontFamily: FONT_SANS, fontSize: '19px', fontStyle: 'bold', color: HEX.ocean };
+      const rankT = this.add.text(cx - rowW / 2 + 30, y, `#${res.myRanking.rank}`, style).setOrigin(0, 0.5);
+      const nameT = this.add.text(cx - rowW / 2 + 130, y, `${res.myRanking.name.toUpperCase().slice(0, 16)} (YOU)`, style).setOrigin(0, 0.5);
+      const scoreT = this.add.text(cx + rowW / 2 - 30, y, `${res.myRanking.score}`, style).setOrigin(1, 0.5);
       this.rows.add([bg, rankT, nameT, scoreT]);
     }
   }

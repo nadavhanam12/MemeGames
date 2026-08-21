@@ -73,10 +73,15 @@ interface Tanker {
   dead: boolean;
 }
 
-// Fallback (code-drawn map) geometry: straight horizontal lane.
-const LANE_TOP = 220;
-const LANE_BOT = 500;
-const TANKER_Y = 360;
+// Fallback (code-drawn map) geometry: straight horizontal lane. Y values are
+// scaled from the original 1280×720 landscape frame to the current
+// 720×1280 portrait frame (×1280/720) so the lane still reads as a
+// proportionate band down the middle of the taller world.
+const OLD_GAME_H = 720;
+const FRAME_SCALE_Y = GAME_H / OLD_GAME_H;
+const LANE_TOP = Math.round(220 * FRAME_SCALE_Y);
+const LANE_BOT = Math.round(500 * FRAME_SCALE_Y);
+const TANKER_Y = Math.round(360 * FRAME_SCALE_Y);
 
 export class GameScene extends Phaser.Scene {
   private stats!: SessionStats;
@@ -966,7 +971,7 @@ export class GameScene extends Phaser.Scene {
     if (this.mission?.type === 'combo') this.bumpMission(this.dayCounters.bestCombo);
     if (this.stats.combo === MEMES.settings.streakCombo) this.emitMeme('ON A RAMPAGE');
     if (milestone) {
-      this.addCredits(this.stats.combo, GAME_W / 2, 200);
+      this.addCredits(this.stats.combo, GAME_W / 2, Math.round(200 * FRAME_SCALE_Y));
       sfx.comboSting(Math.floor(this.stats.combo / 10));
     }
   }
@@ -977,7 +982,7 @@ export class GameScene extends Phaser.Scene {
       if (this.stats.combo >= 5) {
         sfx.comboBreak();
         camImpulse(this, TUNING.juice.shakeSmall, 100);
-        floatText(this, GAME_W / 2, 250, `COMBO ×${this.stats.combo} LOST`, HEX.red, 24);
+        floatText(this, GAME_W / 2, Math.round(250 * FRAME_SCALE_Y), `COMBO ×${this.stats.combo} LOST`, HEX.red, 24);
       }
       this.stats.combo = 0;
       bus.emit(EV.COMBO, 0, undefined);
@@ -1166,7 +1171,7 @@ export class GameScene extends Phaser.Scene {
       g.generateTexture('jetGen', 48, 28);
       g.destroy();
     }
-    this.jet = this.add.image(GAME_W / 2, 110, 'jetGen').setDepth(40);
+    this.jet = this.add.image(GAME_W / 2, Math.round(110 * FRAME_SCALE_Y), 'jetGen').setDepth(40);
   }
 
   // ------------------------------------------------------------- events
@@ -1216,7 +1221,7 @@ export class GameScene extends Phaser.Scene {
       this.stats.eventsWon++;
       this.changePrice(-4);
       this.addCredits(TUNING.economy.eventWinCredits, GAME_W / 2, TANKER_Y);
-      confetti(this, GAME_W / 2, 200, 20);
+      confetti(this, GAME_W / 2, Math.round(200 * FRAME_SCALE_Y), 20);
       sfx.fanfare();
       this.stats.memeMoment = this.stats.memeMoment || `SURVIVED: ${this.eventLabel}`;
       this.emitMeme('EVENT SURVIVED');
@@ -1295,7 +1300,7 @@ export class GameScene extends Phaser.Scene {
     if (m.type !== 'price' && m.type !== 'perfect' && progress >= m.target) {
       m.done = true;
       sfx.fanfare();
-      floatText(this, GAME_W / 2, 250, 'MISSION COMPLETE!', HEX.green, 30);
+      floatText(this, GAME_W / 2, Math.round(250 * FRAME_SCALE_Y), 'MISSION COMPLETE!', HEX.green, 30);
     }
     bus.emit(EV.MISSION, { ...m });
   }
@@ -1309,10 +1314,10 @@ export class GameScene extends Phaser.Scene {
     else if (m.type === 'perfect') m.done = this.dayCounters.lost === 0;
     const rewardCredits = d.rewardCreditsBase + this.day * d.rewardCreditsPerDay;
     if (m.done) {
-      this.addCredits(rewardCredits, GAME_W / 2, 220);
+      this.addCredits(rewardCredits, GAME_W / 2, Math.round(220 * FRAME_SCALE_Y));
       this.stats.milestoneBonus += this.day * d.rewardScorePerDay;
       this.stats.missionsCompleted++;
-      confetti(this, GAME_W / 2, 220, 18);
+      confetti(this, GAME_W / 2, Math.round(220 * FRAME_SCALE_Y), 18);
       sfx.fanfare();
     } else {
       sfx.alarm();
@@ -1794,7 +1799,7 @@ export class GameScene extends Phaser.Scene {
       this.airTimer = Math.max(0, this.airTimer - rawDt);
       const alive = this.threats.filter(t => !t.dead);
       let tx = GAME_W / 2;
-      let ty = 110 + Math.sin(this.waveT * 1.4) * 18;
+      let ty = Math.round(110 * FRAME_SCALE_Y) + Math.sin(this.waveT * 1.4) * 18;
       let target: Threat | null = null;
       if (alive.length) {
         target = alive.reduce((a, b) =>

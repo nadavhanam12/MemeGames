@@ -37,7 +37,7 @@
         justify-content: center;
       }
       canvas { display: block; }
-      /* Portrait blocker: touch devices only — desktop portrait windows stay playable */
+      /* Landscape blocker: touch devices only — desktop landscape windows stay playable */
       #rotate-overlay {
         display: none;
         position: fixed;
@@ -67,7 +67,7 @@
         0%, 25% { transform: rotate(0deg); }
         65%, 100% { transform: rotate(90deg); }
       }
-      @media (orientation: portrait) and (pointer: coarse) {
+      @media (orientation: landscape) and (pointer: coarse) {
         #rotate-overlay { display: flex; }
       }
     </style>
@@ -77,7 +77,7 @@
     <div id="rotate-overlay">
       <div class="icon">📱</div>
       <div class="title">ROTATE YOUR DEVICE</div>
-      <div class="sub">This game plays in landscape</div>
+      <div class="sub">This game plays in portrait</div>
     </div>
     <!-- TEMP DEBUG: on-screen error reporter for mobile — remove after diagnosing -->
     <script>
