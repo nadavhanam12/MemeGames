@@ -64,6 +64,11 @@ function buildGalleryPanel(panel: HTMLElement): void {
         <span class="gallery-card-title">Meme Collection</span>
         <span class="gallery-card-count" id="gallery-count"></span>
       </div>
+      <div class="gallery-card-meta"><span>Archive status</span><span>Today · live</span></div>
+      <div class="gallery-search-row">
+        <input class="gallery-search" id="gallery-search" type="search" placeholder="Search memes…" aria-label="Search meme collection" />
+        <button class="gallery-filter" id="gallery-filter" type="button">ALL</button>
+      </div>
       <div class="gallery-card-grid" id="gallery-grid"></div>
     </div>
   `;
@@ -74,13 +79,39 @@ function buildGalleryPanel(panel: HTMLElement): void {
   if (!gridEl) return;
   for (const id of ids) {
     const isUnlocked = unlocked.has(id);
-    const tile = document.createElement('div');
+    const tile = document.createElement('button');
+    tile.type = 'button';
     tile.className = `gallery-tile ${isUnlocked ? 'unlocked' : 'locked'}`;
+    tile.dataset.label = MEMES.templates[id].label.toLowerCase();
+    tile.dataset.unlocked = isUnlocked ? 'true' : 'false';
+    tile.setAttribute('aria-label', `${MEMES.templates[id].label}${isUnlocked ? '' : ' (locked)'}`);
     tile.innerHTML = `${tileArtHtml(id)}<span class="gallery-tile-badge">NEW</span>`;
     if (isUnlocked) tile.addEventListener('click', () => selectTile(id));
     gridEl.appendChild(tile);
     tileEls.set(id, tile);
   }
+
+  let filter: 'all' | 'unlocked' = 'all';
+  const search = panel.querySelector<HTMLInputElement>('#gallery-search');
+  const filterBtn = panel.querySelector<HTMLButtonElement>('#gallery-filter');
+  const applyFilters = (): void => {
+    const query = search?.value.trim().toLowerCase() ?? '';
+    for (const tile of tileEls.values()) {
+      const labelMatches = !query || tile.dataset.label?.includes(query);
+      const stateMatches = filter === 'all' || tile.dataset.unlocked === 'true';
+      tile.style.display = labelMatches && stateMatches ? '' : 'none';
+    }
+  };
+  search?.addEventListener('input', applyFilters);
+  filterBtn?.addEventListener('click', () => {
+    filter = filter === 'all' ? 'unlocked' : 'all';
+    filterBtn.textContent = filter === 'all' ? 'ALL' : 'UNLOCKED';
+    filterBtn.setAttribute('aria-pressed', filter === 'unlocked' ? 'true' : 'false');
+    applyFilters();
+  });
+
+  const firstUnlocked = ids.find(id => unlocked.has(id));
+  if (firstUnlocked) requestAnimationFrame(() => selectTile(firstUnlocked));
 }
 
 function buildPreviewPanel(panel: HTMLElement): void {
@@ -109,6 +140,8 @@ function onNewUnlocks(ids: string[]): void {
     if (tile.classList.contains('locked')) {
       tile.classList.remove('locked');
       tile.classList.add('unlocked');
+      tile.dataset.unlocked = 'true';
+      tile.setAttribute('aria-label', MEMES.templates[id].label);
       tile.innerHTML = `${tileArtHtml(id)}<span class="gallery-tile-badge">NEW</span>`;
       tile.addEventListener('click', () => selectTile(id));
     }
@@ -176,6 +209,11 @@ function showPreview(id: string): void {
   card.className = 'preview-card';
   card.innerHTML = `
     <button class="preview-close" type="button" aria-label="Close preview">&#10005;</button>
+    <div class="preview-card-heading">
+      <span class="preview-card-eyebrow">MEME PREVIEW</span>
+      <strong>${tpl.label}</strong>
+      <span class="preview-card-rarity">EPIC · COLLECTION INTEL</span>
+    </div>
     ${hasImg ? `<img class="preview-img" src="assets/${tpl.artFile}" alt="${tpl.label}" />` : `<div class="preview-fallback">${tpl.label}</div>`}
     <span class="preview-share-title">SHARE TO</span>
     <div class="preview-share-row">

@@ -1,34 +1,34 @@
 // Art-direction palette — single source of truth for every color in the game.
 export const PAL = {
-  navy: 0x073b5c,
-  ocean: 0x087ca7,
-  sand: 0xe8c07d,
-  green: 0x35d07f,
+  navy: 0x071018,
+  ocean: 0x1a9bc5,
+  sand: 0xcaa76b,
+  green: 0x54df93,
   red: 0xff4d5a,
   gold: 0xf4b942,
-  orange: 0xff8a3d,
-  cream: 0xfff3d6,
-  ink: 0x17202a,
-  purple: 0x9b5de5,
+  orange: 0xe99b3c,
+  cream: 0xf2f2ee,
+  ink: 0x0d151d,
+  purple: 0xa46de1,
   black: 0x000000,
   white: 0xffffff,
-  muted: 0x71767b
+  muted: 0x89939d
 } as const;
 
 export const HEX = {
-  navy: '#073B5C',
-  ocean: '#087CA7',
-  sand: '#E8C07D',
-  green: '#35D07F',
+  navy: '#071018',
+  ocean: '#1A9BC5',
+  sand: '#CAA76B',
+  green: '#54DF93',
   red: '#FF4D5A',
   gold: '#F4B942',
-  orange: '#FF8A3D',
-  cream: '#FFF3D6',
-  ink: '#17202A',
-  purple: '#9B5DE5',
+  orange: '#E99B3C',
+  cream: '#F2F2EE',
+  ink: '#0D151D',
+  purple: '#A46DE1',
   black: '#000000',
   white: '#FFFFFF',
-  muted: '#71767B'
+  muted: '#89939D'
 } as const;
 
 export const FONT_DISPLAY = '"Anton", "Arial Black", "Impact", sans-serif';

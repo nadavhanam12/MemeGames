@@ -1,7 +1,5 @@
-// Shared "X/Twitter feed post" screen language: avatar/handle post headers,
-// the engagement icon row, stackable comment lines, "suggested for you"
-// cards, and the trending pill. Every scene composes these instead of
-// hand-rolling feed-post styling, so the whole game reads as one timeline.
+// Shared strategic-dashboard screen language: operational headers, compact
+// telemetry pods, stackable intel rows, upgrade cards, and alert pills.
 // All animation respects settings.reducedMotion.
 import Phaser from 'phaser';
 import { FONT_SANS, HEX, PAL } from './palette';
@@ -66,36 +64,43 @@ export interface PostHeaderOpts {
 export function createPostHeader(scene: Phaser.Scene, opts: PostHeaderOpts): Phaser.GameObjects.Container {
   const c = scene.add.container(opts.x, opts.y);
   const avatarR = 22;
-  const avatar = scene.add.circle(avatarR, 0, avatarR, opts.avatarColor ?? PAL.ocean);
+  const avatar = scene.add.circle(avatarR, 0, avatarR, 0x101820).setStrokeStyle(2, opts.avatarColor ?? PAL.gold, 0.85);
   const textX = avatarR * 2 + 12;
   const handle = scene.add
-    .text(textX, -13, opts.handle, {
+    .text(textX, -11, opts.handle.toUpperCase(), {
       fontFamily: FONT_SANS,
-      fontSize: '20px',
+      fontSize: '17px',
       fontStyle: 'bold',
-      color: HEX.cream
+      color: HEX.cream,
+      letterSpacing: 1
     })
     .setOrigin(0, 0.5);
   const subtext = scene.add
-    .text(textX, 14, opts.subtext, {
+    .text(textX, 12, opts.subtext, {
       fontFamily: FONT_SANS,
-      fontSize: '15px',
-      color: HEX.muted
+      fontSize: '11px',
+      color: HEX.muted,
+      letterSpacing: 1
     })
     .setOrigin(0, 0.5);
   c.add([avatar, handle, subtext]);
+  const reticle = scene.add.graphics().lineStyle(1.5, opts.avatarColor ?? PAL.gold, 0.9);
+  reticle.strokeCircle(avatarR, 0, 8).lineBetween(7, 0, 12, 0).lineBetween(32, 0, 37, 0)
+    .lineBetween(avatarR, -15, avatarR, -10).lineBetween(avatarR, 10, avatarR, 15);
+  c.add(reticle);
 
   if (opts.live) {
     const badge = scene.add.container(opts.w - 14, 0);
     const label = scene.add
-      .text(-8, 0, 'LIVE', {
+      .text(-8, 0, 'SYSTEM LIVE', {
         fontFamily: FONT_SANS,
-        fontSize: '14px',
+        fontSize: '11px',
         fontStyle: 'bold',
-        color: HEX.red
+        color: HEX.green,
+        letterSpacing: 1
       })
       .setOrigin(1, 0.5);
-    const dot = scene.add.circle(-8 - label.width - 10, 0, 5, PAL.red);
+    const dot = scene.add.circle(-8 - label.width - 10, 0, 4, PAL.green);
     badge.add([dot, label]);
     c.add(badge);
     if (!settings.reducedMotion) {
@@ -134,6 +139,7 @@ export function createEngagementBar(scene: Phaser.Scene, opts: EngagementBarOpts
   const c = scene.add.container(opts.x, opts.y);
   const n = Math.max(opts.icons.length, 1);
   const slot = opts.w / n;
+  const labels = ['DAY', 'COMBO', 'CASH', 'OIL', 'INTEL'];
   const countTexts: Phaser.GameObjects.Text[] = [];
   const current: number[] = [];
 
@@ -141,18 +147,28 @@ export function createEngagementBar(scene: Phaser.Scene, opts: EngagementBarOpts
     const cx = slot * i + slot / 2;
     const tint = icon.color ?? PAL.muted;
     const color = toHex(tint);
-    const glyph = scene.add.image(cx, -7, icon.textureKey).setDisplaySize(20, 20).setTint(tint).setOrigin(0.5);
+    const podW = slot - 8;
+    const bg = roundedRect(scene, podW, 42, 0x101820, 0.98, 8, DIVIDER, 1).setPosition(cx, 0);
+    const glyphX = cx - podW / 2 + 15;
+    const glyph = scene.add.image(glyphX, 0, icon.textureKey).setDisplaySize(16, 16).setTint(tint).setOrigin(0.5);
+    const label = scene.add.text(glyphX + 15, -10, labels[i] ?? 'STAT', {
+      fontFamily: FONT_SANS,
+      fontSize: '10px',
+      fontStyle: 'bold',
+      color: HEX.muted,
+      letterSpacing: 1
+    }).setOrigin(0, 0.5);
     const countTxt = scene.add
-      .text(cx, 15, formatCount(icon.count), {
+      .text(glyphX + 15, 10, formatCount(icon.count), {
         fontFamily: FONT_SANS,
-        fontSize: '14px',
+        fontSize: '17px',
         fontStyle: 'bold',
         color
       })
-      .setOrigin(0.5);
+      .setOrigin(0, 0.5);
     current.push(icon.count);
     countTexts.push(countTxt);
-    c.add([glyph, countTxt]);
+    c.add([bg, glyph, label, countTxt]);
   });
 
   return {
@@ -183,23 +199,23 @@ export interface CommentRowOpts {
  *  height for the comments strip. */
 export function createCommentRow(scene: Phaser.Scene, opts: CommentRowOpts): Phaser.GameObjects.Container {
   const c = scene.add.container(opts.x, opts.y);
-  const avatarR = 14;
-  const avatar = scene.add.circle(avatarR, 0, avatarR, opts.avatarColor ?? PAL.purple);
-  const textX = avatarR * 2 + 10;
+  const avatar = scene.add.rectangle(2, 0, 4, 28, opts.avatarColor ?? PAL.purple);
+  const textX = 16;
   const handle = scene.add
-    .text(textX, 0, `${opts.handle} `, {
+    .text(textX, -8, opts.handle.toUpperCase(), {
       fontFamily: FONT_SANS,
-      fontSize: '15px',
+      fontSize: '9px',
       fontStyle: 'bold',
-      color: HEX.cream
+      color: HEX.muted,
+      letterSpacing: 1
     })
     .setOrigin(0, 0.5);
   const body = scene.add
-    .text(textX + handle.width, 0, opts.text, {
+    .text(textX, 9, opts.text, {
       fontFamily: FONT_SANS,
-      fontSize: '15px',
-      color: HEX.muted,
-      wordWrap: { width: Math.max(opts.w - textX - handle.width - 8, 40) }
+      fontSize: '13px',
+      color: HEX.cream,
+      wordWrap: { width: Math.max(opts.w - textX - 8, 40) }
     })
     .setOrigin(0, 0.5);
   c.add([avatar, handle, body]);
@@ -223,7 +239,7 @@ export interface SuggestedCardOpts {
  *  given, matching the upgrade-card idiom used elsewhere in the game. */
 export function createSuggestedCard(scene: Phaser.Scene, opts: SuggestedCardOpts): Phaser.GameObjects.Container {
   const c = scene.add.container(opts.x, opts.y);
-  const bg = roundedRect(scene, opts.w, opts.h, PAL.black, 1, RADIUS, DIVIDER, 2);
+  const bg = roundedRect(scene, opts.w, opts.h, 0x101820, 1, RADIUS, DIVIDER, 1);
   const parts: Phaser.GameObjects.GameObject[] = [bg];
 
   let textX = -opts.w / 2 + 16;
@@ -256,8 +272,12 @@ export function createSuggestedCard(scene: Phaser.Scene, opts: SuggestedCardOpts
   if (opts.onClick) {
     c.setSize(opts.w, opts.h);
     c.setInteractive({ useHandCursor: true });
-    c.on('pointerover', () => scene.tweens.add({ targets: c, scale: 1.03, duration: 100 }));
-    c.on('pointerout', () => scene.tweens.add({ targets: c, scale: 1, duration: 100 }));
+    c.on('pointerover', () => {
+      scene.tweens.add({ targets: c, scale: 1.03, duration: 100 });
+    });
+    c.on('pointerout', () => {
+      scene.tweens.add({ targets: c, scale: 1, duration: 100 });
+    });
     c.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
       ev.stopPropagation();
       opts.onClick?.();

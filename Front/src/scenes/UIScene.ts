@@ -3,7 +3,7 @@ import { COMMENTS, ENGAGEMENT, FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEADER, 
 import { settings } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { MemeContext, MEMES, pickMeme } from '../core/memes';
-import { captureAndShare, captureAndShareTo, captureArea } from '../core/share';
+import { captureAndShare, captureAndShareTo } from '../core/share';
 import { addExportButtonRow } from '../core/shareButtons';
 import { hasArt } from '../core/art';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
@@ -18,7 +18,8 @@ import { devState } from '../dev/state';
 
 // Hairline divider color between feed chrome sections — matches feedChrome.ts's
 // internal DIVIDER constant (not exported, so duplicated here).
-const DIVIDER = 0x2f3336;
+const DIVIDER = 0x26323d;
+const PANEL = 0x101820;
 
 interface UpgradeDef {
   key: 'air' | 'hull' | 'gold';
@@ -133,6 +134,7 @@ export class UIScene extends Phaser.Scene {
   private swipeStartX: number | null = null;
   private swipeStartY: number | null = null;
   private missionText!: Phaser.GameObjects.Text;
+  private missionLabel!: Phaser.GameObjects.Text;
   private headlineQueue: Array<{ text: string; tone: 'good' | 'bad' | 'event'; hold: number }> = [];
   private headlineBusy = false;
   private upgradeLocked: Record<string, boolean> = { air: true, hull: true, gold: true };
@@ -240,7 +242,7 @@ export class UIScene extends Phaser.Scene {
    *  video (VIEW), and the post header (avatar/handle/subtext/LIVE badge). */
   private buildChrome(): void {
     const g = this.add.graphics().setDepth(990);
-    g.fillStyle(PAL.ink, 1);
+    g.fillStyle(PAL.navy, 1);
     // Fill everything EXCEPT the VIEW rect — that's GameScene's own camera
     // viewport, rendered underneath; a full-canvas fill here would paint
     // straight over it since UIScene draws on top of GameScene.
@@ -252,13 +254,15 @@ export class UIScene extends Phaser.Scene {
     g.lineBetween(0, HEADER.h, GAME_W, HEADER.h);
     g.lineStyle(1, DIVIDER, 0.8);
     g.strokeRect(VIEW.x, VIEW.y, VIEW.w, VIEW.h);
+    g.lineStyle(2, PAL.gold, 0.75);
+    g.lineBetween(24, 2, GAME_W - 24, 2);
 
     const header = createPostHeader(this, {
       x: HEADER.x + 16,
       y: HEADER.h / 2,
       w: HEADER.w - 32,
       handle: "Hormuz Hold'em",
-      subtext: '00:00',
+      subtext: '00:00 · STRAIT COMMAND',
       live: true
     }).setDepth(1001);
     // createPostHeader adds [avatar, handle, subtext] then an optional badge —
@@ -273,20 +277,23 @@ export class UIScene extends Phaser.Scene {
   private buildPriceCard(): void {
     const group = this.add.container(0, 0).setDepth(1000);
     const cardBg = this.add.graphics();
-    cardBg.fillStyle(PAL.black, 1);
+    cardBg.fillStyle(PANEL, 1);
     cardBg.fillRoundedRect(PRICE_CARD.x, PRICE_CARD.y, PRICE_CARD.w, PRICE_CARD.h, 14);
-    cardBg.lineStyle(2, DIVIDER, 1);
+    cardBg.lineStyle(1, DIVIDER, 1);
     cardBg.strokeRoundedRect(PRICE_CARD.x, PRICE_CARD.y, PRICE_CARD.w, PRICE_CARD.h, 14);
+    cardBg.fillStyle(PAL.gold, 0.8);
+    cardBg.fillRoundedRect(PRICE_CARD.x + 14, PRICE_CARD.y, 96, 3, 2);
     group.add(cardBg);
 
-    const oilLabel = this.add.text(PRICE_CARD.x + 14, PRICE_CARD.y + 9, 'OIL — LIVE MARKET', {
+    const oilLabel = this.add.text(PRICE_CARD.x + 14, PRICE_CARD.y + 9, 'MARKET / BRENT OIL', {
       fontFamily: FONT_SANS,
       fontSize: '11px',
       fontStyle: 'bold',
-      color: HEX.muted
+      color: HEX.gold,
+      letterSpacing: 1
     });
     const failLabel = this.add
-      .text(PRICE_CARD.x + PRICE_CARD.w - 14, PRICE_CARD.y + 9, `LIMIT $${TUNING.session.failPrice}`, {
+      .text(PRICE_CARD.x + PRICE_CARD.w - 14, PRICE_CARD.y + 9, `MELTDOWN  $${TUNING.session.failPrice}`, {
         fontFamily: FONT_SANS,
         fontSize: '11px',
         fontStyle: 'bold',
@@ -295,7 +302,7 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(1, 0);
     const priceCx = PRICE_CARD.x + 66;
     const priceCy = PRICE_CARD.y + 34;
-    this.priceBox = this.add.rectangle(priceCx, priceCy, 116, 32, 0x1c1f23).setStrokeStyle(2, DIVIDER);
+    this.priceBox = this.add.rectangle(priceCx, priceCy, 116, 32, 0x0b1117).setStrokeStyle(1, PAL.gold, 0.55);
     this.priceText = this.add
       .text(priceCx, priceCy, '$112', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.cream })
       .setOrigin(0.5);
@@ -348,11 +355,11 @@ export class UIScene extends Phaser.Scene {
       y: ENGAGEMENT.y + ENGAGEMENT.h / 2,
       w: ENGAGEMENT.w,
       icons: [
-        { textureKey: ENGAGEMENT_ICON_KEYS.reply, count: this.engagementCounts[0] },
-        { textureKey: ENGAGEMENT_ICON_KEYS.retweet, count: this.engagementCounts[1] },
-        { textureKey: ENGAGEMENT_ICON_KEYS.heart, count: this.engagementCounts[2], color: PAL.red },
-        { textureKey: ENGAGEMENT_ICON_KEYS.analytics, count: this.engagementCounts[3] },
-        { textureKey: ENGAGEMENT_ICON_KEYS.share, count: this.engagementCounts[4] }
+        { textureKey: ENGAGEMENT_ICON_KEYS.reply, count: this.engagementCounts[0], color: PAL.gold },
+        { textureKey: ENGAGEMENT_ICON_KEYS.retweet, count: this.engagementCounts[1], color: PAL.purple },
+        { textureKey: ENGAGEMENT_ICON_KEYS.heart, count: this.engagementCounts[2], color: PAL.green },
+        { textureKey: ENGAGEMENT_ICON_KEYS.analytics, count: this.engagementCounts[3], color: PAL.gold },
+        { textureKey: ENGAGEMENT_ICON_KEYS.share, count: this.engagementCounts[4], color: PAL.ocean }
       ]
     });
     this.engagementBar.container.setDepth(1000);
@@ -373,6 +380,24 @@ export class UIScene extends Phaser.Scene {
    *  "BREAKING NEWS" band. Headline queue/pump sequencing is unchanged;
    *  only the chrome around it (no box, no red banner) changed. */
   private buildCommentsTicker(): void {
+    const intelBg = this.add.graphics().setDepth(999);
+    intelBg.fillStyle(PANEL, 0.98);
+    intelBg.fillRoundedRect(M, TICKER_Y - 22, GAME_W - M * 2, 44, 10);
+    intelBg.lineStyle(1, PAL.purple, 0.5);
+    intelBg.strokeRoundedRect(M, TICKER_Y - 22, GAME_W - M * 2, 44, 10);
+    intelBg.fillStyle(PAL.purple, 0.8);
+    intelBg.fillRoundedRect(M, TICKER_Y - 22, 5, 44, 2);
+    const tickerStart = M + 74;
+    this.add
+      .text(M + 16, TICKER_Y, 'INTEL', {
+        fontFamily: FONT_SANS,
+        fontSize: '10px',
+        fontStyle: 'bold',
+        color: HEX.purple,
+        letterSpacing: 1
+      })
+      .setOrigin(0, 0.5)
+      .setDepth(1001);
     this.tickerText = this.add
       .text(GAME_W - M, TICKER_Y, TICKER_ITEMS.join('   ·   '), {
         fontFamily: FONT_SANS,
@@ -382,7 +407,7 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setDepth(1000);
     const maskShape = this.make.graphics({ x: 0, y: 0 }, false);
-    maskShape.fillRect(M, TICKER_Y - 14, GAME_W - 2 * M, 28);
+    maskShape.fillRect(tickerStart, TICKER_Y - 14, GAME_W - tickerStart - M, 28);
     this.tickerText.setMask(maskShape.createGeometryMask());
     this.tweens.add({
       targets: this.tickerText,
@@ -392,7 +417,7 @@ export class UIScene extends Phaser.Scene {
     });
 
     this.headlineText = this.add
-      .text(M, TICKER_Y, '', { fontFamily: FONT_SANS, fontSize: '15px', fontStyle: 'bold', color: HEX.cream })
+      .text(tickerStart, TICKER_Y, '', { fontFamily: FONT_SANS, fontSize: '13px', fontStyle: 'bold', color: HEX.cream })
       .setOrigin(0, 0.5)
       .setAlpha(0)
       .setDepth(1001);
@@ -588,13 +613,13 @@ export class UIScene extends Phaser.Scene {
       .setText(next.text)
       .setColor(next.tone === 'good' ? '#B8F5CD' : next.tone === 'event' ? '#F2D8FF' : HEX.cream)
       .setAlpha(0)
-      .setX(M + 30);
+      .setX(M + 104);
     // headline takes over the ticker line; ticker comes back when the queue drains
     this.tickerText.setAlpha(0);
     this.tweens.add({
       targets: this.headlineText,
       alpha: 1,
-      x: M,
+      x: M + 74,
       duration: settings.reducedMotion ? 100 : 250,
       ease: 'Cubic.easeOut'
     });
@@ -608,20 +633,38 @@ export class UIScene extends Phaser.Scene {
   }
 
   // ---------------------------------------------------------------- day system
-  /** Mission caption: a plain feed-caption line under the header, above
-   *  VIEW — no chip/border, just "day N mission: <text>". */
+  /** Mission caption: compact operational card over the top edge of the map. */
   private buildMissionCaption(): void {
     const group = this.add.container(0, 0).setDepth(1001);
-    this.missionText = this.add.text(HEADER.x + 16, HEADER.h + 10, 'day 1 mission: incoming orders…', {
+    const x = VIEW.x + 12;
+    const y = VIEW.y + 10;
+    const w = VIEW.w - 24;
+    const bg = this.add.graphics();
+    bg.fillStyle(0x081016, 0.9);
+    bg.fillRoundedRect(x, y, w, 54, 10);
+    bg.lineStyle(1, PAL.green, 0.55);
+    bg.strokeRoundedRect(x, y, w, 54, 10);
+    bg.fillStyle(PAL.green, 0.85);
+    bg.fillRoundedRect(x, y, 5, 54, 2);
+    const target = this.add.graphics().lineStyle(2, PAL.green, 0.9);
+    target.strokeCircle(x + 28, y + 27, 10).lineBetween(x + 12, y + 27, x + 18, y + 27)
+      .lineBetween(x + 38, y + 27, x + 44, y + 27);
+    this.missionLabel = this.add.text(x + 52, y + 10, 'DAY 01 / LIVE MISSION', {
       fontFamily: FONT_SANS,
-      fontSize: '26px',
-      color: HEX.white,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      padding: { x: 8, y: 4 },
-      wordWrap: { width: GAME_W - 32 }
+      fontSize: '9px',
+      fontStyle: 'bold',
+      color: HEX.green,
+      letterSpacing: 1
     });
-    group.add(this.missionText);
-    registerLayout(this, 'hud-mission', group, { x: HEADER.x + 16, y: HEADER.h + 10, w: GAME_W - 32, h: 20 });
+    this.missionText = this.add.text(x + 52, y + 27, 'INCOMING ORDERS…', {
+      fontFamily: FONT_SANS,
+      fontSize: '15px',
+      fontStyle: 'bold',
+      color: HEX.cream,
+      wordWrap: { width: w - 70 }
+    });
+    group.add([bg, target, this.missionLabel, this.missionText]);
+    registerLayout(this, 'hud-mission', group, { x, y, w, h: 54 });
   }
 
   private renderMissionCaption(): void {
@@ -642,7 +685,8 @@ export class UIScene extends Phaser.Scene {
     } else {
       suffix = ` (${Math.min(m.progress, m.target)}/${m.target})`;
     }
-    this.missionText.setText(`day ${m.day} mission: ${m.text}${suffix}`).setColor(color);
+    this.missionLabel.setText(`DAY ${String(m.day).padStart(2, '0')} / LIVE MISSION`);
+    this.missionText.setText(`${m.text}${suffix}`.toUpperCase()).setColor(color);
   }
 
   private onMission(m: DayMission): void {
@@ -691,47 +735,26 @@ export class UIScene extends Phaser.Scene {
     this.enterDaySummary(s);
   }
 
-  /** Day-end entrance: the recap/shop panel is built immediately, full-bleed,
-   *  already resting in place — but hidden behind a "feed curtain" (a frozen
-   *  snapshot of the just-ended gameplay frame, then 1-2 filler feed cards,
-   *  plus a dedicated collect card on a day with new unlocks) that the player
-   *  steps through one screen at a time — CONTINUE/COLLECT button or swipe-up
-   *  — the way flicking past posts on a social feed reveals the next one
-   *  underneath. Skipped under reducedMotion, which reveals the panel
-   *  immediately. */
+  /** Day-end entrance: transition directly from operations into the strategic
+   *  after-action dashboard. The old social-feed curtain is intentionally
+   *  bypassed so the recap and upgrade decisions remain the visual focus. */
   private enterDaySummary(s: DaySummary): void {
     this.dayEndToken++;
-    const token = this.dayEndToken;
     this.feedCurtain?.destroy();
     this.feedCurtain = undefined;
     this.buildDaySummaryPanel(s);
-
-    if (settings.reducedMotion) {
-      this.revealDaySummary();
-      return;
-    }
-
-    // stage the panel one screen-height below its resting position — the
-    // final curtain transition scrolls it up into place in sync with the
-    // curtain scrolling away, so it enters with the same continuous
-    // scroll-up motion as every slot before it, not an instant reveal
-    if (this.summaryPanel) this.summaryPanel.y = this.summaryPanelFinalY + GAME_H;
-
-    // captureArea's callback fires on "the next render pass" — if the tab is
-    // backgrounded right as the day ends (locked phone, switched tabs) that
-    // pass may not come for a long time, so race it against a real (non-
-    // Phaser-timer, since the scene clock itself can be paused while hidden)
-    // setTimeout — never leave the player stuck on a frozen curtain.
-    const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 1500));
-    Promise.race([captureArea(this.game, 0, 0, GAME_W, GAME_H), timeout])
-      .then(canvas => {
-        if (token !== this.dayEndToken) return; // day already advanced/restarted
-        if (canvas) this.showFeedCurtain(s, canvas, token);
-        else this.revealDaySummary(); // snapshot timed out — reveal without the curtain
-      })
-      .catch(() => {
-        if (token === this.dayEndToken) this.revealDaySummary(); // fail open
-      });
+    const panel = this.summaryPanel;
+    if (!panel || settings.reducedMotion) return this.revealDaySummary();
+    const finalY = this.summaryPanelFinalY;
+    panel.setY(finalY + 42).setAlpha(0);
+    this.tweens.add({
+      targets: panel,
+      y: finalY,
+      alpha: 1,
+      duration: 420,
+      ease: 'Cubic.easeOut',
+      onComplete: () => this.revealDaySummary()
+    });
   }
 
   /** Builds the curtain — snapshot+stamp, two filler feed cards, and (only on
@@ -990,7 +1013,9 @@ export class UIScene extends Phaser.Scene {
     const block = this.add.container(0, y + h / 2);
     block.add(
       this.add
-        .text(-width / 2, -h / 2 + 6, '🎉 new memes unlocked', { fontFamily: FONT_DISPLAY, fontSize: '21px', color: HEX.gold })
+        .text(-width / 2, -h / 2 + 6, 'NEW MEMES UNLOCKED', {
+          fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: HEX.gold, letterSpacing: 1
+        })
         .setOrigin(0, 0)
     );
     let rowY = -h / 2 + 38;
@@ -1002,7 +1027,7 @@ export class UIScene extends Phaser.Scene {
           y: rowY,
           w: width,
           avatarColor: PAL.gold,
-          handle: '🔓 unlocked',
+          handle: 'UNLOCKED',
           text: tpl?.label ?? id
         })
       );
@@ -1123,14 +1148,16 @@ export class UIScene extends Phaser.Scene {
     const padBottom = 8;
     const h = padTop + lines.length * lineH + padBottom;
     const card = this.add.container(0, y + h / 2);
-    card.add(this.add.rectangle(0, 0, width, h, 0x22303e, 0.9).setStrokeStyle(3, accent, 0.85));
+    card.add(this.add.rectangle(0, 0, width, h, PANEL, 0.98).setStrokeStyle(1, DIVIDER, 1));
+    card.add(this.add.rectangle(-width / 2 + 2, 0, 4, h - 4, accent, 0.9));
     card.add(
       this.add
         .text(-width / 2 + 18, -h / 2 + 15, header, {
           fontFamily: FONT_SANS,
           fontSize: '13px',
           fontStyle: 'bold',
-          color: '#AAB4BD'
+          color: `#${accent.toString(16).padStart(6, '0')}`,
+          letterSpacing: 1
         })
         .setOrigin(0, 0.5)
     );
@@ -1176,10 +1203,12 @@ export class UIScene extends Phaser.Scene {
     const rowW = widths.reduce((a, b) => a + b + gap, -gap);
     const h = 20 + thumbH + (shown.length ? 8 : 0) + 20 + 8;
     const card = this.add.container(0, y + h / 2);
-    card.add(this.add.rectangle(0, 0, width, h, 0x22303e, 0.9).setStrokeStyle(3, PAL.gold, 0.85));
+    card.add(this.add.rectangle(0, 0, width, h, PANEL, 0.98).setStrokeStyle(1, DIVIDER, 1));
+    card.add(this.add.rectangle(-width / 2 + 2, 0, 4, h - 4, PAL.gold, 0.9));
+    const cardTitle = newIds.length ? 'MEMES / NEW UNLOCKS' : 'MEMES';
     card.add(
       this.add
-        .text(-width / 2 + 18, -h / 2 + 15, 'MEMES', {
+        .text(-width / 2 + 18, -h / 2 + 15, cardTitle, {
           fontFamily: FONT_SANS,
           fontSize: '13px',
           fontStyle: 'bold',
@@ -1243,11 +1272,9 @@ export class UIScene extends Phaser.Scene {
     return h;
   }
 
-  /** Frozen-world recap + shop screen — the next full-screen "post" in the
-   *  feed, built and settled in place immediately (no entrance tween of its
-   *  own; see enterDaySummary/showFeedCurtain for how it's revealed). The
-   *  only time upgrades are purchasable. Waits for the player to click NEXT
-   *  DAY (or swipe up) once revealed. */
+  /** Frozen-world recap + shop screen, built and settled in place immediately.
+   *  This is the only time upgrades are purchasable. Waits for the player to
+   *  click NEXT DAY (or swipe up) once revealed. */
   private buildDaySummaryPanel(s: DaySummary): void {
     this.summaryPanel?.destroy();
     this.upgradeButtons = {};
@@ -1260,30 +1287,45 @@ export class UIScene extends Phaser.Scene {
     this.registry.set('ui-modal', true);
     // fully opaque — this bg is now the only thing standing between the
     // panel and the live HUD underneath (no dim backdrop layer any more)
-    const bg = this.add.rectangle(0, 0, W, H, PAL.black, 1).setStrokeStyle(2, DIVIDER);
+    const bg = this.add.rectangle(0, 0, W, H, PAL.navy, 1).setStrokeStyle(2, DIVIDER);
     panel.add(bg);
+    const grid = this.add.graphics().lineStyle(1, 0x34505f, 0.09);
+    for (let gx = -W / 2; gx <= W / 2; gx += 48) grid.lineBetween(gx, -H / 2, gx, H / 2);
+    for (let gy = -H / 2; gy <= H / 2; gy += 48) grid.lineBetween(-W / 2, gy, W / 2, gy);
+    panel.add(grid);
+    panel.add(this.add.rectangle(0, -H / 2 + 3, W - 64, 3, PAL.gold, 0.8));
     let y = -H / 2 + 20;
     const cardW = W - 80;
-    panel.add(
-      this.add
-        .text(0, y, `DAY ${s.day} COMPLETE`, { fontFamily: FONT_SANS, fontSize: '13px', fontStyle: 'bold', color: HEX.muted })
-        .setOrigin(0.5, 0)
-    );
-    y += 20;
+    panel.add(this.add.text(-cardW / 2, y, 'AFTER ACTION REPORT', {
+      fontFamily: FONT_SANS,
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: HEX.gold,
+      letterSpacing: 1
+    }).setOrigin(0, 0));
+    const dayPill = this.add.container(cardW / 2 - 52, y + 8);
+    dayPill.add(this.add.rectangle(0, 0, 104, 28, PANEL, 1).setStrokeStyle(1, PAL.green, 0.6));
+    dayPill.add(this.add.text(0, 0, `DAY ${s.day} COMPLETE`, {
+      fontFamily: FONT_SANS, fontSize: '10px', fontStyle: 'bold', color: HEX.green
+    }).setOrigin(0.5));
+    panel.add(dayPill);
+    y += 34;
+    panel.add(this.add.rectangle(0, y, cardW, 1, DIVIDER));
+    y += 18;
     // "global repercussions" — a big bizarre/tabloid headline picked from
     // this day's price swing + how well it went, real numbers underneath
     const perf = dayPerfScore(s.missionDone, s.safe, s.lost);
     const headlineTxt = this.add
       .text(0, y, repercussionHeadline(s.priceDelta, perf), {
         fontFamily: FONT_DISPLAY,
-        fontSize: '26px',
-        color: HEX.gold,
+        fontSize: '30px',
+        color: HEX.cream,
         align: 'center',
         wordWrap: { width: cardW }
       })
       .setOrigin(0.5, 0);
     panel.add(headlineTxt);
-    y += headlineTxt.height + 8;
+    y += headlineTxt.height + 10;
     panel.add(
       this.add
         .text(
@@ -1301,15 +1343,10 @@ export class UIScene extends Phaser.Scene {
         )
         .setOrigin(0.5, 0)
     );
-    y += 30;
+    y += 38;
 
-    // new unlocks — folded into the top of the stack instead of a separate popup
-    if (s.newMemesUnlocked.length) {
-      y += this.buildUnlocksSection(panel, y, cardW, s.newMemesUnlocked);
-      y += 24;
-    }
-    // section 1 — mission outcome
-    y += this.buildSummaryCard(panel, y, cardW, 'MISSION', [
+    // section 1 — mission outcome: the primary result gets first billing
+    y += this.buildSummaryCard(panel, y, cardW, 'MISSION OUTCOME', [
       {
         text: s.missionDone ? `✓ ${s.missionText}` : `✗ ${s.missionText}`,
         color: s.missionDone ? HEX.green : HEX.red,
@@ -1321,13 +1358,9 @@ export class UIScene extends Phaser.Scene {
         size: '14px'
       }
     ], s.missionDone ? PAL.green : PAL.red);
-    y += 24;
+    y += 18;
 
-    // section 2 — memes: every template that fired today + overall collection tally
-    y += this.buildMemesCard(panel, y, cardW, s.memesToday, s.newMemesUnlocked);
-    y += 24;
-
-    // section 3 — intel (warnings), only when there's something to show
+    // section 2 — intel (warnings), only when there's something to show
     const intelLines: { text: string; color: string; size?: string }[] = s.warnings.map(w => ({
       text: `⚠ ${w}`,
       color: '#F2D8FF',
@@ -1335,27 +1368,35 @@ export class UIScene extends Phaser.Scene {
     }));
     if (intelLines.length) {
       y += this.buildSummaryCard(panel, y, cardW, 'INTEL', intelLines, PAL.purple);
+      y += 18;
     }
-    y += 26;
 
-    // shop — the only window in which upgrades can be bought; sits below whatever
-    // the recap cards above needed, so a long warnings list can never overlap it
+    // section 3 — rewards: unlock state lives with its thumbnail instead of
+    // repeating the same information in a separate block above the mission
+    y += this.buildMemesCard(panel, y, cardW, s.memesToday, s.newMemesUnlocked);
+    y += 20;
+
+    // shop — form a distinct decision zone near the foot of a short report, but
+    // keep flowing downward if warnings/rewards made the recap taller
+    y = Math.max(y, H / 2 - 414);
+    panel.add(this.add.rectangle(0, y, cardW, 1, DIVIDER));
+    y += 22;
     const upgradeCardH = 170;
     // live cash readout right above the shop; onCredits keeps it current on buys
     this.summaryCashText = this.add
-      .text(0, y + 12, `CASH: $${Math.round(this.displayedCredits)}`, {
+      .text(-cardW / 2, y + 12, `CASH  $${Math.round(this.displayedCredits)}`, {
         fontFamily: FONT_DISPLAY,
         fontSize: '24px',
         color: HEX.gold
       })
-      .setOrigin(0.5);
+      .setOrigin(0, 0.5);
     panel.add(this.summaryCashText);
     y += 44;
     const upgradesHeaderY = y + 10;
     panel.add(
       this.add
-        .text(0, upgradesHeaderY, 'UPGRADES', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.gold })
-        .setOrigin(0.5)
+        .text(cardW / 2, upgradesHeaderY, 'TACTICAL UPGRADES', { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: HEX.muted, letterSpacing: 1 })
+        .setOrigin(1, 0.5)
     );
     const upgradeCardsY = upgradesHeaderY + 28 + upgradeCardH / 2;
     // 3 cards side by side must fit the narrower portrait panel (cardW≈496)
@@ -1367,7 +1408,7 @@ export class UIScene extends Phaser.Scene {
       this.buildUpgradeCard(panel, u, (i - 1) * upgradeCardStep, upgradeCardsY, upgradeCardH, upgradeCardW)
     );
 
-    const nextBtnY = upgradeCardsY + upgradeCardH / 2 + 40;
+    const nextBtnY = Math.max(upgradeCardsY + upgradeCardH / 2 + 36, H / 2 - 76);
     // size the panel's own opaque background to however far the content
     // actually ran (+ the swipe hint under the button), floored at a full
     // screen — this panel is the next full-bleed "post" replacing the game
@@ -1379,19 +1420,19 @@ export class UIScene extends Phaser.Scene {
     panel.setY(GAME_H / 2 - bg.y);
     const nextBtn = this.add.container(0, nextBtnY);
     const nextBtnBg = this.add.graphics();
-    nextBtnBg.fillStyle(PAL.black, 1);
-    nextBtnBg.fillRoundedRect(-150, -29, 300, 58, 16);
-    nextBtnBg.lineStyle(2, DIVIDER, 1);
-    nextBtnBg.strokeRoundedRect(-150, -29, 300, 58, 16);
+    nextBtnBg.fillStyle(0x171810, 1);
+    nextBtnBg.fillRoundedRect(-cardW / 2, -32, cardW, 64, 12);
+    nextBtnBg.lineStyle(2, PAL.gold, 0.85);
+    nextBtnBg.strokeRoundedRect(-cardW / 2, -32, cardW, 64, 12);
     const nextBtnText = this.add
       .text(0, 0, `NEXT DAY — DAY ${this.summaryNextDay} ▶`, {
         fontFamily: FONT_DISPLAY,
         fontSize: '20px',
-        color: HEX.cream
+        color: HEX.gold
       })
       .setOrigin(0.5);
     nextBtn.add([nextBtnBg, nextBtnText]);
-    nextBtn.setSize(300, 58);
+    nextBtn.setSize(cardW, 64);
     nextBtn.setInteractive({ useHandCursor: true });
     nextBtn.on('pointerover', () => this.tweens.add({ targets: nextBtn, scale: 1.05, duration: 100 }));
     nextBtn.on('pointerout', () => this.tweens.add({ targets: nextBtn, scale: 1, duration: 100 }));
@@ -1571,7 +1612,7 @@ export class UIScene extends Phaser.Scene {
     this.currentDay = Math.floor(elapsed / dayLen) + 1;
     // broadcast clock: the day maps to a 24h cycle, ticking hour by hour
     const hour = Math.min(23, Math.floor(((elapsed % dayLen) / dayLen) * 24));
-    this.hourText.setText(`${hour.toString().padStart(2, '0')}:00`);
+    this.hourText.setText(`${hour.toString().padStart(2, '0')}:00 · STRAIT COMMAND`);
     // share count eases toward dayShareStart + dayShareTarget as the day plays
     // out — ease-out so it feels like early traction rather than a linear tick
     const dayFrac = Phaser.Math.Clamp((elapsed % dayLen) / dayLen, 0, 1);
@@ -1652,7 +1693,7 @@ export class UIScene extends Phaser.Scene {
       y0 = PRICE_CARD.y + 50,
       w = PRICE_CARD.w - 32,
       h = PRICE_CARD.y + PRICE_CARD.h - 8 - (PRICE_CARD.y + 50);
-    g.fillStyle(0x22303e, 1);
+    g.fillStyle(0x0b141c, 1);
     g.fillRect(x0, y0, w, h);
     if (this.graphFlash > 0) {
       g.fillStyle(PAL.red, 0.35 * this.graphFlash);
