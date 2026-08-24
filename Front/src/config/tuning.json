@@ -15,13 +15,13 @@
     "mineMinReactSec": 3
   },
   "speeds": {
-    "missile": 51,
-    "drone": 42,
-    "mine": 32,
-    "patrol": 45,
-    "tankerMin": 20,
-    "tankerMax": 39,
-    "vipTanker": 46
+    "missile": 76.5,
+    "drone": 63,
+    "mine": 48,
+    "patrol": 67.5,
+    "tankerMin": 30,
+    "tankerMax": 58.5,
+    "vipTanker": 69
   },
   "economy": {
     "jitterAmp": 0.45,
@@ -173,7 +173,7 @@
   "turret": {
     "x": 343,
     "y": 1173,
-    "bulletSpeed": 1440,
+    "bulletSpeed": 2160,
     "fireInterval": 0.13,
     "lockRadius": 130,
     "bulletHitRadius": 30,
