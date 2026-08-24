@@ -7,22 +7,14 @@ import { pressPulse } from '../core/juice';
 import { MEMES, renderMeme } from '../core/memes';
 import { getUnlockedTemplates } from '../core/memeUnlocks';
 import { broadcastCut, broadcastReveal } from '../core/broadcast';
-import { createPostHeader } from '../core/feedChrome';
 import { fetchLeaderboard } from '../backend/api';
 
-// Hairline divider color shared with feedChrome's card borders.
-const DIVIDER = 0x2f3336;
-
-// Hand-picked "best of" rotation for the front-page carousel.
+const PANEL = 0x101820;
+const PANEL_HOVER = 0x15212b;
+const BORDER = 0x26323d;
 const FEATURED_MEME_IDS = [
-  'twoButtons2Trump',
-  'templeIran',
-  'successTrump',
-  'saltTrump',
-  'saltKhamenei',
-  'rejectApproveTrump',
-  'rejectApproveKhamenei',
-  'podcastKhamenei'
+  'twoButtons2Trump', 'templeIran', 'successTrump', 'saltTrump',
+  'saltKhamenei', 'rejectApproveTrump', 'rejectApproveKhamenei', 'podcastKhamenei'
 ];
 
 export class MenuScene extends Phaser.Scene {
@@ -35,245 +27,200 @@ export class MenuScene extends Phaser.Scene {
     broadcastReveal(this);
     let leaving = false;
     const cx = GAME_W / 2;
+    const contentW = GAME_W - 64;
 
-    if (hasArt(this, 'map_bg')) {
-      const bgImg = this.add.image(cx, GAME_H / 2, 'map_bg').setDisplaySize(GAME_W, GAME_H).setAlpha(0.45);
-      // slow aerial-camera drift so the "studio backdrop" never sits still
-      if (!settings.reducedMotion) {
-        this.tweens.add({
-          targets: bgImg,
-          scaleX: bgImg.scaleX * 1.06,
-          scaleY: bgImg.scaleY * 1.06,
-          x: cx - 16,
-          duration: 16000,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut'
-        });
-      }
-      this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, PAL.ink, 0.35);
-    } else {
-      this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, PAL.navy);
-      const waves = this.add.graphics();
-      waves.lineStyle(4, PAL.ocean, 0.5);
-      for (let y = 120; y < GAME_H; y += 80) {
-        waves.beginPath();
-        for (let x = -20; x <= GAME_W + 20; x += 10) {
-          const yy = y + Math.sin(x / 40) * 8;
-          if (x === -20) waves.moveTo(x, yy);
-          else waves.lineTo(x, yy);
-        }
-        waves.strokePath();
-      }
-    }
+    this.drawBackdrop();
 
-    // profile header — bigger avatar for prominence, still the feed idiom.
-    // Scaled up from a narrower w so the right-aligned LIVE badge still lands
-    // inside the canvas after the scale multiplies every local offset.
-    const BANNER_SCALE = 1.3;
-    const BANNER_W = 420;
-    const bannerX = cx - (BANNER_W * BANNER_SCALE) / 2;
-    const banner = createPostHeader(this, {
-      x: bannerX,
-      y: 110,
-      w: BANNER_W,
-      handle: "Hormuz Hold'em",
-      subtext: '@hormuz_holdem',
-      live: true
+    const header = this.add.container(0, 0);
+    const mark = this.add.circle(52, 50, 22, PANEL, 1).setStrokeStyle(2, PAL.gold, 0.85);
+    const reticle = this.add.graphics().lineStyle(2, PAL.gold, 0.8);
+    reticle.strokeCircle(52, 50, 10).lineBetween(34, 50, 43, 50).lineBetween(61, 50, 70, 50)
+      .lineBetween(52, 32, 52, 41).lineBetween(52, 59, 52, 68);
+    const brand = this.add.text(88, 37, "HOLD'EM HORMUZ", {
+      fontFamily: FONT_SANS, fontSize: '20px', fontStyle: 'bold', color: HEX.cream, letterSpacing: 2
     });
-    banner.setScale(BANNER_SCALE);
-    if (!settings.reducedMotion) {
-      // graphics package slide-in from the left
-      banner.setAlpha(0);
-      const targetX = banner.x;
-      banner.x = targetX - 60;
-      this.tweens.add({ targets: banner, x: targetX, alpha: 1, duration: 320, ease: 'Cubic.easeOut' });
-    }
+    const brandSub = this.add.text(88, 62, 'STRATEGIC INTEL DASHBOARD', {
+      fontFamily: FONT_SANS, fontSize: '10px', color: HEX.muted, letterSpacing: 1
+    });
+    const liveDot = this.add.circle(628, 43, 5, PAL.green);
+    const live = this.add.text(642, 34, 'LIVE', {
+      fontFamily: FONT_SANS, fontSize: '12px', fontStyle: 'bold', color: HEX.green
+    });
+    const status = this.add.text(670, 60, 'STRAIT ONLINE', {
+      fontFamily: FONT_SANS, fontSize: '10px', color: HEX.muted
+    }).setOrigin(1, 0);
+    header.add([mark, reticle, brand, brandSub, liveDot, live, status]);
+    if (!settings.reducedMotion) this.tweens.add({ targets: liveDot, alpha: 0.25, duration: 780, yoyo: true, repeat: -1 });
 
-    // the situation, in plain english
-    const blurb = [
-      'Iran is threatening to SHUT THE STRAIT OF HORMUZ —',
-      'the narrow sea lane that carries A FIFTH OF THE WORLD’S OIL!',
-      'TAP a threat and your gunner shoots it down.',
-      'HOLD for a full burst — but DON’T OVERHEAT the gun!',
-      'KEEP THE TANKERS SAFE and complete each day’s MISSION for bonus cash.'
-    ];
-    const BLURB_W = 680;
-    const BLURB_Y = 330;
-    const BLURB_H = 230;
-    this.add.rectangle(cx, BLURB_Y, BLURB_W, BLURB_H, PAL.black, 0.85).setStrokeStyle(2, DIVIDER);
-    blurb.forEach((line, i) => {
-      const t = this.add
-        .text(cx, BLURB_Y - 70 + i * 26, line, {
-          fontFamily: FONT_SANS,
-          fontSize: '15px',
-          color: HEX.cream,
-          wordWrap: { width: BLURB_W - 40 }
-        })
-        .setOrigin(0.5);
-      if (!settings.reducedMotion) {
-        t.setAlpha(0);
-        t.x -= 36;
-        this.tweens.add({ targets: t, x: cx, alpha: 1, delay: 160 + i * 80, duration: 260, ease: 'Cubic.easeOut' });
-      }
+    this.add.rectangle(cx, 94, contentW, 1, BORDER, 1);
+    const eyebrow = this.add.text(32, 126, 'OPERATIONAL BRIEF  /  DAY 01', {
+      fontFamily: FONT_SANS, fontSize: '12px', fontStyle: 'bold', color: HEX.gold, letterSpacing: 1
+    });
+    const title = this.add.text(32, 154, 'THE STRAIT IS OPEN.\nKEEP IT THAT WAY.', {
+      fontFamily: FONT_DISPLAY, fontSize: '48px', color: HEX.cream, lineSpacing: -5
+    });
+    const deck = this.add.text(34, 262, 'Global oil is moving through a live fire zone.\nProtect tankers, control the market, unlock the feed.', {
+      fontFamily: FONT_SANS, fontSize: '16px', color: '#B7C0C8', lineSpacing: 5
     });
 
-    // start button
-    const START_Y = 530;
-    const start = this.add.container(cx, START_Y);
-    const sb = this.add.rectangle(0, 0, 440, 100, PAL.black, 0.9).setStrokeStyle(2, PAL.green);
-    const st = this.add
-      .text(0, 0, 'DEFEND THE STRAIT', { fontFamily: FONT_DISPLAY, fontSize: '34px', color: HEX.green })
-      .setOrigin(0.5);
-    start.add([sb, st]);
-    start.setSize(440, 100);
-    start.setInteractive({ useHandCursor: true });
-    if (!settings.reducedMotion) {
-      this.tweens.add({ targets: start, scale: 1.04, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    }
+    const brief = this.add.container(cx, 380);
+    const briefBg = this.add.rectangle(0, 0, contentW, 124, PANEL, 0.96).setStrokeStyle(1, BORDER);
+    const briefIcon = this.add.circle(-278, 0, 28, 0x11281f, 1).setStrokeStyle(1, PAL.green, 0.7);
+    const briefTarget = this.add.graphics().lineStyle(2, PAL.green, 1);
+    briefTarget.strokeCircle(-278, 0, 10).lineBetween(-294, 0, -286, 0).lineBetween(-270, 0, -262, 0);
+    const briefLabel = this.add.text(-234, -36, 'MISSION CONTROL', {
+      fontFamily: FONT_SANS, fontSize: '11px', color: HEX.green, letterSpacing: 1
+    });
+    const briefText = this.add.text(-234, -10, 'SHOOT DOWN THREATS', {
+      fontFamily: FONT_SANS, fontSize: '20px', fontStyle: 'bold', color: HEX.cream
+    });
+    const briefSub = this.add.text(-234, 24, 'Tap to fire  ·  hold for a burst  ·  watch the heat', {
+      fontFamily: FONT_SANS, fontSize: '12px', color: HEX.muted
+    });
+    brief.add([briefBg, briefIcon, briefTarget, briefLabel, briefText, briefSub]);
 
-    // global leaderboard + meme gallery buttons, side by side below the CTA
-    const ROW_Y = 650;
-    const lb = this.add.container(cx - 140, ROW_Y);
-    const lbBg = this.add.rectangle(0, 0, 250, 70, PAL.black, 0.9).setStrokeStyle(2, PAL.ocean);
-    const lbTxt = this.add
-      .text(0, 0, 'LEADERBOARD', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.ocean })
-      .setOrigin(0.5);
-    lb.add([lbBg, lbTxt]);
-    lb.setSize(250, 70);
-    lb.setInteractive({ useHandCursor: true });
-    lb.on('pointerdown', () => {
+    const start = this.makeButton(cx, 482, contentW, 72, 'BEGIN OPERATION  ▶', PAL.gold, true, () => {
       if (leaving) return;
       leaving = true;
-      sfx.unlock();
-      sfx.tap();
-      pressPulse(this, lb);
+      sfx.unlock(); sfx.fanfare();
+      this.time.delayedCall(140, () => broadcastCut(this, () => this.scene.start('Intro')));
+    });
+    const leaderboard = this.makeButton(194, 578, 304, 64, 'RANKINGS', PAL.ocean, false, () => {
+      if (leaving) return;
+      leaving = true;
+      sfx.unlock(); sfx.tap();
       broadcastCut(this, () => this.scene.start('Leaderboard', { from: 'Menu' }));
     });
-
-    // meme collection gallery
-    const gallery = this.add.container(cx + 140, ROW_Y);
-    const galleryBg = this.add.rectangle(0, 0, 250, 70, PAL.black, 0.9).setStrokeStyle(2, PAL.purple);
-    const galleryTxt = this.add
-      .text(0, 0, 'MEME GALLERY', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.purple })
-      .setOrigin(0.5);
-    gallery.add([galleryBg, galleryTxt]);
-    gallery.setSize(250, 70);
-
-    // player count (backend-driven; hidden until the fetch succeeds)
-    const playersNumTxt = this.add
-      .text(cx, 715, '', {
-        fontFamily: FONT_SANS,
-        fontSize: '34px',
-        fontStyle: 'bold',
-        color: HEX.cream,
-        stroke: HEX.ink,
-        strokeThickness: 4
-      })
-      .setOrigin(0.5);
-    const playersLabelTxt = this.add
-      .text(cx, 715, '', {
-        fontFamily: FONT_SANS,
-        fontSize: '24px',
-        fontStyle: 'bold',
-        color: HEX.cream,
-        stroke: HEX.ink,
-        strokeThickness: 3
-      })
-      .setOrigin(0, 0.5);
-    fetchLeaderboard({ period: 'all', pageSize: 1 })
-      .then(res => {
-        if (!this.scene.isActive()) return;
-        if (res.total > 0) {
-          const numStr = res.total.toLocaleString();
-          const labelStr = ` ${res.total === 1 ? 'person has' : 'people have'} already played`;
-          playersNumTxt.setText(numStr).setOrigin(0.5);
-          playersLabelTxt.setText(labelStr);
-          const totalWidth = playersNumTxt.width + playersLabelTxt.width;
-          playersNumTxt.setX(cx - totalWidth / 2 + playersNumTxt.width / 2);
-          playersLabelTxt.setX(playersNumTxt.x + playersNumTxt.width / 2);
-        }
-      })
-      .catch(() => {
-        /* server unreachable — leave the line empty */
-      });
-
-    // front-page meme carousel — rotates through the featured picks above
-    // (not part of the run's meme log; purely a "best of" showcase).
-    const MEME_Y = 900;
-    const memeCarousel = this.add.container(cx, MEME_Y).setAngle(-3);
-    let carouselIndex = 0;
-    const drawCarouselMeme = (): void => {
-      memeCarousel.removeAll(true);
-      const id = FEATURED_MEME_IDS[carouselIndex];
-      renderMeme(this, memeCarousel, { id, tpl: MEMES.templates[id], captions: [], isNew: false }, 320, 320);
-    };
-    drawCarouselMeme();
-    const advanceCarousel = (): void => {
-      carouselIndex = (carouselIndex + 1) % FEATURED_MEME_IDS.length;
-      if (settings.reducedMotion) {
-        drawCarouselMeme();
-        return;
-      }
-      this.tweens.add({
-        targets: memeCarousel,
-        alpha: 0,
-        duration: 220,
-        ease: 'Cubic.easeIn',
-        onComplete: () => {
-          drawCarouselMeme();
-          memeCarousel.setAlpha(0);
-          this.tweens.add({ targets: memeCarousel, alpha: 1, duration: 220, ease: 'Cubic.easeOut' });
-        }
-      });
-    };
-    const carouselTimer = this.time.addEvent({ delay: 3200, loop: true, callback: advanceCarousel });
-    this.events.once('shutdown', () => carouselTimer.remove());
-    // Meme art loads in the background after Boot hands off to Menu (see
-    // BootScene/loadMemeArt) — refresh from placeholder to real art once it lands.
-    const onMemeArtLoaded = (): void => drawCarouselMeme();
-    this.game.events.on('meme-art-loaded', onMemeArtLoaded);
-    this.events.once('shutdown', () => this.game.events.off('meme-art-loaded', onMemeArtLoaded));
-    gallery.setInteractive({ useHandCursor: true });
-    gallery.on('pointerdown', () => {
+    const gallery = this.makeButton(526, 578, 304, 64, 'MEME COLLECTION', PAL.purple, false, () => {
       if (leaving) return;
       leaving = true;
-      sfx.unlock();
-      sfx.tap();
-      pressPulse(this, gallery);
+      sfx.unlock(); sfx.tap();
       broadcastCut(this, () => this.scene.start('Gallery', { from: 'Menu' }));
     });
 
-    start.on('pointerdown', () => {
-      if (leaving) return;
-      leaving = true;
-      sfx.unlock();
-      sfx.fanfare();
-      pressPulse(this, start);
-      this.time.delayedCall(150, () => broadcastCut(this, () => this.scene.start('Intro')));
+    const stats = this.add.container(cx, 654);
+    stats.add(this.add.rectangle(0, 0, contentW, 60, 0x0c131a, 0.96).setStrokeStyle(1, BORDER));
+    const unlocked = getUnlockedTemplates().size;
+    const total = Object.keys(MEMES.templates).length;
+    stats.add(this.add.text(-292, -14, 'COLLECTION', {
+      fontFamily: FONT_SANS, fontSize: '10px', color: HEX.muted, letterSpacing: 1
+    }));
+    stats.add(this.add.text(-292, 7, `${unlocked}/${total} UNLOCKED`, {
+      fontFamily: FONT_SANS, fontSize: '14px', color: HEX.gold
+    }));
+    stats.add(this.add.rectangle(0, 0, 1, 34, BORDER));
+    const playerCount = this.add.text(292, -3, 'SECURE UPLINK', {
+      fontFamily: FONT_SANS, fontSize: '13px', color: HEX.green
+    }).setOrigin(1, 0.5);
+    stats.add(playerCount);
+    fetchLeaderboard({ period: 'all', pageSize: 1 })
+      .then(res => {
+        if (this.scene.isActive() && res.total > 0) playerCount.setText(`${res.total.toLocaleString()} OPERATORS`);
+      })
+      .catch(() => undefined);
+
+    const featured = this.add.container(cx, 951);
+    featured.add(this.add.rectangle(0, 0, contentW, 516, PANEL, 0.96).setStrokeStyle(1, BORDER));
+    featured.add(this.add.text(-292, -232, 'FEATURED INTEL', {
+      fontFamily: FONT_SANS, fontSize: '11px', color: HEX.gold, letterSpacing: 1
+    }));
+    featured.add(this.add.text(-292, -204, 'MEME OF THE MOMENT', {
+      fontFamily: FONT_SANS, fontSize: '18px', fontStyle: 'bold', color: HEX.cream
+    }));
+    featured.add(this.add.text(292, -225, 'AUTO ROTATION', {
+      fontFamily: FONT_SANS, fontSize: '10px', color: HEX.muted
+    }).setOrigin(1, 0));
+    featured.add(this.add.rectangle(0, -180, contentW - 48, 1, BORDER));
+    const memeHost = this.add.container(0, 28).setAngle(-1);
+    featured.add(memeHost);
+    let carouselIndex = 0;
+    const drawMeme = (): void => {
+      memeHost.removeAll(true);
+      const id = FEATURED_MEME_IDS[carouselIndex];
+      renderMeme(this, memeHost, { id, tpl: MEMES.templates[id], captions: [], isNew: false }, 340, 340);
+    };
+    drawMeme();
+    const timer = this.time.addEvent({
+      delay: 3400, loop: true,
+      callback: () => {
+        carouselIndex = (carouselIndex + 1) % FEATURED_MEME_IDS.length;
+        if (settings.reducedMotion) return drawMeme();
+        this.tweens.add({
+          targets: memeHost, alpha: 0, y: 38, duration: 180, ease: 'Cubic.easeIn',
+          onComplete: () => {
+            drawMeme();
+            memeHost.setAlpha(0).setY(18);
+            this.tweens.add({ targets: memeHost, alpha: 1, y: 28, duration: 260, ease: 'Cubic.easeOut' });
+          }
+        });
+      }
+    });
+    const onMemeArtLoaded = (): void => drawMeme();
+    this.game.events.on('meme-art-loaded', onMemeArtLoaded);
+    this.events.once('shutdown', () => {
+      timer.remove();
+      this.game.events.off('meme-art-loaded', onMemeArtLoaded);
     });
 
-    // staggered fly-ins: buttons and studio memes enter like graphics packages
-    const flyIn = (obj: Phaser.GameObjects.Container, delay: number, fromY = 50): void => {
+    const enter = (
+      obj: Phaser.GameObjects.GameObject & {
+        x: number;
+        y: number;
+        setAlpha(value: number): unknown;
+        setPosition(x: number, y: number): unknown;
+      },
+      delay: number, dx = 0, dy = 18
+    ): void => {
       if (settings.reducedMotion) return;
-      const y = obj.y;
+      const x = obj.x; const y = obj.y;
       obj.setAlpha(0);
-      obj.y = y + fromY;
-      this.tweens.add({ targets: obj, y, alpha: 1, delay, duration: 300, ease: 'Cubic.easeOut' });
+      obj.setPosition(x + dx, y + dy);
+      this.tweens.add({ targets: obj, x, y, alpha: 1, delay, duration: 360, ease: 'Cubic.easeOut' });
     };
-    flyIn(start, 320);
-    flyIn(lb, 430);
-    flyIn(gallery, 500);
-    flyIn(memeCarousel, 590, 30);
-
-    // static muted stat line replacing the old scrolling ticker crawl
-    this.add
-      .text(cx, 1256, `🔓 ${getUnlockedTemplates().size}/${Object.keys(MEMES.templates).length} memes collected`, {
-        fontFamily: FONT_SANS,
-        fontSize: '16px',
-        color: HEX.muted
-      })
-      .setOrigin(0.5);
+    enter(header, 20, -20, 0); enter(eyebrow, 70, -16, 0); enter(title, 110, -20, 0);
+    enter(deck, 160, -20, 0); enter(brief, 220); enter(start, 280);
+    enter(leaderboard, 340, -12, 0); enter(gallery, 370, 12, 0); enter(stats, 420); enter(featured, 480, 0, 24);
   }
 
+  private drawBackdrop(): void {
+    const cx = GAME_W / 2;
+    if (hasArt(this, 'map_bg')) {
+      const bg = this.add.image(cx, GAME_H / 2, 'map_bg').setDisplaySize(GAME_W, GAME_H).setAlpha(0.17);
+      if (!settings.reducedMotion) this.tweens.add({
+        targets: bg, scale: 1.035, x: cx - 8, duration: 18000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+      });
+    }
+    this.add.rectangle(cx, GAME_H / 2, GAME_W, GAME_H, PAL.navy, 0.9);
+    const grid = this.add.graphics().lineStyle(1, 0x34505f, 0.12);
+    for (let x = 0; x <= GAME_W; x += 48) grid.lineBetween(x, 0, x, GAME_H);
+    for (let y = 0; y <= GAME_H; y += 48) grid.lineBetween(0, y, GAME_W, y);
+    const glow = this.add.circle(610, 240, 250, PAL.gold, 0.035);
+    if (!settings.reducedMotion) this.tweens.add({
+      targets: glow, alpha: 0.07, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+    });
+  }
+
+  private makeButton(
+    x: number, y: number, w: number, h: number, label: string, accent: number, primary: boolean, onClick: () => void
+  ): Phaser.GameObjects.Container {
+    const c = this.add.container(x, y);
+    const bg = this.add.rectangle(0, 0, w, h, primary ? 0x171810 : PANEL, 0.98)
+      .setStrokeStyle(primary ? 2 : 1, accent, primary ? 0.9 : 0.55);
+    const text = this.add.text(0, 0, label, {
+      fontFamily: FONT_SANS, fontSize: primary ? '20px' : '15px', fontStyle: 'bold',
+      color: primary ? HEX.gold : HEX.cream, letterSpacing: 1
+    }).setOrigin(0.5);
+    c.add([bg, text]);
+    c.setSize(w, h).setInteractive({ useHandCursor: true });
+    c.on('pointerover', () => {
+      bg.setFillStyle(primary ? 0x231f12 : PANEL_HOVER, 1).setStrokeStyle(2, accent, 1);
+      this.tweens.add({ targets: c, scale: 1.015, duration: 100 });
+    });
+    c.on('pointerout', () => {
+      bg.setFillStyle(primary ? 0x171810 : PANEL, 0.98).setStrokeStyle(primary ? 2 : 1, accent, primary ? 0.9 : 0.55);
+      this.tweens.add({ targets: c, scale: 1, duration: 100 });
+    });
+    c.on('pointerdown', () => { pressPulse(this, c); onClick(); });
+    return c;
+  }
 }

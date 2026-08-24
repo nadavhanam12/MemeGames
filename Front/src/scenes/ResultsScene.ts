@@ -19,7 +19,7 @@ import { analytics } from '../backend/analytics';
 // post designed to be screenshotted or exported via the SHARE button (which
 // captures exactly this rect, watermarked, and opens the OS share sheet).
 const CARD = { x: GAME_W / 2, y: 500, w: 660, h: 960 } as const;
-const CARD_BG = PAL.black;
+const CARD_BG = PAL.ink;
 const CARD_INK = HEX.cream;
 // Hairline divider color shared with feedChrome's card borders.
 const DIVIDER = 0x2f3336;
@@ -64,11 +64,13 @@ export class ResultsScene extends Phaser.Scene {
       onClick: () => void
     ): Phaser.GameObjects.Container => {
       const c = this.add.container(x, y);
-      const bg = this.add.rectangle(0, 0, w, 76, PAL.black, 0.9).setStrokeStyle(2, accent);
+      const bg = this.add.rectangle(0, 0, w, 76, 0x101820, 0.98).setStrokeStyle(1, accent, 0.75);
       const t = this.add
         .text(0, 0, label, {
-          fontFamily: FONT_DISPLAY,
-          fontSize: '26px',
+          fontFamily: FONT_SANS,
+          fontSize: '18px',
+          fontStyle: 'bold',
+          letterSpacing: 1,
           color: labelColor,
           align: 'center'
         })
@@ -228,7 +230,8 @@ export class ResultsScene extends Phaser.Scene {
     const halfW = CARD.w / 2;
     const halfH = CARD.h / 2;
 
-    card.add(this.add.rectangle(0, 0, CARD.w, CARD.h, CARD_BG, 0.92).setStrokeStyle(2, DIVIDER));
+    card.add(this.add.rectangle(0, 0, CARD.w, CARD.h, CARD_BG, 0.98).setStrokeStyle(1, DIVIDER));
+    card.add(this.add.rectangle(0, -halfH + 2, CARD.w - 40, 3, PAL.gold, 0.8));
 
     // post header — this run's recap as a single tweet
     card.add(
@@ -236,8 +239,8 @@ export class ResultsScene extends Phaser.Scene {
         x: -halfW + 20,
         y: -halfH + 44,
         w: CARD.w - 40,
-        handle: "Hormuz Hold'em",
-        subtext: 'just now',
+        handle: 'After Action Report',
+        subtext: 'RUN COMPLETE · VERIFIED',
         live: false
       })
     );
@@ -281,7 +284,7 @@ export class ResultsScene extends Phaser.Scene {
     // "photo": the last meme this run produced, real captions — single
     // centered column now (was a left column beside the stats in landscape)
     const photoY = -halfH + 410;
-    card.add(this.add.rectangle(0, photoY, 460, 300, 0x0e161e).setStrokeStyle(2, DIVIDER));
+    card.add(this.add.rectangle(0, photoY, 460, 300, 0x0e161e).setStrokeStyle(1, PAL.gold, 0.55));
     const lastMeme = this.lastMemePick();
     if (lastMeme) {
       const photo = this.add.container(0, photoY - 8);
@@ -346,7 +349,7 @@ export class ResultsScene extends Phaser.Scene {
       .text(0, halfH - 270, '0', {
         fontFamily: FONT_DISPLAY,
         fontSize: '56px',
-        color: CARD_INK
+        color: HEX.gold
       })
       .setOrigin(0.5);
     card.add(scoreTxt);
