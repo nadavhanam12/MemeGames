@@ -52,23 +52,26 @@ export function hasArt(scene: Phaser.Scene, key: string): boolean {
   return artStatus.generated.has(key) && scene.textures.exists(key);
 }
 
-/**
- * Fetches public/assets/index.json and queues every available generated image
- * on the scene's loader under its canonical key. Returns once textures are
- * loaded and artStatus is populated. Every fallback is reported to the console.
- */
-export async function loadGeneratedArt(scene: Phaser.Scene): Promise<void> {
-  let available: string[] = [];
+let indexCache: string[] | null = null;
+async function fetchIndex(): Promise<string[]> {
+  if (indexCache) return indexCache;
   try {
     const res = await fetch('assets/index.json');
-    if (res.ok) available = (await res.json()) as string[];
-    else console.warn('[art] assets/index.json not found (HTTP', res.status, ') — run `npm run art`. Using fallback art for everything.');
+    if (res.ok) return (indexCache = (await res.json()) as string[]);
+    console.warn('[art] assets/index.json not found (HTTP', res.status, ') — run `npm run art`. Using fallback art for everything.');
   } catch (e) {
     console.warn('[art] could not fetch assets/index.json — using fallback art for everything.', e);
   }
+  return (indexCache = []);
+}
+
+/** Queues `map`'s entries that are available on the scene's loader, resolving
+ *  once loaded and artStatus is populated (fallback entries reported to console). */
+async function loadArtMap(scene: Phaser.Scene, map: Record<string, string>, label: string): Promise<void> {
+  const available = await fetchIndex();
 
   const toLoad: Array<[string, string]> = [];
-  for (const [key, file] of Object.entries(ART_MAP)) {
+  for (const [key, file] of Object.entries(map)) {
     if (available.includes(file)) toLoad.push([key, file]);
     else artStatus.fallback.add(key);
   }
@@ -89,9 +92,23 @@ export async function loadGeneratedArt(scene: Phaser.Scene): Promise<void> {
     }
   }
 
-  const gen = [...artStatus.generated];
-  const fb = [...artStatus.fallback];
-  console.log(`[art] generated (${gen.length}/${Object.keys(ART_MAP).length}): ${gen.join(', ') || '(none)'}`);
-  if (fb.length) console.warn(`[art] FALLBACK (${fb.length}): ${fb.join(', ')} — regenerate + \`npm run art\` (see assets/ART_RUN_SUMMARY.md)`);
-  else console.log('[art] no fallbacks — every key uses generated art');
+  const gen = [...artStatus.generated].filter(k => k in map);
+  const fb = [...artStatus.fallback].filter(k => k in map);
+  console.log(`[art] ${label} generated (${gen.length}/${Object.keys(map).length}): ${gen.join(', ') || '(none)'}`);
+  if (fb.length) console.warn(`[art] ${label} FALLBACK (${fb.length}): ${fb.join(', ')} — regenerate + \`npm run art\` (see assets/ART_RUN_SUMMARY.md)`);
+}
+
+/** Core game art (tankers, threats, UI chrome, character frames) — small and
+ *  blocks the loading screen; the game can't render without it. */
+export function loadCoreArt(scene: Phaser.Scene): Promise<void> {
+  return loadArtMap(scene, CORE_ART, 'core');
+}
+
+/** Meme reaction art (79 images) — loaded in the background after the game
+ *  is already playable. `renderMeme` falls back to a drawn placeholder for
+ *  any meme picked before its texture lands, so this never blocks gameplay. */
+export function loadMemeArt(scene: Phaser.Scene): Promise<void> {
+  return loadArtMap(scene, MEME_ART, 'meme').then(() => {
+    scene.game.events.emit('meme-art-loaded');
+  });
 }

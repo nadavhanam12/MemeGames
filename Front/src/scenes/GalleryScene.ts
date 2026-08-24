@@ -109,7 +109,14 @@ export class GalleryScene extends Phaser.Scene {
     flyIn(this.grid, 160, 30);
     flyIn(back, 280, 24);
 
+    // Meme art loads in the background after Boot hands off to Menu (see
+    // BootScene/loadMemeArt) — if this scene is opened before it finishes,
+    // refresh tiles from placeholder to real art once it lands.
+    const onMemeArtLoaded = (): void => this.buildGrid();
+    this.game.events.on('meme-art-loaded', onMemeArtLoaded);
+
     this.events.on('shutdown', () => {
+      this.game.events.off('meme-art-loaded', onMemeArtLoaded);
       this.input.off('pointerdown');
       this.input.off('pointermove');
       this.input.off('pointerup');
@@ -125,6 +132,7 @@ export class GalleryScene extends Phaser.Scene {
   }
 
   private buildGrid(): void {
+    this.grid.removeAll(true);
     const unlocked = getUnlockedTemplates();
     const rows = Math.ceil(this.ids.length / COLS);
     const gridW = COLS * TILE_W + (COLS - 1) * GAP_X;

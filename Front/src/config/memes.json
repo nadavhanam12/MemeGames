@@ -27,7 +27,7 @@
   "templates": {
     "twoButtons": {
       "artKey": "memeTwoButtons",
-      "artFile": "Memes/meme_twobuttons_blank.png",
+      "artFile": "Memes/meme_twobuttons_blank.webp",
       "label": "TWO BUTTONS",
       "aspect": 1.5,
       "boxes": [
@@ -59,7 +59,7 @@
     },
     "squintTrump": {
       "artKey": "memeSquintTrump",
-      "artFile": "Memes/meme_squint_trump.png",
+      "artFile": "Memes/meme_squint_trump.webp",
       "label": "SQUINT: POTUS",
       "aspect": 1,
       "boxes": [
@@ -89,7 +89,7 @@
     },
     "squintIran": {
       "artKey": "memeSquintIran",
-      "artFile": "Memes/meme_squint_iran.png",
+      "artFile": "Memes/meme_squint_iran.webp",
       "label": "SQUINT: IRAN",
       "aspect": 1,
       "boxes": [
@@ -119,7 +119,7 @@
     },
     "templeTrump": {
       "artKey": "memeTempleTrump",
-      "artFile": "Memes/meme_temple_trump.png",
+      "artFile": "Memes/meme_temple_trump.webp",
       "label": "TEMPLE TAP: POTUS",
       "aspect": 1,
       "boxes": [
@@ -149,7 +149,7 @@
     },
     "templeIran": {
       "artKey": "memeTempleIran",
-      "artFile": "Memes/meme_temple_iran.png",
+      "artFile": "Memes/meme_temple_iran.webp",
       "label": "TEMPLE TAP: IRAN",
       "aspect": 1,
       "boxes": [
@@ -179,7 +179,7 @@
     },
     "podcastCaptain": {
       "artKey": "memePodcastCaptain",
-      "artFile": "Memes/meme_podcast_captain.png",
+      "artFile": "Memes/meme_podcast_captain.webp",
       "label": "PODCAST: CAPTAIN",
       "aspect": 1,
       "boxes": [
@@ -201,7 +201,7 @@
     },
     "podcastKhamenei": {
       "artKey": "memePodcastKhamenei",
-      "artFile": "Memes/meme_podcast_khamenei.png",
+      "artFile": "Memes/meme_podcast_khamenei.webp",
       "label": "PODCAST: IRAN",
       "aspect": 1,
       "boxes": [
@@ -223,7 +223,7 @@
     },
     "condescendingTrump": {
       "artKey": "memeCondescendingTrump",
-      "artFile": "Memes/meme_condescending_trump.png",
+      "artFile": "Memes/meme_condescending_trump.webp",
       "label": "SMUG: POTUS",
       "aspect": 1,
       "boxes": [
@@ -253,7 +253,7 @@
     },
     "condescendingKhamenei": {
       "artKey": "memeCondescendingKhamenei",
-      "artFile": "Memes/meme_condescending_khamenei.png",
+      "artFile": "Memes/meme_condescending_khamenei.webp",
       "label": "SMUG: IRAN",
       "aspect": 1,
       "boxes": [
@@ -283,7 +283,7 @@
     },
     "disasterTrump": {
       "artKey": "memeDisasterTrump",
-      "artFile": "Memes/meme_disaster_trump.png",
+      "artFile": "Memes/meme_disaster_trump.webp",
       "label": "SMIRK: POTUS",
       "aspect": 1,
       "boxes": [
@@ -313,7 +313,7 @@
     },
     "disasterKhamenei": {
       "artKey": "memeDisasterKhamenei",
-      "artFile": "Memes/meme_disaster_khamenei.png",
+      "artFile": "Memes/meme_disaster_khamenei.webp",
       "label": "SMIRK: IRAN",
       "aspect": 1,
       "boxes": [
@@ -343,7 +343,7 @@
     },
     "successTrump": {
       "artKey": "memeSuccessTrump",
-      "artFile": "Memes/meme_success_trump.png",
+      "artFile": "Memes/meme_success_trump.webp",
       "label": "SUCCESS: POTUS",
       "aspect": 1,
       "boxes": [
@@ -373,7 +373,7 @@
     },
     "calmFireAnchor": {
       "artKey": "memeCalmFireAnchor",
-      "artFile": "Memes/meme_calmfire_anchor.png",
+      "artFile": "Memes/meme_calmfire_anchor.webp",
       "label": "CALM FIRE: ANCHOR",
       "aspect": 1,
       "boxes": [
@@ -403,7 +403,7 @@
     },
     "calmFireTrump": {
       "artKey": "memeCalmFireTrump",
-      "artFile": "Memes/meme_calmfire_trump.png",
+      "artFile": "Memes/meme_calmfire_trump.webp",
       "label": "CALM FIRE: POTUS",
       "aspect": 1,
       "boxes": [
@@ -433,7 +433,7 @@
     },
     "calmFireKhamenei": {
       "artKey": "memeCalmFireKhamenei",
-      "artFile": "Memes/meme_calmfire_khamenei.png",
+      "artFile": "Memes/meme_calmfire_khamenei.webp",
       "label": "CALM FIRE: IRAN",
       "aspect": 1,
       "boxes": [
@@ -463,7 +463,7 @@
     },
     "calmFireCaptain": {
       "artKey": "memeCalmFireCaptain",
-      "artFile": "Memes/meme_calmfire_captain.png",
+      "artFile": "Memes/meme_calmfire_captain.webp",
       "label": "CALM FIRE: CAPTAIN",
       "aspect": 1,
       "boxes": [
@@ -493,7 +493,7 @@
     },
     "twoButtons2Trump": {
       "artKey": "memeTwoButtons2Trump",
-      "artFile": "Memes/meme_twobuttons2_trump.png",
+      "artFile": "Memes/meme_twobuttons2_trump.webp",
       "label": "TWO BUTTONS: POTUS",
       "aspect": 1,
       "boxes": [
@@ -529,7 +529,7 @@
     },
     "twoButtons2Khamenei": {
       "artKey": "memeTwoButtons2Khamenei",
-      "artFile": "Memes/meme_twobuttons2_khamenei.png",
+      "artFile": "Memes/meme_twobuttons2_khamenei.webp",
       "label": "TWO BUTTONS: IRAN",
       "aspect": 0.928,
       "boxes": [
@@ -565,7 +565,7 @@
     },
     "draw25Captain": {
       "artKey": "memeDraw25Captain",
-      "artFile": "Memes/meme_draw25_captain.png",
+      "artFile": "Memes/meme_draw25_captain.webp",
       "label": "DRAW 25: CAPTAIN",
       "aspect": 1,
       "boxes": [
@@ -587,7 +587,7 @@
     },
     "draw25Trump": {
       "artKey": "memeDraw25Trump",
-      "artFile": "Memes/meme_draw25_trump.png",
+      "artFile": "Memes/meme_draw25_trump.webp",
       "label": "DRAW 25: POTUS",
       "aspect": 1,
       "boxes": [
@@ -609,7 +609,7 @@
     },
     "draw25Khamenei": {
       "artKey": "memeDraw25Khamenei",
-      "artFile": "Memes/meme_draw25_khamenei.png",
+      "artFile": "Memes/meme_draw25_khamenei.webp",
       "label": "DRAW 25: IRAN",
       "aspect": 1,
       "boxes": [
@@ -631,7 +631,7 @@
     },
     "draw25Exec": {
       "artKey": "memeDraw25Exec",
-      "artFile": "Memes/meme_draw25_exec.png",
+      "artFile": "Memes/meme_draw25_exec.webp",
       "label": "DRAW 25: OIL EXEC",
       "aspect": 1,
       "boxes": [
@@ -653,7 +653,7 @@
     },
     "disasterEyeTrump": {
       "artKey": "memeDisasterEyeTrump",
-      "artFile": "Memes/meme_disastereye_trump.png",
+      "artFile": "Memes/meme_disastereye_trump.webp",
       "label": "DISASTER SIDE-EYE: POTUS",
       "aspect": 1,
       "boxes": [
@@ -683,7 +683,7 @@
     },
     "rejectApproveTrump": {
       "artKey": "memeRejectApproveTrump",
-      "artFile": "Memes/meme_rejectapprove_trump.png",
+      "artFile": "Memes/meme_rejectapprove_trump.webp",
       "label": "REJECT/APPROVE: POTUS",
       "aspect": 1,
       "boxes": [
@@ -713,7 +713,7 @@
     },
     "rejectApproveKhamenei": {
       "artKey": "memeRejectApproveKhamenei",
-      "artFile": "Memes/meme_rejectapprove_khamenei.png",
+      "artFile": "Memes/meme_rejectapprove_khamenei.webp",
       "label": "REJECT/APPROVE: IRAN",
       "aspect": 1,
       "boxes": [
@@ -743,7 +743,7 @@
     },
     "rejectApproveCaptain": {
       "artKey": "memeRejectApproveCaptain",
-      "artFile": "Memes/meme_rejectapprove_captain.png",
+      "artFile": "Memes/meme_rejectapprove_captain.webp",
       "label": "REJECT/APPROVE: CAPTAIN",
       "aspect": 1,
       "boxes": [
@@ -773,7 +773,7 @@
     },
     "rejectApproveTrader": {
       "artKey": "memeRejectApproveTrader",
-      "artFile": "Memes/meme_rejectapprove_trader.png",
+      "artFile": "Memes/meme_rejectapprove_trader.webp",
       "label": "REJECT/APPROVE: TRADER",
       "aspect": 1,
       "boxes": [
@@ -803,7 +803,7 @@
     },
     "highwayExitTrump": {
       "artKey": "memeHighwayExitTrump",
-      "artFile": "Memes/meme_highwayexit_trump.png",
+      "artFile": "Memes/meme_highwayexit_trump.webp",
       "label": "HIGHWAY EXIT: POTUS",
       "aspect": 1,
       "boxes": [
@@ -825,7 +825,7 @@
     },
     "highwayExitKhamenei": {
       "artKey": "memeHighwayExitKhamenei",
-      "artFile": "Memes/meme_highwayexit_khamenei.png",
+      "artFile": "Memes/meme_highwayexit_khamenei.webp",
       "label": "HIGHWAY EXIT: IRAN",
       "aspect": 1,
       "boxes": [
@@ -847,7 +847,7 @@
     },
     "highwayExitTrader": {
       "artKey": "memeHighwayExitTrader",
-      "artFile": "Memes/meme_highwayexit_trader.png",
+      "artFile": "Memes/meme_highwayexit_trader.webp",
       "label": "HIGHWAY EXIT: TRADER",
       "aspect": 1,
       "boxes": [
@@ -869,7 +869,7 @@
     },
     "saltTrump": {
       "artKey": "memeSaltTrump",
-      "artFile": "Memes/meme_salt_trump.png",
+      "artFile": "Memes/meme_salt_trump.webp",
       "label": "SALT SPRINKLE: POTUS",
       "aspect": 1,
       "boxes": [
@@ -891,7 +891,7 @@
     },
     "saltKhamenei": {
       "artKey": "memeSaltKhamenei",
-      "artFile": "Memes/meme_salt_khamenei.png",
+      "artFile": "Memes/meme_salt_khamenei.webp",
       "label": "SALT SPRINKLE: IRAN",
       "aspect": 1,
       "boxes": [
@@ -913,7 +913,7 @@
     },
     "saltCommander": {
       "artKey": "memeSaltCommander",
-      "artFile": "Memes/meme_salt_commander.png",
+      "artFile": "Memes/meme_salt_commander.webp",
       "label": "SALT SPRINKLE: COMMANDER",
       "aspect": 1,
       "boxes": [
@@ -935,7 +935,7 @@
     },
     "saltDiplomat": {
       "artKey": "memeSaltDiplomat",
-      "artFile": "Memes/meme_salt_diplomat.png",
+      "artFile": "Memes/meme_salt_diplomat.webp",
       "label": "SALT SPRINKLE: DIPLOMAT",
       "aspect": 1,
       "boxes": [
@@ -957,7 +957,7 @@
     },
     "success2Trump": {
       "artKey": "memeSuccess2Trump",
-      "artFile": "Memes/meme_success2_trump.png",
+      "artFile": "Memes/meme_success2_trump.webp",
       "label": "SUCCESS FIST II: POTUS",
       "aspect": 1,
       "boxes": [
@@ -987,7 +987,7 @@
     },
     "distracted2Trump": {
       "artKey": "memeDistracted2Trump",
-      "artFile": "Memes/meme_distracted2_trump.png",
+      "artFile": "Memes/meme_distracted2_trump.webp",
       "label": "DISTRACTED II: POTUS",
       "aspect": 1,
       "boxes": [
@@ -1024,7 +1024,7 @@
     },
     "distracted2Khamenei": {
       "artKey": "memeDistracted2Khamenei",
-      "artFile": "Memes/meme_distracted2_khamenei.png",
+      "artFile": "Memes/meme_distracted2_khamenei.webp",
       "label": "DISTRACTED II: IRAN",
       "aspect": 1,
       "boxes": [
@@ -1061,7 +1061,7 @@
     },
     "condescending2Trump": {
       "artKey": "memeCondescending2Trump",
-      "artFile": "Memes/meme_condescending2_trump.png",
+      "artFile": "Memes/meme_condescending2_trump.webp",
       "label": "CONDESCENDING II: POTUS",
       "aspect": 1,
       "boxes": [
@@ -1091,7 +1091,7 @@
     },
     "condescending2Khamenei": {
       "artKey": "memeCondescending2Khamenei",
-      "artFile": "Memes/meme_condescending2_khamenei.png",
+      "artFile": "Memes/meme_condescending2_khamenei.webp",
       "label": "CONDESCENDING II: IRAN",
       "aspect": 1,
       "boxes": [
@@ -1121,7 +1121,7 @@
     },
     "expandingBrainWin": {
       "artKey": "memeExpandingbrainWin",
-      "artFile": "Memes/meme_expandingbrain_win.png",
+      "artFile": "Memes/meme_expandingbrain_win.webp",
       "label": "EXPANDING BRAIN: WIN",
       "aspect": 1,
       "boxes": [
@@ -1161,7 +1161,7 @@
     },
     "expandingBrainFail": {
       "artKey": "memeExpandingbrainFail",
-      "artFile": "Memes/meme_expandingbrain_fail.png",
+      "artFile": "Memes/meme_expandingbrain_fail.webp",
       "label": "EXPANDING BRAIN: FAIL",
       "aspect": 1,
       "boxes": [
@@ -1201,7 +1201,7 @@
     },
     "expandingBrainFoe": {
       "artKey": "memeExpandingbrainFoe",
-      "artFile": "Memes/meme_expandingbrain_foe.png",
+      "artFile": "Memes/meme_expandingbrain_foe.webp",
       "label": "EXPANDING BRAIN: FOE",
       "aspect": 1,
       "boxes": [
@@ -1241,7 +1241,7 @@
     },
     "expandingBrainReact": {
       "artKey": "memeExpandingbrainReact",
-      "artFile": "Memes/meme_expandingbrain_react.png",
+      "artFile": "Memes/meme_expandingbrain_react.webp",
       "label": "EXPANDING BRAIN: REACT",
       "aspect": 1,
       "boxes": [
@@ -1281,7 +1281,7 @@
     },
     "clownMakeupWin": {
       "artKey": "memeClownmakeupWin",
-      "artFile": "Memes/meme_clownmakeup_win.png",
+      "artFile": "Memes/meme_clownmakeup_win.webp",
       "label": "CLOWN MAKEUP: WIN",
       "aspect": 1,
       "boxes": [
@@ -1321,7 +1321,7 @@
     },
     "clownMakeupFail": {
       "artKey": "memeClownmakeupFail",
-      "artFile": "Memes/meme_clownmakeup_fail.png",
+      "artFile": "Memes/meme_clownmakeup_fail.webp",
       "label": "CLOWN MAKEUP: FAIL",
       "aspect": 1,
       "boxes": [
@@ -1361,7 +1361,7 @@
     },
     "clownMakeupFoe": {
       "artKey": "memeClownmakeupFoe",
-      "artFile": "Memes/meme_clownmakeup_foe.png",
+      "artFile": "Memes/meme_clownmakeup_foe.webp",
       "label": "CLOWN MAKEUP: FOE",
       "aspect": 1,
       "boxes": [
@@ -1401,7 +1401,7 @@
     },
     "clownMakeupReact": {
       "artKey": "memeClownmakeupReact",
-      "artFile": "Memes/meme_clownmakeup_react.png",
+      "artFile": "Memes/meme_clownmakeup_react.webp",
       "label": "CLOWN MAKEUP: REACT",
       "aspect": 1,
       "boxes": [
@@ -1441,7 +1441,7 @@
     },
     "panikKalmWin": {
       "artKey": "memePanikkalmWin",
-      "artFile": "Memes/meme_panikkalm_win.png",
+      "artFile": "Memes/meme_panikkalm_win.webp",
       "label": "PANIK KALM: WIN",
       "aspect": 1,
       "boxes": [
@@ -1475,7 +1475,7 @@
     },
     "panikKalmFail": {
       "artKey": "memePanikkalmFail",
-      "artFile": "Memes/meme_panikkalm_fail.png",
+      "artFile": "Memes/meme_panikkalm_fail.webp",
       "label": "PANIK KALM: FAIL",
       "aspect": 1,
       "boxes": [
@@ -1509,7 +1509,7 @@
     },
     "panikKalmFoe": {
       "artKey": "memePanikkalmFoe",
-      "artFile": "Memes/meme_panikkalm_foe.png",
+      "artFile": "Memes/meme_panikkalm_foe.webp",
       "label": "PANIK KALM: FOE",
       "aspect": 1,
       "boxes": [
@@ -1543,7 +1543,7 @@
     },
     "panikKalmReact": {
       "artKey": "memePanikkalmReact",
-      "artFile": "Memes/meme_panikkalm_react.png",
+      "artFile": "Memes/meme_panikkalm_react.webp",
       "label": "PANIK KALM: REACT",
       "aspect": 1,
       "boxes": [
@@ -1577,7 +1577,7 @@
     },
     "gruPlanWin": {
       "artKey": "memeGrusplanWin",
-      "artFile": "Memes/meme_grusplan_win.png",
+      "artFile": "Memes/meme_grusplan_win.webp",
       "label": "GRU'S PLAN: WIN",
       "aspect": 1,
       "boxes": [
@@ -1617,7 +1617,7 @@
     },
     "gruPlanFail": {
       "artKey": "memeGrusplanFail",
-      "artFile": "Memes/meme_grusplan_fail.png",
+      "artFile": "Memes/meme_grusplan_fail.webp",
       "label": "GRU'S PLAN: FAIL",
       "aspect": 1,
       "boxes": [
@@ -1657,7 +1657,7 @@
     },
     "gruPlanFoe": {
       "artKey": "memeGrusplanFoe",
-      "artFile": "Memes/meme_grusplan_foe.png",
+      "artFile": "Memes/meme_grusplan_foe.webp",
       "label": "GRU'S PLAN: FOE",
       "aspect": 1,
       "boxes": [
@@ -1697,7 +1697,7 @@
     },
     "gruPlanReact": {
       "artKey": "memeGrusplanReact",
-      "artFile": "Memes/meme_grusplan_react.png",
+      "artFile": "Memes/meme_grusplan_react.webp",
       "label": "GRU'S PLAN: REACT",
       "aspect": 1,
       "boxes": [
@@ -1737,7 +1737,7 @@
     },
     "alwaysHasBeenWin": {
       "artKey": "memeAlwayshasbeenWin",
-      "artFile": "Memes/meme_alwayshasbeen_win.png",
+      "artFile": "Memes/meme_alwayshasbeen_win.webp",
       "label": "ALWAYS HAS BEEN: WIN",
       "aspect": 1,
       "boxes": [
@@ -1767,7 +1767,7 @@
     },
     "alwaysHasBeenFail": {
       "artKey": "memeAlwayshasbeenFail",
-      "artFile": "Memes/meme_alwayshasbeen_fail.png",
+      "artFile": "Memes/meme_alwayshasbeen_fail.webp",
       "label": "ALWAYS HAS BEEN: FAIL",
       "aspect": 1,
       "boxes": [
@@ -1797,7 +1797,7 @@
     },
     "alwaysHasBeenFoe": {
       "artKey": "memeAlwayshasbeenFoe",
-      "artFile": "Memes/meme_alwayshasbeen_foe.png",
+      "artFile": "Memes/meme_alwayshasbeen_foe.webp",
       "label": "ALWAYS HAS BEEN: FOE",
       "aspect": 1,
       "boxes": [
@@ -1827,7 +1827,7 @@
     },
     "alwaysHasBeenReact": {
       "artKey": "memeAlwayshasbeenReact",
-      "artFile": "Memes/meme_alwayshasbeen_react.png",
+      "artFile": "Memes/meme_alwayshasbeen_react.webp",
       "label": "ALWAYS HAS BEEN: REACT",
       "aspect": 1,
       "boxes": [
@@ -1857,7 +1857,7 @@
     },
     "sideEyeWin": {
       "artKey": "memeSideeyeWin",
-      "artFile": "Memes/meme_sideeye_win.png",
+      "artFile": "Memes/meme_sideeye_win.webp",
       "label": "SIDE-EYE PUPPET: WIN",
       "aspect": 1,
       "boxes": [
@@ -1879,7 +1879,7 @@
     },
     "sideEyeFail": {
       "artKey": "memeSideeyeFail",
-      "artFile": "Memes/meme_sideeye_fail.png",
+      "artFile": "Memes/meme_sideeye_fail.webp",
       "label": "SIDE-EYE PUPPET: FAIL",
       "aspect": 1,
       "boxes": [
@@ -1901,7 +1901,7 @@
     },
     "sideEyeFoe": {
       "artKey": "memeSideeyeFoe",
-      "artFile": "Memes/meme_sideeye_foe.png",
+      "artFile": "Memes/meme_sideeye_foe.webp",
       "label": "SIDE-EYE PUPPET: FOE",
       "aspect": 1,
       "boxes": [
@@ -1923,7 +1923,7 @@
     },
     "sideEyeReact": {
       "artKey": "memeSideeyeReact",
-      "artFile": "Memes/meme_sideeye_react.png",
+      "artFile": "Memes/meme_sideeye_react.webp",
       "label": "SIDE-EYE PUPPET: REACT",
       "aspect": 1,
       "boxes": [
@@ -1945,7 +1945,7 @@
     },
     "partyCornerWin": {
       "artKey": "memePartycornerWin",
-      "artFile": "Memes/meme_partycorner_win.png",
+      "artFile": "Memes/meme_partycorner_win.webp",
       "label": "PARTY CORNER: WIN",
       "aspect": 1,
       "boxes": [
@@ -1967,7 +1967,7 @@
     },
     "partyCornerFail": {
       "artKey": "memePartycornerFail",
-      "artFile": "Memes/meme_partycorner_fail.png",
+      "artFile": "Memes/meme_partycorner_fail.webp",
       "label": "PARTY CORNER: FAIL",
       "aspect": 1,
       "boxes": [
@@ -1989,7 +1989,7 @@
     },
     "partyCornerFoe": {
       "artKey": "memePartycornerFoe",
-      "artFile": "Memes/meme_partycorner_foe.png",
+      "artFile": "Memes/meme_partycorner_foe.webp",
       "label": "PARTY CORNER: FOE",
       "aspect": 1,
       "boxes": [
@@ -2011,7 +2011,7 @@
     },
     "partyCornerReact": {
       "artKey": "memePartycornerReact",
-      "artFile": "Memes/meme_partycorner_react.png",
+      "artFile": "Memes/meme_partycorner_react.webp",
       "label": "PARTY CORNER: REACT",
       "aspect": 1,
       "boxes": [
@@ -2033,7 +2033,7 @@
     },
     "tradeOfferWin": {
       "artKey": "memeTradeofferWin",
-      "artFile": "Memes/meme_tradeoffer_win.png",
+      "artFile": "Memes/meme_tradeoffer_win.webp",
       "label": "TRADE OFFER: WIN",
       "aspect": 1,
       "boxes": [
@@ -2061,7 +2061,7 @@
     },
     "tradeOfferFail": {
       "artKey": "memeTradeofferFail",
-      "artFile": "Memes/meme_tradeoffer_fail.png",
+      "artFile": "Memes/meme_tradeoffer_fail.webp",
       "label": "TRADE OFFER: FAIL",
       "aspect": 1,
       "boxes": [
@@ -2089,7 +2089,7 @@
     },
     "tradeOfferFoe": {
       "artKey": "memeTradeofferFoe",
-      "artFile": "Memes/meme_tradeoffer_foe.png",
+      "artFile": "Memes/meme_tradeoffer_foe.webp",
       "label": "TRADE OFFER: FOE",
       "aspect": 1,
       "boxes": [
@@ -2117,7 +2117,7 @@
     },
     "tradeOfferReact": {
       "artKey": "memeTradeofferReact",
-      "artFile": "Memes/meme_tradeoffer_react.png",
+      "artFile": "Memes/meme_tradeoffer_react.webp",
       "label": "TRADE OFFER: REACT",
       "aspect": 1,
       "boxes": [
@@ -2145,7 +2145,7 @@
     },
     "onceAgainWin": {
       "artKey": "memeOnceagainWin",
-      "artFile": "Memes/meme_onceagain_win.png",
+      "artFile": "Memes/meme_onceagain_win.webp",
       "label": "ONCE AGAIN ASKING: WIN",
       "aspect": 1,
       "boxes": [
@@ -2167,7 +2167,7 @@
     },
     "onceAgainFail": {
       "artKey": "memeOnceagainFail",
-      "artFile": "Memes/meme_onceagain_fail.png",
+      "artFile": "Memes/meme_onceagain_fail.webp",
       "label": "ONCE AGAIN ASKING: FAIL",
       "aspect": 1,
       "boxes": [
@@ -2189,7 +2189,7 @@
     },
     "onceAgainFoe": {
       "artKey": "memeOnceagainFoe",
-      "artFile": "Memes/meme_onceagain_foe.png",
+      "artFile": "Memes/meme_onceagain_foe.webp",
       "label": "ONCE AGAIN ASKING: FOE",
       "aspect": 1,
       "boxes": [
@@ -2211,7 +2211,7 @@
     },
     "onceAgainReact": {
       "artKey": "memeOnceagainReact",
-      "artFile": "Memes/meme_onceagain_react.png",
+      "artFile": "Memes/meme_onceagain_react.webp",
       "label": "ONCE AGAIN ASKING: REACT",
       "aspect": 1,
       "boxes": [
@@ -2233,7 +2233,7 @@
     },
     "forTheBetterWin": {
       "artKey": "memeForthebetterWin",
-      "artFile": "Memes/meme_forthebetter_win.png",
+      "artFile": "Memes/meme_forthebetter_win.webp",
       "label": "FOR THE BETTER: WIN",
       "aspect": 1,
       "boxes": [
@@ -2273,7 +2273,7 @@
     },
     "forTheBetterFail": {
       "artKey": "memeForthebetterFail",
-      "artFile": "Memes/meme_forthebetter_fail.png",
+      "artFile": "Memes/meme_forthebetter_fail.webp",
       "label": "FOR THE BETTER: FAIL",
       "aspect": 1,
       "boxes": [
@@ -2313,7 +2313,7 @@
     },
     "forTheBetterFoe": {
       "artKey": "memeForthebetterFoe",
-      "artFile": "Memes/meme_forthebetter_foe.png",
+      "artFile": "Memes/meme_forthebetter_foe.webp",
       "label": "FOR THE BETTER: FOE",
       "aspect": 1,
       "boxes": [
@@ -2353,7 +2353,7 @@
     },
     "forTheBetterReact": {
       "artKey": "memeForthebetterReact",
-      "artFile": "Memes/meme_forthebetter_react.png",
+      "artFile": "Memes/meme_forthebetter_react.webp",
       "label": "FOR THE BETTER: REACT",
       "aspect": 1,
       "boxes": [

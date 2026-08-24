@@ -2,7 +2,7 @@
 // textures for anything missing. Fallbacks are reported in the console.
 import Phaser from 'phaser';
 import { PAL } from '../core/palette';
-import { hasArt, loadGeneratedArt } from '../core/art';
+import { hasArt, loadCoreArt, loadMemeArt } from '../core/art';
 import { loadShareIcons } from '../core/shareIcons';
 import { loadEngagementIcons } from '../core/engagementIcons';
 
@@ -15,12 +15,17 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     this.makeParticles();
-    void Promise.all([this.loadFonts(), loadGeneratedArt(this), loadShareIcons(this), loadEngagementIcons(this)]).then(() => {
+    void Promise.all([this.loadFonts(), loadCoreArt(this), loadShareIcons(this), loadEngagementIcons(this)]).then(() => {
       // programmatic fallbacks only for keys with no generated texture
       this.makeTankers();
       this.makeThreats();
       this.makeUpgradeIcons();
-      this.scene.start('Menu');
+      // launch (not start) so Boot stays alive to keep background-loading
+      // meme art after Menu is already playable — stopping Boot would kill
+      // its in-flight loader (renderMeme falls back to a drawn placeholder
+      // for any meme picked before its texture lands).
+      this.scene.launch('Menu');
+      void loadMemeArt(this);
     });
   }
 

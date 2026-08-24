@@ -23,11 +23,24 @@ const MEMES_OUT = path.join(OUT, 'Memes');
 function isMemeFile(filename) {
   return filename.startsWith('meme_');
 }
+// Meme content images are re-encoded as lossy WebP (flat AI-generated art
+// compresses far better there than as lossless PNG). The broadcast frame is
+// a compositing overlay (has alpha, isn't meme "content"), kept as PNG.
+const WEBP_QUALITY = 90;
+function isWebpMeme(filename) {
+  return isMemeFile(filename) && filename !== 'meme_frame_broadcast.png';
+}
+function outExt(filename) {
+  return isWebpMeme(filename) ? filename.replace(/\.png$/, '.webp') : filename;
+}
 function outFileFor(filename) {
-  return path.join(isMemeFile(filename) ? MEMES_OUT : OUT, filename);
+  return path.join(isMemeFile(filename) ? MEMES_OUT : OUT, outExt(filename));
 }
 function relOutFor(filename) {
-  return isMemeFile(filename) ? `Memes/${filename}` : filename;
+  return isMemeFile(filename) ? `Memes/${outExt(filename)}` : filename;
+}
+function encode(img, filename) {
+  return isWebpMeme(filename) ? img.webp({ quality: WEBP_QUALITY }) : img.png({ compressionLevel: 9 });
 }
 
 // Final on-screen sizes for standalone images (game world is 1280x720).
@@ -70,7 +83,7 @@ async function processImage(asset) {
   const outFile = outFileFor(`${asset.name}.png`);
   let img = sharp(src);
   if (target.width || target.height) img = img.resize(target.width ?? null, target.height ?? null);
-  await img.png({ compressionLevel: 9 }).toFile(outFile);
+  await encode(img, `${asset.name}.png`).toFile(outFile);
   produced.push(relOutFor(`${asset.name}.png`));
 }
 
@@ -114,7 +127,7 @@ async function processAtlas(asset) {
     let out = sharp(trimmed);
     if (targetW) out = out.resize({ width: targetW });
     const outFile = outFileFor(`${frameName}.png`);
-    const info = await out.png({ compressionLevel: 9 }).toFile(outFile);
+    const info = await encode(out, `${frameName}.png`).toFile(outFile);
     produced.push(`${relOutFor(`${frameName}.png`)} (${info.width}x${info.height})`);
   }
 }
