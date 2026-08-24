@@ -2,6 +2,10 @@
 // seen fire, saved per account in localStorage (same key discipline as
 // src/backend/leaderboard.ts). Populated by pickMeme() in memes.ts.
 const STORAGE_KEY = 'hormuz-memes-v1';
+// Best day-count ever reached across all runs — gates which templates'
+// dayTier is eligible to fire (see pickMeme() in memes.ts). Account-wide and
+// never resets, same as `unlocked` below.
+const BEST_DAY_KEY = 'hormuz-memes-bestday-v1';
 
 interface StoredUnlocks {
   ids: string[];
@@ -17,7 +21,21 @@ function load(): Set<string> {
   return new Set();
 }
 
+function loadBestDay(): number {
+  try {
+    const raw = localStorage.getItem(BEST_DAY_KEY);
+    if (raw) {
+      const n = Number(raw);
+      if (Number.isFinite(n)) return n;
+    }
+  } catch {
+    /* corrupted or unavailable storage — start fresh */
+  }
+  return 0;
+}
+
 const unlocked = load();
+let bestDayReached = loadBestDay();
 let dayUnlocks: string[] = [];
 let dayFired: string[] = [];
 let runUnlocks: string[] = [];
@@ -28,6 +46,23 @@ function persist(): void {
   } catch {
     /* storage unavailable — non-fatal */
   }
+}
+
+/** Call whenever a run starts/reaches a day, so the meme-tier gate (and the
+ *  gallery's per-tier "reached" state) only ever grows across a player's
+ *  whole account, never resets between runs. */
+export function recordDayReached(day: number): void {
+  if (day <= bestDayReached) return;
+  bestDayReached = day;
+  try {
+    localStorage.setItem(BEST_DAY_KEY, String(bestDayReached));
+  } catch {
+    /* storage unavailable — non-fatal */
+  }
+}
+
+export function getBestDayReached(): number {
+  return bestDayReached;
 }
 
 /** Marks a template as seen today (whether or not it was already unlocked),

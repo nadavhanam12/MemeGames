@@ -14,7 +14,7 @@ import { pressPulse } from '../core/juice';
 import { broadcastCut, broadcastReveal, staticBlink } from '../core/broadcast';
 import { createPostHeader } from '../core/feedChrome';
 import { MEMES } from '../core/memes';
-import { getUnlockedTemplates } from '../core/memeUnlocks';
+import { getBestDayReached, getUnlockedTemplates } from '../core/memeUnlocks';
 import { captureAndShare, captureAndShareTo } from '../core/share';
 import { addExportButtonRow } from '../core/shareButtons';
 import { settings } from '../core/settings';
@@ -27,6 +27,8 @@ const GAP_Y = 16;
 const VIEWPORT_TOP = 116;
 const VIEWPORT_BOTTOM = 1150; // above the BACK button
 const CLICK_DRAG_THRESHOLD = 8; // px of movement below which a release counts as a tap, not a scroll
+const SECTION_HEADER_H = 40;
+const SECTION_GAP = 26;
 
 // Hairline divider color shared with feedChrome's card borders.
 const DIVIDER = 0x2f3336;
@@ -37,7 +39,6 @@ export class GalleryScene extends Phaser.Scene {
   private grid!: Phaser.GameObjects.Container;
   private focusLayer?: Phaser.GameObjects.Container;
 
-  private baseY = 0;
   private contentOffset = 0;
   private maxScroll = 0;
   private pointerDown = false;
@@ -131,63 +132,165 @@ export class GalleryScene extends Phaser.Scene {
     broadcastCut(this, () => this.scene.start(target));
   }
 
+  /** Templates are grouped by MEMES.templates[id].dayTier — the day-count a
+   *  template needs before pickMeme() will ever draw it (see memes.ts). Each
+   *  tier gets its own header ("reached — n/total unlocked" or a locked
+   *  "reach day N" line) so a player can tell an unfired meme that's already
+   *  in the pool from one still waiting on future progress. Progress is
+   *  account-wide (getBestDayReached()), not per-run.
+   */
   private buildGrid(): void {
     this.grid.removeAll(true);
     const unlocked = getUnlockedTemplates();
-    const rows = Math.ceil(this.ids.length / COLS);
+    const bestDay = Math.max(1, getBestDayReached());
+
+    const tiers = new Map<number, string[]>();
+    for (const id of this.ids) {
+      const tier = MEMES.templates[id].dayTier;
+      const bucket = tiers.get(tier);
+      if (bucket) bucket.push(id);
+      else tiers.set(tier, [id]);
+    }
+    const tierKeys = [...tiers.keys()].sort((a, b) => a - b);
+
     const gridW = COLS * TILE_W + (COLS - 1) * GAP_X;
     const originX = GAME_W / 2 - gridW / 2 + TILE_W / 2;
-    this.baseY = VIEWPORT_TOP + TILE_H / 2 + 6;
-    const contentH = rows * TILE_H + (rows - 1) * GAP_Y;
-    this.maxScroll = Math.max(0, contentH - (VIEWPORT_BOTTOM - VIEWPORT_TOP - 12));
 
-    this.ids.forEach((id, i) => {
-      const col = i % COLS;
-      const row = Math.floor(i / COLS);
-      const x = originX + col * (TILE_W + GAP_X);
-      const y = this.baseY + row * (TILE_H + GAP_Y);
-      const tpl = MEMES.templates[id];
-      const unlockedHere = unlocked.has(id);
+    let y = VIEWPORT_TOP + 14;
+    for (const tier of tierKeys) {
+      const ids = tiers.get(tier)!;
+      const reached = tier <= bestDay;
 
-      const tile = this.add.container(x, y);
-      tile.add(
-        this.add.rectangle(0, 0, TILE_W, TILE_H, 0x0e161e).setStrokeStyle(3, unlockedHere ? PAL.gold : 0x39424e)
-      );
+      this.grid.add(this.buildSectionHeader(GAME_W / 2, y, gridW, tier, ids, unlocked, reached));
+      y += SECTION_HEADER_H;
 
-      const maxW = TILE_W - 14;
-      const maxH = TILE_H - 14;
-      let w = maxW;
-      let h = w * tpl.aspect;
-      if (h > maxH) {
-        h = maxH;
-        w = h / tpl.aspect;
-      }
-
-      if (hasArt(this, tpl.artKey)) {
-        const img = this.add.image(0, 0, tpl.artKey).setDisplaySize(w, h);
-        if (!unlockedHere) img.setTint(0x3d434a).setAlpha(0.7);
-        tile.add(img);
-      } else {
-        tile.add(this.add.rectangle(0, 0, w, h, unlockedHere ? 0xf2f2f2 : 0x2a323b));
-      }
-
-      tile.setSize(TILE_W, TILE_H);
-      tile.setInteractive({ useHandCursor: unlockedHere });
-      tile.on('pointerup', () => {
-        if (this.leaving || this.dragMoved > CLICK_DRAG_THRESHOLD) return;
-        if (!unlockedHere) {
-          // locked — a little shake instead of opening the zoom view
-          sfx.tap();
-          this.tweens.add({ targets: tile, x: tile.x - 6, duration: 40, yoyo: true, repeat: 2 });
-          return;
-        }
-        sfx.tap();
-        staticBlink(this, 110); // channel-flip into the meme
-        this.showFocusedMeme(id);
+      const rows = Math.ceil(ids.length / COLS);
+      ids.forEach((id, i) => {
+        const col = i % COLS;
+        const row = Math.floor(i / COLS);
+        const x = originX + col * (TILE_W + GAP_X);
+        const ty = y + TILE_H / 2 + row * (TILE_H + GAP_Y);
+        this.grid.add(this.buildTile(id, x, ty, unlocked.has(id), !reached));
       });
+      const blockH = rows * TILE_H + (rows - 1) * GAP_Y;
+      if (!reached) this.grid.add(this.buildLockedStamp(GAME_W / 2, y + blockH / 2, tier));
+      y += blockH + SECTION_GAP;
+    }
 
-      this.grid.add(tile);
+    const contentH = y - SECTION_GAP - VIEWPORT_TOP;
+    this.maxScroll = Math.max(0, contentH - (VIEWPORT_BOTTOM - VIEWPORT_TOP - 12));
+  }
+
+  private buildSectionHeader(
+    cx: number,
+    y: number,
+    w: number,
+    tier: number,
+    ids: string[],
+    unlocked: ReadonlySet<string>,
+    reached: boolean
+  ): Phaser.GameObjects.Container {
+    const label = tier === 1 ? 'DAY 1' : `DAY ${tier}`;
+    let sub: string;
+    if (tier === 1) {
+      sub = `${ids.length} memes · always in the mix`;
+    } else if (reached) {
+      const n = ids.filter(id => unlocked.has(id)).length;
+      sub = `${ids.length} memes · reached — ${n}/${ids.length} unlocked`;
+    } else {
+      sub = `${ids.length} memes`;
+    }
+
+    const c = this.add.container(cx - w / 2, y);
+    c.add(
+      this.add
+        .text(0, 0, label, {
+          fontFamily: FONT_SANS,
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: reached ? HEX.cream : '#5b6570'
+        })
+        .setOrigin(0, 0)
+    );
+    c.add(
+      this.add
+        .text(w, 0, sub, { fontFamily: FONT_SANS, fontSize: '11px', color: HEX.muted })
+        .setOrigin(1, 0)
+    );
+    return c;
+  }
+
+  /** Centered lock icon + "available in day N" stamp over an entire
+   *  not-yet-reached tier's tile block, so the gap between a group of dimmed
+   *  tiles and the mission progress needed to unlock them reads at a glance. */
+  private buildLockedStamp(cx: number, cy: number, tier: number): Phaser.GameObjects.Container {
+    const c = this.add.container(cx, cy);
+    c.add(
+      this.add
+        .text(0, -12, '🔒', { fontFamily: FONT_SANS, fontSize: '22px' })
+        .setOrigin(0.5)
+    );
+    c.add(
+      this.add
+        .text(0, 14, `available in day ${tier}`, {
+          fontFamily: FONT_SANS,
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: HEX.cream
+        })
+        .setOrigin(0.5)
+    );
+    return c;
+  }
+
+  private buildTile(
+    id: string,
+    x: number,
+    y: number,
+    unlockedHere: boolean,
+    tierLocked = false
+  ): Phaser.GameObjects.Container {
+    const tpl = MEMES.templates[id];
+
+    const tile = this.add.container(x, y);
+    tile.add(
+      this.add.rectangle(0, 0, TILE_W, TILE_H, 0x0e161e).setStrokeStyle(3, unlockedHere ? PAL.gold : 0x39424e)
+    );
+
+    const maxW = TILE_W - 14;
+    const maxH = TILE_H - 14;
+    let w = maxW;
+    let h = w * tpl.aspect;
+    if (h > maxH) {
+      h = maxH;
+      w = h / tpl.aspect;
+    }
+
+    if (hasArt(this, tpl.artKey)) {
+      const img = this.add.image(0, 0, tpl.artKey).setDisplaySize(w, h);
+      if (!unlockedHere) img.setTint(0x3d434a).setAlpha(tierLocked ? 0.45 : 0.7);
+      tile.add(img);
+    } else {
+      tile.add(this.add.rectangle(0, 0, w, h, unlockedHere ? 0xf2f2f2 : 0x2a323b));
+    }
+    if (tierLocked) tile.setAlpha(0.55);
+
+    tile.setSize(TILE_W, TILE_H);
+    tile.setInteractive({ useHandCursor: unlockedHere });
+    tile.on('pointerup', () => {
+      if (this.leaving || this.dragMoved > CLICK_DRAG_THRESHOLD) return;
+      if (!unlockedHere) {
+        // locked — a little shake instead of opening the zoom view
+        sfx.tap();
+        this.tweens.add({ targets: tile, x: tile.x - 6, duration: 40, yoyo: true, repeat: 2 });
+        return;
+      }
+      sfx.tap();
+      staticBlink(this, 110); // channel-flip into the meme
+      this.showFocusedMeme(id);
     });
+
+    return tile;
   }
 
   /** Mouse: click-and-hold drag, or wheel — never on hover alone. Touch: drag

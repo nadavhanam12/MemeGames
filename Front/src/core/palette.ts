@@ -42,11 +42,22 @@ export const GAME_H = 1280;
 // the canvas is DPR× larger and every camera zooms by DPR to compensate.
 export const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
+// Desktop side panels kick in at this width (index.html's matching
+// @media (min-width: 1180px) — keep the two in sync). At that width the
+// media area (VIEW) goes edge-to-edge instead of inset, so gameplay reads
+// wider/bigger even though the post frame (HEADER/ENGAGEMENT/COMMENTS) and
+// overall canvas stay the same 720×1280. The camera/backdrop-cover math in
+// GameScene already handles VIEW being wider than the 720-wide authored
+// world (see drawWorld's camW/camH cover-scale) — no gameplay code needed.
+const DESKTOP_BREAKPOINT = 1180;
+const IS_WIDE_VIEW = window.innerWidth >= DESKTOP_BREAKPOINT;
+const VIEW_MARGIN = IS_WIDE_VIEW ? 0 : 20;
+
 // Portrait "feed post" frame: the gameplay camera renders inside VIEW (the
 // embedded media area); the HUD stacks around it top-to-bottom as HEADER
 // (avatar/handle bar), ENGAGEMENT (reply/retweet/like/view icon row) and
 // COMMENTS (scrollable unlocks/reactions strip).
 export const HEADER = { x: 0, y: 0, w: GAME_W, h: 64 } as const;
-export const VIEW = { x: 20, y: 74, w: GAME_W - 40, h: 780 } as const;
+export const VIEW = { x: VIEW_MARGIN, y: 74, w: GAME_W - VIEW_MARGIN * 2, h: 780 } as const;
 export const ENGAGEMENT = { x: 20, y: 864, w: GAME_W - 40, h: 50 } as const;
 export const COMMENTS = { x: 0, y: 924, w: GAME_W, h: 346 } as const;

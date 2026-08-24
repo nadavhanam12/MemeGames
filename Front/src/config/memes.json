@@ -26,6 +26,7 @@
   },
   "templates": {
     "twoButtons": {
+      "dayTier": 1,
       "artKey": "memeTwoButtons",
       "artFile": "Memes/meme_twobuttons_blank.webp",
       "label": "TWO BUTTONS",
@@ -58,6 +59,7 @@
       ]
     },
     "squintTrump": {
+      "dayTier": 1,
       "artKey": "memeSquintTrump",
       "artFile": "Memes/meme_squint_trump.webp",
       "label": "SQUINT: POTUS",
@@ -88,6 +90,7 @@
       ]
     },
     "squintIran": {
+      "dayTier": 1,
       "artKey": "memeSquintIran",
       "artFile": "Memes/meme_squint_iran.webp",
       "label": "SQUINT: IRAN",
@@ -118,6 +121,7 @@
       ]
     },
     "templeTrump": {
+      "dayTier": 1,
       "artKey": "memeTempleTrump",
       "artFile": "Memes/meme_temple_trump.webp",
       "label": "TEMPLE TAP: POTUS",
@@ -148,6 +152,7 @@
       ]
     },
     "templeIran": {
+      "dayTier": 1,
       "artKey": "memeTempleIran",
       "artFile": "Memes/meme_temple_iran.webp",
       "label": "TEMPLE TAP: IRAN",
@@ -178,6 +183,7 @@
       ]
     },
     "podcastCaptain": {
+      "dayTier": 1,
       "artKey": "memePodcastCaptain",
       "artFile": "Memes/meme_podcast_captain.webp",
       "label": "PODCAST: CAPTAIN",
@@ -200,6 +206,7 @@
       ]
     },
     "podcastKhamenei": {
+      "dayTier": 1,
       "artKey": "memePodcastKhamenei",
       "artFile": "Memes/meme_podcast_khamenei.webp",
       "label": "PODCAST: IRAN",
@@ -222,6 +229,7 @@
       ]
     },
     "condescendingTrump": {
+      "dayTier": 1,
       "artKey": "memeCondescendingTrump",
       "artFile": "Memes/meme_condescending_trump.webp",
       "label": "SMUG: POTUS",
@@ -252,6 +260,7 @@
       ]
     },
     "condescendingKhamenei": {
+      "dayTier": 1,
       "artKey": "memeCondescendingKhamenei",
       "artFile": "Memes/meme_condescending_khamenei.webp",
       "label": "SMUG: IRAN",
@@ -282,6 +291,7 @@
       ]
     },
     "disasterTrump": {
+      "dayTier": 1,
       "artKey": "memeDisasterTrump",
       "artFile": "Memes/meme_disaster_trump.webp",
       "label": "SMIRK: POTUS",
@@ -312,6 +322,7 @@
       ]
     },
     "disasterKhamenei": {
+      "dayTier": 1,
       "artKey": "memeDisasterKhamenei",
       "artFile": "Memes/meme_disaster_khamenei.webp",
       "label": "SMIRK: IRAN",
@@ -342,6 +353,7 @@
       ]
     },
     "successTrump": {
+      "dayTier": 1,
       "artKey": "memeSuccessTrump",
       "artFile": "Memes/meme_success_trump.webp",
       "label": "SUCCESS: POTUS",
@@ -372,6 +384,7 @@
       ]
     },
     "calmFireAnchor": {
+      "dayTier": 2,
       "artKey": "memeCalmFireAnchor",
       "artFile": "Memes/meme_calmfire_anchor.webp",
       "label": "CALM FIRE: ANCHOR",
@@ -402,6 +415,7 @@
       ]
     },
     "calmFireTrump": {
+      "dayTier": 2,
       "artKey": "memeCalmFireTrump",
       "artFile": "Memes/meme_calmfire_trump.webp",
       "label": "CALM FIRE: POTUS",
@@ -432,6 +446,7 @@
       ]
     },
     "calmFireKhamenei": {
+      "dayTier": 2,
       "artKey": "memeCalmFireKhamenei",
       "artFile": "Memes/meme_calmfire_khamenei.webp",
       "label": "CALM FIRE: IRAN",
@@ -462,6 +477,7 @@
       ]
     },
     "calmFireCaptain": {
+      "dayTier": 2,
       "artKey": "memeCalmFireCaptain",
       "artFile": "Memes/meme_calmfire_captain.webp",
       "label": "CALM FIRE: CAPTAIN",
@@ -492,6 +508,7 @@
       ]
     },
     "twoButtons2Trump": {
+      "dayTier": 2,
       "artKey": "memeTwoButtons2Trump",
       "artFile": "Memes/meme_twobuttons2_trump.webp",
       "label": "TWO BUTTONS: POTUS",
@@ -528,6 +545,7 @@
       ]
     },
     "twoButtons2Khamenei": {
+      "dayTier": 2,
       "artKey": "memeTwoButtons2Khamenei",
       "artFile": "Memes/meme_twobuttons2_khamenei.webp",
       "label": "TWO BUTTONS: IRAN",
@@ -564,6 +582,7 @@
       ]
     },
     "draw25Captain": {
+      "dayTier": 2,
       "artKey": "memeDraw25Captain",
       "artFile": "Memes/meme_draw25_captain.webp",
       "label": "DRAW 25: CAPTAIN",
@@ -586,6 +605,7 @@
       ]
     },
     "draw25Trump": {
+      "dayTier": 2,
       "artKey": "memeDraw25Trump",
       "artFile": "Memes/meme_draw25_trump.webp",
       "label": "DRAW 25: POTUS",
@@ -608,6 +628,7 @@
       ]
     },
     "draw25Khamenei": {
+      "dayTier": 4,
       "artKey": "memeDraw25Khamenei",
       "artFile": "Memes/meme_draw25_khamenei.webp",
       "label": "DRAW 25: IRAN",
@@ -630,6 +651,7 @@
       ]
     },
     "draw25Exec": {
+      "dayTier": 4,
       "artKey": "memeDraw25Exec",
       "artFile": "Memes/meme_draw25_exec.webp",
       "label": "DRAW 25: OIL EXEC",
@@ -652,6 +674,7 @@
       ]
     },
     "disasterEyeTrump": {
+      "dayTier": 4,
       "artKey": "memeDisasterEyeTrump",
       "artFile": "Memes/meme_disastereye_trump.webp",
       "label": "DISASTER SIDE-EYE: POTUS",
@@ -682,6 +705,7 @@
       ]
     },
     "rejectApproveTrump": {
+      "dayTier": 4,
       "artKey": "memeRejectApproveTrump",
       "artFile": "Memes/meme_rejectapprove_trump.webp",
       "label": "REJECT/APPROVE: POTUS",
@@ -712,6 +736,7 @@
       ]
     },
     "rejectApproveKhamenei": {
+      "dayTier": 4,
       "artKey": "memeRejectApproveKhamenei",
       "artFile": "Memes/meme_rejectapprove_khamenei.webp",
       "label": "REJECT/APPROVE: IRAN",
@@ -742,6 +767,7 @@
       ]
     },
     "rejectApproveCaptain": {
+      "dayTier": 4,
       "artKey": "memeRejectApproveCaptain",
       "artFile": "Memes/meme_rejectapprove_captain.webp",
       "label": "REJECT/APPROVE: CAPTAIN",
@@ -772,6 +798,7 @@
       ]
     },
     "rejectApproveTrader": {
+      "dayTier": 4,
       "artKey": "memeRejectApproveTrader",
       "artFile": "Memes/meme_rejectapprove_trader.webp",
       "label": "REJECT/APPROVE: TRADER",
@@ -802,6 +829,7 @@
       ]
     },
     "highwayExitTrump": {
+      "dayTier": 4,
       "artKey": "memeHighwayExitTrump",
       "artFile": "Memes/meme_highwayexit_trump.webp",
       "label": "HIGHWAY EXIT: POTUS",
@@ -824,6 +852,7 @@
       ]
     },
     "highwayExitKhamenei": {
+      "dayTier": 6,
       "artKey": "memeHighwayExitKhamenei",
       "artFile": "Memes/meme_highwayexit_khamenei.webp",
       "label": "HIGHWAY EXIT: IRAN",
@@ -846,6 +875,7 @@
       ]
     },
     "highwayExitTrader": {
+      "dayTier": 6,
       "artKey": "memeHighwayExitTrader",
       "artFile": "Memes/meme_highwayexit_trader.webp",
       "label": "HIGHWAY EXIT: TRADER",
@@ -868,6 +898,7 @@
       ]
     },
     "saltTrump": {
+      "dayTier": 6,
       "artKey": "memeSaltTrump",
       "artFile": "Memes/meme_salt_trump.webp",
       "label": "SALT SPRINKLE: POTUS",
@@ -890,6 +921,7 @@
       ]
     },
     "saltKhamenei": {
+      "dayTier": 6,
       "artKey": "memeSaltKhamenei",
       "artFile": "Memes/meme_salt_khamenei.webp",
       "label": "SALT SPRINKLE: IRAN",
@@ -912,6 +944,7 @@
       ]
     },
     "saltCommander": {
+      "dayTier": 6,
       "artKey": "memeSaltCommander",
       "artFile": "Memes/meme_salt_commander.webp",
       "label": "SALT SPRINKLE: COMMANDER",
@@ -934,6 +967,7 @@
       ]
     },
     "saltDiplomat": {
+      "dayTier": 6,
       "artKey": "memeSaltDiplomat",
       "artFile": "Memes/meme_salt_diplomat.webp",
       "label": "SALT SPRINKLE: DIPLOMAT",
@@ -956,6 +990,7 @@
       ]
     },
     "success2Trump": {
+      "dayTier": 6,
       "artKey": "memeSuccess2Trump",
       "artFile": "Memes/meme_success2_trump.webp",
       "label": "SUCCESS FIST II: POTUS",
@@ -986,6 +1021,7 @@
       ]
     },
     "distracted2Trump": {
+      "dayTier": 6,
       "artKey": "memeDistracted2Trump",
       "artFile": "Memes/meme_distracted2_trump.webp",
       "label": "DISTRACTED II: POTUS",
@@ -1023,6 +1059,7 @@
       ]
     },
     "distracted2Khamenei": {
+      "dayTier": 8,
       "artKey": "memeDistracted2Khamenei",
       "artFile": "Memes/meme_distracted2_khamenei.webp",
       "label": "DISTRACTED II: IRAN",
@@ -1060,6 +1097,7 @@
       ]
     },
     "condescending2Trump": {
+      "dayTier": 8,
       "artKey": "memeCondescending2Trump",
       "artFile": "Memes/meme_condescending2_trump.webp",
       "label": "CONDESCENDING II: POTUS",
@@ -1090,6 +1128,7 @@
       ]
     },
     "condescending2Khamenei": {
+      "dayTier": 8,
       "artKey": "memeCondescending2Khamenei",
       "artFile": "Memes/meme_condescending2_khamenei.webp",
       "label": "CONDESCENDING II: IRAN",
@@ -1120,6 +1159,7 @@
       ]
     },
     "expandingBrainWin": {
+      "dayTier": 8,
       "artKey": "memeExpandingbrainWin",
       "artFile": "Memes/meme_expandingbrain_win.webp",
       "label": "EXPANDING BRAIN: WIN",
@@ -1160,6 +1200,7 @@
       ]
     },
     "expandingBrainFail": {
+      "dayTier": 8,
       "artKey": "memeExpandingbrainFail",
       "artFile": "Memes/meme_expandingbrain_fail.webp",
       "label": "EXPANDING BRAIN: FAIL",
@@ -1200,6 +1241,7 @@
       ]
     },
     "expandingBrainFoe": {
+      "dayTier": 8,
       "artKey": "memeExpandingbrainFoe",
       "artFile": "Memes/meme_expandingbrain_foe.webp",
       "label": "EXPANDING BRAIN: FOE",
@@ -1240,6 +1282,7 @@
       ]
     },
     "expandingBrainReact": {
+      "dayTier": 8,
       "artKey": "memeExpandingbrainReact",
       "artFile": "Memes/meme_expandingbrain_react.webp",
       "label": "EXPANDING BRAIN: REACT",
@@ -1280,6 +1323,7 @@
       ]
     },
     "clownMakeupWin": {
+      "dayTier": 8,
       "artKey": "memeClownmakeupWin",
       "artFile": "Memes/meme_clownmakeup_win.webp",
       "label": "CLOWN MAKEUP: WIN",
@@ -1320,6 +1364,7 @@
       ]
     },
     "clownMakeupFail": {
+      "dayTier": 10,
       "artKey": "memeClownmakeupFail",
       "artFile": "Memes/meme_clownmakeup_fail.webp",
       "label": "CLOWN MAKEUP: FAIL",
@@ -1360,6 +1405,7 @@
       ]
     },
     "clownMakeupFoe": {
+      "dayTier": 10,
       "artKey": "memeClownmakeupFoe",
       "artFile": "Memes/meme_clownmakeup_foe.webp",
       "label": "CLOWN MAKEUP: FOE",
@@ -1400,6 +1446,7 @@
       ]
     },
     "clownMakeupReact": {
+      "dayTier": 10,
       "artKey": "memeClownmakeupReact",
       "artFile": "Memes/meme_clownmakeup_react.webp",
       "label": "CLOWN MAKEUP: REACT",
@@ -1440,6 +1487,7 @@
       ]
     },
     "panikKalmWin": {
+      "dayTier": 10,
       "artKey": "memePanikkalmWin",
       "artFile": "Memes/meme_panikkalm_win.webp",
       "label": "PANIK KALM: WIN",
@@ -1474,6 +1522,7 @@
       ]
     },
     "panikKalmFail": {
+      "dayTier": 10,
       "artKey": "memePanikkalmFail",
       "artFile": "Memes/meme_panikkalm_fail.webp",
       "label": "PANIK KALM: FAIL",
@@ -1508,6 +1557,7 @@
       ]
     },
     "panikKalmFoe": {
+      "dayTier": 10,
       "artKey": "memePanikkalmFoe",
       "artFile": "Memes/meme_panikkalm_foe.webp",
       "label": "PANIK KALM: FOE",
@@ -1542,6 +1592,7 @@
       ]
     },
     "panikKalmReact": {
+      "dayTier": 10,
       "artKey": "memePanikkalmReact",
       "artFile": "Memes/meme_panikkalm_react.webp",
       "label": "PANIK KALM: REACT",
@@ -1576,6 +1627,7 @@
       ]
     },
     "gruPlanWin": {
+      "dayTier": 10,
       "artKey": "memeGrusplanWin",
       "artFile": "Memes/meme_grusplan_win.webp",
       "label": "GRU'S PLAN: WIN",
@@ -1616,6 +1668,7 @@
       ]
     },
     "gruPlanFail": {
+      "dayTier": 12,
       "artKey": "memeGrusplanFail",
       "artFile": "Memes/meme_grusplan_fail.webp",
       "label": "GRU'S PLAN: FAIL",
@@ -1656,6 +1709,7 @@
       ]
     },
     "gruPlanFoe": {
+      "dayTier": 12,
       "artKey": "memeGrusplanFoe",
       "artFile": "Memes/meme_grusplan_foe.webp",
       "label": "GRU'S PLAN: FOE",
@@ -1696,6 +1750,7 @@
       ]
     },
     "gruPlanReact": {
+      "dayTier": 12,
       "artKey": "memeGrusplanReact",
       "artFile": "Memes/meme_grusplan_react.webp",
       "label": "GRU'S PLAN: REACT",
@@ -1736,6 +1791,7 @@
       ]
     },
     "alwaysHasBeenWin": {
+      "dayTier": 12,
       "artKey": "memeAlwayshasbeenWin",
       "artFile": "Memes/meme_alwayshasbeen_win.webp",
       "label": "ALWAYS HAS BEEN: WIN",
@@ -1766,6 +1822,7 @@
       ]
     },
     "alwaysHasBeenFail": {
+      "dayTier": 12,
       "artKey": "memeAlwayshasbeenFail",
       "artFile": "Memes/meme_alwayshasbeen_fail.webp",
       "label": "ALWAYS HAS BEEN: FAIL",
@@ -1796,6 +1853,7 @@
       ]
     },
     "alwaysHasBeenFoe": {
+      "dayTier": 12,
       "artKey": "memeAlwayshasbeenFoe",
       "artFile": "Memes/meme_alwayshasbeen_foe.webp",
       "label": "ALWAYS HAS BEEN: FOE",
@@ -1826,6 +1884,7 @@
       ]
     },
     "alwaysHasBeenReact": {
+      "dayTier": 12,
       "artKey": "memeAlwayshasbeenReact",
       "artFile": "Memes/meme_alwayshasbeen_react.webp",
       "label": "ALWAYS HAS BEEN: REACT",
@@ -1856,6 +1915,7 @@
       ]
     },
     "sideEyeWin": {
+      "dayTier": 12,
       "artKey": "memeSideeyeWin",
       "artFile": "Memes/meme_sideeye_win.webp",
       "label": "SIDE-EYE PUPPET: WIN",
@@ -1878,6 +1938,7 @@
       ]
     },
     "sideEyeFail": {
+      "dayTier": 16,
       "artKey": "memeSideeyeFail",
       "artFile": "Memes/meme_sideeye_fail.webp",
       "label": "SIDE-EYE PUPPET: FAIL",
@@ -1900,6 +1961,7 @@
       ]
     },
     "sideEyeFoe": {
+      "dayTier": 16,
       "artKey": "memeSideeyeFoe",
       "artFile": "Memes/meme_sideeye_foe.webp",
       "label": "SIDE-EYE PUPPET: FOE",
@@ -1922,6 +1984,7 @@
       ]
     },
     "sideEyeReact": {
+      "dayTier": 16,
       "artKey": "memeSideeyeReact",
       "artFile": "Memes/meme_sideeye_react.webp",
       "label": "SIDE-EYE PUPPET: REACT",
@@ -1944,6 +2007,7 @@
       ]
     },
     "partyCornerWin": {
+      "dayTier": 16,
       "artKey": "memePartycornerWin",
       "artFile": "Memes/meme_partycorner_win.webp",
       "label": "PARTY CORNER: WIN",
@@ -1966,6 +2030,7 @@
       ]
     },
     "partyCornerFail": {
+      "dayTier": 16,
       "artKey": "memePartycornerFail",
       "artFile": "Memes/meme_partycorner_fail.webp",
       "label": "PARTY CORNER: FAIL",
@@ -1988,6 +2053,7 @@
       ]
     },
     "partyCornerFoe": {
+      "dayTier": 16,
       "artKey": "memePartycornerFoe",
       "artFile": "Memes/meme_partycorner_foe.webp",
       "label": "PARTY CORNER: FOE",
@@ -2010,6 +2076,7 @@
       ]
     },
     "partyCornerReact": {
+      "dayTier": 16,
       "artKey": "memePartycornerReact",
       "artFile": "Memes/meme_partycorner_react.webp",
       "label": "PARTY CORNER: REACT",
@@ -2032,6 +2099,7 @@
       ]
     },
     "tradeOfferWin": {
+      "dayTier": 16,
       "artKey": "memeTradeofferWin",
       "artFile": "Memes/meme_tradeoffer_win.webp",
       "label": "TRADE OFFER: WIN",
@@ -2060,6 +2128,7 @@
       ]
     },
     "tradeOfferFail": {
+      "dayTier": 20,
       "artKey": "memeTradeofferFail",
       "artFile": "Memes/meme_tradeoffer_fail.webp",
       "label": "TRADE OFFER: FAIL",
@@ -2088,6 +2157,7 @@
       ]
     },
     "tradeOfferFoe": {
+      "dayTier": 20,
       "artKey": "memeTradeofferFoe",
       "artFile": "Memes/meme_tradeoffer_foe.webp",
       "label": "TRADE OFFER: FOE",
@@ -2116,6 +2186,7 @@
       ]
     },
     "tradeOfferReact": {
+      "dayTier": 20,
       "artKey": "memeTradeofferReact",
       "artFile": "Memes/meme_tradeoffer_react.webp",
       "label": "TRADE OFFER: REACT",
@@ -2144,6 +2215,7 @@
       ]
     },
     "onceAgainWin": {
+      "dayTier": 20,
       "artKey": "memeOnceagainWin",
       "artFile": "Memes/meme_onceagain_win.webp",
       "label": "ONCE AGAIN ASKING: WIN",
@@ -2166,6 +2238,7 @@
       ]
     },
     "onceAgainFail": {
+      "dayTier": 20,
       "artKey": "memeOnceagainFail",
       "artFile": "Memes/meme_onceagain_fail.webp",
       "label": "ONCE AGAIN ASKING: FAIL",
@@ -2188,6 +2261,7 @@
       ]
     },
     "onceAgainFoe": {
+      "dayTier": 20,
       "artKey": "memeOnceagainFoe",
       "artFile": "Memes/meme_onceagain_foe.webp",
       "label": "ONCE AGAIN ASKING: FOE",
@@ -2210,6 +2284,7 @@
       ]
     },
     "onceAgainReact": {
+      "dayTier": 20,
       "artKey": "memeOnceagainReact",
       "artFile": "Memes/meme_onceagain_react.webp",
       "label": "ONCE AGAIN ASKING: REACT",
@@ -2232,6 +2307,7 @@
       ]
     },
     "forTheBetterWin": {
+      "dayTier": 20,
       "artKey": "memeForthebetterWin",
       "artFile": "Memes/meme_forthebetter_win.webp",
       "label": "FOR THE BETTER: WIN",
@@ -2272,6 +2348,7 @@
       ]
     },
     "forTheBetterFail": {
+      "dayTier": 24,
       "artKey": "memeForthebetterFail",
       "artFile": "Memes/meme_forthebetter_fail.webp",
       "label": "FOR THE BETTER: FAIL",
@@ -2312,6 +2389,7 @@
       ]
     },
     "forTheBetterFoe": {
+      "dayTier": 24,
       "artKey": "memeForthebetterFoe",
       "artFile": "Memes/meme_forthebetter_foe.webp",
       "label": "FOR THE BETTER: FOE",
@@ -2352,6 +2430,7 @@
       ]
     },
     "forTheBetterReact": {
+      "dayTier": 24,
       "artKey": "memeForthebetterReact",
       "artFile": "Memes/meme_forthebetter_react.webp",
       "label": "FOR THE BETTER: REACT",

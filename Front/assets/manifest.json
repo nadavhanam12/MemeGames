@@ -9,6 +9,8 @@
   ],
   "received": [
     "world_map.png",
+    "map_gulf.png",
+    "map_strait_close.png",
     "map_bg.png",
     "tankers_atlas.png",
     "threats_atlas.png",
@@ -39,7 +41,31 @@
         1152
       ],
       "alpha": false,
-      "use": "Establishing world map for the Menu->Game intro zoom (IntroScene); zooms in on the Strait of Hormuz before cutting to gameplay",
+      "use": "Establishing world map for the Menu->Game intro zoom (IntroScene), stage 1 of 3; zooms toward the Strait of Hormuz before cutting to map_gulf",
+      "importFilter": "bilinear"
+    },
+    {
+      "name": "map_gulf",
+      "file": "map_gulf.png",
+      "kind": "image",
+      "size": [
+        1672,
+        941
+      ],
+      "alpha": false,
+      "use": "Mid-zoom Gulf-region map for IntroScene, stage 2 of 3 (Turkey/Egypt/Israel/Iraq/Iran/Saudi/UAE/Oman/Pakistan/India labeled); zooms toward the Strait before cutting to map_strait_close",
+      "importFilter": "bilinear"
+    },
+    {
+      "name": "map_strait_close",
+      "file": "map_strait_close.png",
+      "kind": "image",
+      "size": [
+        2048,
+        1152
+      ],
+      "alpha": false,
+      "use": "Closest-zoom Strait of Hormuz map for IntroScene, stage 3 of 3 (Iran/UAE/Oman/Qatar/Bahrain labeled); final zoom push before fading into GameScene",
       "importFilter": "bilinear"
     },
     {
@@ -196,18 +222,6 @@
       "targetWidth": 720,
       "use": "Suspicious sideways squint, 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_squint_captain": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_squint_analyst": {
-          "x": 1024,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
         "meme_squint_trump": {
           "x": 0,
           "y": 1024,
@@ -268,20 +282,8 @@
           "w": 1024,
           "h": 1024
         },
-        "meme_podcast_analyst": {
-          "x": 1024,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
         "meme_podcast_khamenei": {
           "x": 0,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_podcast_commander": {
-          "x": 1024,
           "y": 1024,
           "w": 1024,
           "h": 1024
@@ -301,12 +303,6 @@
       "targetWidth": 720,
       "use": "Condescending cheek-on-fist smile, 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_condescending_anchor": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
         "meme_condescending_trump": {
           "x": 1024,
           "y": 0,
@@ -315,12 +311,6 @@
         },
         "meme_condescending_khamenei": {
           "x": 0,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_condescending_exec": {
-          "x": 1024,
           "y": 1024,
           "w": 1024,
           "h": 1024
@@ -340,12 +330,6 @@
       "targetWidth": 720,
       "use": "Foreground smirk with burning disaster behind, 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_disaster_captain": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
         "meme_disaster_trump": {
           "x": 1024,
           "y": 0,
@@ -354,90 +338,6 @@
         },
         "meme_disaster_khamenei": {
           "x": 0,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_disaster_anchor": {
-          "x": 1024,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        }
-      }
-    },
-    {
-      "name": "meme_crying_phone_blank_atlas",
-      "file": "Meme/meme_crying_phone_blank_atlas.png",
-      "kind": "atlas",
-      "size": [
-        2048,
-        2048
-      ],
-      "alpha": false,
-      "trim": false,
-      "targetWidth": 720,
-      "use": "Crying while reading phone, 4 characters; runtime caption in the blank white top band of each cell",
-      "frames": {
-        "meme_crying_analyst": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_crying_captain": {
-          "x": 1024,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_crying_anchor": {
-          "x": 0,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_crying_soldier": {
-          "x": 1024,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        }
-      }
-    },
-    {
-      "name": "meme_vehicle_sideeye_blank_atlas",
-      "file": "Meme/meme_vehicle_sideeye_blank_atlas.png",
-      "kind": "atlas",
-      "size": [
-        2048,
-        2048
-      ],
-      "alpha": false,
-      "trim": false,
-      "targetWidth": 720,
-      "use": "Awkward side-eye from a vehicle seat, 4 characters; runtime captions overlay top/bottom",
-      "frames": {
-        "meme_vehicle_anchor": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_vehicle_analyst": {
-          "x": 1024,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_vehicle_civilian": {
-          "x": 0,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_vehicle_diplomat": {
-          "x": 1024,
           "y": 1024,
           "w": 1024,
           "h": 1024
@@ -457,27 +357,9 @@
       "targetWidth": 720,
       "use": "Determined fist-clench celebration, 4 characters; runtime captions overlay top/bottom",
       "frames": {
-        "meme_success_captain": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
         "meme_success_trump": {
           "x": 1024,
           "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_success_soldier": {
-          "x": 0,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_success_responder": {
-          "x": 1024,
-          "y": 1024,
           "w": 1024,
           "h": 1024
         }
@@ -523,45 +405,6 @@
       }
     },
     {
-      "name": "meme_change_mind_blank_atlas",
-      "file": "Meme/meme_change_mind_blank_atlas.png",
-      "kind": "atlas",
-      "size": [
-        2048,
-        2048
-      ],
-      "alpha": false,
-      "trim": false,
-      "targetWidth": 720,
-      "use": "Debate-table with blank placard, 4 characters; runtime caption on the placard. Bottom row is letterboxed: cells are 694px tall",
-      "frames": {
-        "meme_changemind_analyst": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_changemind_diplomat": {
-          "x": 1024,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_changemind_civilian": {
-          "x": 0,
-          "y": 1025,
-          "w": 1024,
-          "h": 694
-        },
-        "meme_changemind_exec": {
-          "x": 1024,
-          "y": 1025,
-          "w": 1024,
-          "h": 694
-        }
-      }
-    },
-    {
       "name": "meme_two_buttons_blank_atlas",
       "file": "Meme/meme_two_buttons_blank_atlas.png",
       "kind": "atlas",
@@ -574,12 +417,6 @@
       "targetWidth": 720,
       "use": "New two-buttons dilemma atlas (distinct from meme_twobuttons_blank.png): captain/Trump/Khamenei/trader each sweat between two console buttons. Bottom row is letterboxed: cells are ~950px tall",
       "frames": {
-        "meme_twobuttons2_captain": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
         "meme_twobuttons2_trump": {
           "x": 1024,
           "y": 0,
@@ -588,12 +425,6 @@
         },
         "meme_twobuttons2_khamenei": {
           "x": 0,
-          "y": 1024,
-          "w": 1024,
-          "h": 950
-        },
-        "meme_twobuttons2_trader": {
-          "x": 1024,
           "y": 1024,
           "w": 1024,
           "h": 950
@@ -793,45 +624,6 @@
       }
     },
     {
-      "name": "meme_change_mind_blank_atlas_v2",
-      "file": "Meme/meme_change_mind_blank_atlas_v2.png",
-      "kind": "atlas",
-      "size": [
-        2048,
-        2048
-      ],
-      "alpha": false,
-      "trim": false,
-      "targetWidth": 720,
-      "use": "Second change-my-mind debate-table variant with new scenarios/characters (additive to meme_change_mind_blank_atlas, not a replacement), no letterbox.",
-      "frames": {
-        "meme_changemind2_analyst": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_changemind2_diplomat": {
-          "x": 1024,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_changemind2_civilian": {
-          "x": 0,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_changemind2_exec": {
-          "x": 1024,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        }
-      }
-    },
-    {
       "name": "meme_distracted_choice_blank_atlas_v2",
       "file": "Meme/meme_distracted_choice_blank_atlas_v2.png",
       "kind": "atlas",
@@ -844,12 +636,6 @@
       "targetWidth": 720,
       "use": "Second distracted-boyfriend variant with new scenarios/characters (additive to meme_distracted_choice_blank_atlas, not a replacement), no letterbox.",
       "frames": {
-        "meme_distracted2_captain": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
         "meme_distracted2_trump": {
           "x": 1024,
           "y": 0,
@@ -858,12 +644,6 @@
         },
         "meme_distracted2_khamenei": {
           "x": 0,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_distracted2_trader": {
-          "x": 1024,
           "y": 1024,
           "w": 1024,
           "h": 1024
@@ -883,12 +663,6 @@
       "targetWidth": 720,
       "use": "Second condescending-smile variant with new scenarios/characters (additive to meme_condescending_blank_atlas, not a replacement), no letterbox.",
       "frames": {
-        "meme_condescending2_anchor": {
-          "x": 0,
-          "y": 0,
-          "w": 1024,
-          "h": 1024
-        },
         "meme_condescending2_trump": {
           "x": 1024,
           "y": 0,
@@ -897,12 +671,6 @@
         },
         "meme_condescending2_khamenei": {
           "x": 0,
-          "y": 1024,
-          "w": 1024,
-          "h": 1024
-        },
-        "meme_condescending2_exec": {
-          "x": 1024,
           "y": 1024,
           "w": 1024,
           "h": 1024

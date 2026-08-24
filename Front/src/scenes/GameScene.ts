@@ -4,7 +4,7 @@ import { settings, vibrate } from '../core/settings';
 import { sfx } from '../core/sfx';
 import { hasArt } from '../core/art';
 import { MemeContext, MEMES, resetMemeLog } from '../core/memes';
-import { getDayFired, getDayUnlocks, resetDayUnlocks, resetRunUnlocks } from '../core/memeUnlocks';
+import { getDayFired, getDayUnlocks, recordDayReached, resetDayUnlocks, resetRunUnlocks } from '../core/memeUnlocks';
 import { TUNING, persistTuningLocal } from '../config/tuning';
 import { devState } from '../dev/state';
 import { leaderboard } from '../backend/leaderboard';
@@ -1278,6 +1278,7 @@ export class GameScene extends Phaser.Scene {
   private startDay(n: number): void {
     if (this.over) return;
     this.day = n;
+    recordDayReached(n);
     resetDayUnlocks();
     this.dayCounters = { priceAtStart: this.stats.oilPrice, safe: 0, lost: 0, intercepts: 0, bestCombo: 0 };
     const reveals: Array<'air' | 'hull' | 'gold'> = [];

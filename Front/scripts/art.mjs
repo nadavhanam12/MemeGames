@@ -47,6 +47,8 @@ function encode(img, filename) {
 const IMAGE_TARGETS = {
   map_bg: { width: 1280, height: 720 },
   world_map: { width: 1280 },
+  map_gulf: { width: 1400 },
+  map_strait_close: { width: 1800 },
   ui_chyron_frame: { width: 1280 },
   meme_frame_broadcast: { width: 1280, height: 720 },
   meme_twobuttons_blank: { width: 720 },
@@ -180,6 +182,8 @@ async function main() {
   const ART_MAP = {
     map_bg: 'map_bg.png',
     world_map: 'world_map.png',
+    map_gulf: 'map_gulf.png',
+    map_strait_close: 'map_strait_close.png',
     tanker0: 'tanker_red.png',
     tanker1: 'tanker_blue.png',
     tankerVip: 'tanker_vip.png',

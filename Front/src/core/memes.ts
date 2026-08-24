@@ -5,7 +5,7 @@
 import Phaser from 'phaser';
 import { hasArt } from './art';
 import { FONT_SANS } from './palette';
-import { getUnlockedTemplates, recordMemeShown } from './memeUnlocks';
+import { getBestDayReached, getUnlockedTemplates, recordMemeShown } from './memeUnlocks';
 import DATA from '../config/memes.json';
 
 export interface MemeSlot {
@@ -18,6 +18,7 @@ export interface MemeSlot {
 }
 
 export interface MemeTemplate {
+  dayTier: number; // day-count needed for this template to be drawable — see pickMeme()
   artKey: string; // canonical texture key (merged into ART_MAP by src/core/art.ts)
   artFile: string; // file produced by `npm run art` for that key
   label: string; // shown on the drawn placeholder when art is missing
@@ -226,7 +227,15 @@ function substituteTokens(caption: string, ctx: MemeContext | undefined): string
  *  avoiding the same template twice in a row when the pool allows it. */
 export function pickMeme(label: string, ctx?: MemeContext): MemePick {
   const pool = MEMES.triggers[label] ?? MEMES.fallback;
-  let candidates = pool.filter(v => v.t !== lastTemplate && MEMES.templates[v.t]);
+  // Day-1's tier is always in reach even before any run has recorded a day,
+  // so the very first meme of a fresh account can still fire.
+  const dayLimit = Math.max(1, getBestDayReached());
+  const inTier = (v: MemeVariant): boolean => MEMES.templates[v.t] && MEMES.templates[v.t].dayTier <= dayLimit;
+  let candidates = pool.filter(v => v.t !== lastTemplate && inTier(v));
+  if (!candidates.length) candidates = pool.filter(inTier);
+  // No template within reach yet for this trigger (e.g. a trigger whose
+  // whole pool happens to sit in a later tier) — fall back to ignoring the
+  // tier gate rather than showing nothing.
   if (!candidates.length) candidates = pool.filter(v => MEMES.templates[v.t]);
   if (!candidates.length) candidates = pool;
 

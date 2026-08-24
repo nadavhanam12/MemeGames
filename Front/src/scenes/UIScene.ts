@@ -754,27 +754,38 @@ export class UIScene extends Phaser.Scene {
     this.curtainIndex = 0;
     this.curtainReady = false;
     this.curtainBaseY = 0;
+    const panelW = 480;
+    const panelH = 220;
 
-    // slot 0 — the frozen gameplay frame, with a brief "DAY X ENDED" stamp
+    // slot 0 — the frozen gameplay frame, with a "DAY X COMPLETED" panel
+    // fading in centered over it (CONTINUE sits directly under the panel,
+    // wired below via continueY0/ctaBtn's yOverride)
     const snapImg = this.add.image(GAME_W / 2, slotY(0), textureKey).setDisplaySize(GAME_W, GAME_H);
     const stamp = this.add.container(GAME_W / 2, slotY(0)).setAlpha(0).setScale(0.9);
-    stamp.add(this.add.text(0, -18, `DAY ${s.day}`, { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.muted }).setOrigin(0.5));
-    stamp.add(this.add.text(0, 24, 'ENDED', { fontFamily: FONT_DISPLAY, fontSize: '46px', color: HEX.gold }).setOrigin(0.5));
+    const stampBg = this.add.graphics();
+    stampBg.fillStyle(PAL.black, 0.82);
+    stampBg.fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 22);
+    stampBg.lineStyle(3, PAL.gold, 1);
+    stampBg.strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 22);
+    stamp.add(stampBg);
+    stamp.add(this.add.text(0, -panelH / 2 + 54, `DAY ${s.day}`, { fontFamily: FONT_DISPLAY, fontSize: '30px', color: HEX.muted }).setOrigin(0.5));
+    stamp.add(this.add.text(0, panelH / 2 - 58, 'COMPLETED', { fontFamily: FONT_DISPLAY, fontSize: '58px', color: HEX.gold }).setOrigin(0.5));
     curtain.add([snapImg, stamp]);
 
-    // reusable pill button, faded in once its slot is the active one
-    const ctaBtn = (i: number, label: string, gold: boolean, onTap: () => void): Phaser.GameObjects.Container => {
-      const btn = this.add.container(GAME_W / 2, slotY(i) + GAME_H / 2 - 90).setAlpha(0);
+    // reusable pill button, faded in once its slot is the active one — defaults
+    // to the bottom of the slot, but a slot can pin it under its own content instead
+    const ctaBtn = (i: number, label: string, gold: boolean, onTap: () => void, yOverride?: number): Phaser.GameObjects.Container => {
+      const btn = this.add.container(GAME_W / 2, yOverride ?? slotY(i) + GAME_H / 2 - 90).setAlpha(0);
       const bg = this.add.graphics();
       bg.fillStyle(PAL.black, 1);
-      bg.fillRoundedRect(-115, -27, 230, 54, 15);
+      bg.fillRoundedRect(-130, -30, 260, 60, 16);
       bg.lineStyle(2, gold ? PAL.gold : DIVIDER, 1);
-      bg.strokeRoundedRect(-115, -27, 230, 54, 15);
+      bg.strokeRoundedRect(-130, -30, 260, 60, 16);
       const txt = this.add
-        .text(0, 0, label, { fontFamily: FONT_DISPLAY, fontSize: '18px', color: gold ? HEX.gold : HEX.cream })
+        .text(0, 0, label, { fontFamily: FONT_DISPLAY, fontSize: '20px', color: gold ? HEX.gold : HEX.cream })
         .setOrigin(0.5);
       btn.add([bg, txt]);
-      btn.setSize(230, 54);
+      btn.setSize(260, 60);
       btn.setInteractive({ useHandCursor: true });
       btn.on('pointerover', () => this.tweens.add({ targets: btn, scale: 1.05, duration: 100 }));
       btn.on('pointerout', () => this.tweens.add({ targets: btn, scale: 1, duration: 100 }));
@@ -785,15 +796,18 @@ export class UIScene extends Phaser.Scene {
       curtain.add(btn);
       return btn;
     };
-    const swipeHint = (i: number) => {
+    const swipeHint = (i: number, yOverride?: number) => {
       curtain.add(
         this.add
-          .text(GAME_W / 2, slotY(i) + GAME_H / 2 - 44, 'or swipe up ↑', { fontFamily: FONT_SANS, fontSize: '13px', color: '#8B98A5' })
+          .text(GAME_W / 2, yOverride ?? slotY(i) + GAME_H / 2 - 44, 'or swipe up ↑', { fontFamily: FONT_SANS, fontSize: '14px', color: '#8B98A5' })
           .setOrigin(0.5)
       );
     };
-    const continueBtn0 = ctaBtn(0, 'CONTINUE', false, () => this.curtainReady && this.curtainAdvance?.());
-    swipeHint(0);
+    // "DAY X COMPLETED" panel fades in centered over the snapshot; CONTINUE
+    // sits directly under it (not pinned to the slot's bottom like slot 1's CTA)
+    const continueY0 = slotY(0) + panelH / 2 + 46;
+    const continueBtn0 = ctaBtn(0, 'CONTINUE', false, () => this.curtainReady && this.curtainAdvance?.(), continueY0);
+    swipeHint(0, continueY0 + 46);
 
     // slot 1 (always shown) — thumbnails of every meme unlocked today, flown
     // one at a time into a running tally on COLLECT; on a day with nothing
@@ -805,18 +819,18 @@ export class UIScene extends Phaser.Scene {
     curtain.add(fillerBg1);
     if (hasUnlocks) {
       const collectLabel = this.add
-        .text(GAME_W / 2, slotY(1) - 190, '🎉 NEW MEMES UNLOCKED', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.gold })
+        .text(GAME_W / 2, slotY(1) - 230, '🎉 NEW MEMES UNLOCKED', { fontFamily: FONT_DISPLAY, fontSize: '25px', color: HEX.gold })
         .setOrigin(0.5);
       curtain.add(collectLabel);
 
       const shown = s.newMemesUnlocked.slice(0, 6);
       const cols = Math.min(shown.length, 3) || 1;
-      const cellW = 96;
-      const cellH = 96;
-      const gap = 14;
+      const cellW = 130;
+      const cellH = 130;
+      const gap = 18;
       const rowW = cols * cellW + (cols - 1) * gap;
       const startX = GAME_W / 2 - rowW / 2 + cellW / 2;
-      const startY = slotY(1) - 120;
+      const startY = slotY(1) - 130;
       const cards: Phaser.GameObjects.Container[] = shown.map((id, i) => {
         const tpl = MEMES.templates[id];
         const col = i % cols;
@@ -830,7 +844,7 @@ export class UIScene extends Phaser.Scene {
             this.add
               .text(0, 0, tpl?.label ?? id, {
                 fontFamily: FONT_SANS,
-                fontSize: '11px',
+                fontSize: '13px',
                 color: '#AAB4BD',
                 align: 'center',
                 wordWrap: { width: cellW - 12 }
@@ -841,15 +855,15 @@ export class UIScene extends Phaser.Scene {
         curtain.add(c);
         return c;
       });
-      const trayY = startY + Math.ceil(shown.length / cols) * (cellH + gap) + 34;
+      const trayY = startY + Math.ceil(shown.length / cols) * (cellH + gap) + 40;
       const trayText = this.add
-        .text(GAME_W / 2, trayY, `📥 0/${shown.length} collected`, { fontFamily: FONT_DISPLAY, fontSize: '18px', color: HEX.cream })
+        .text(GAME_W / 2, trayY, `📥 0/${shown.length} collected`, { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.cream })
         .setOrigin(0.5);
       curtain.add(trayText);
       if (s.newMemesUnlocked.length > shown.length) {
         curtain.add(
           this.add
-            .text(GAME_W / 2, trayY + 26, `+${s.newMemesUnlocked.length - shown.length} more`, { fontFamily: FONT_SANS, fontSize: '13px', color: HEX.muted })
+            .text(GAME_W / 2, trayY + 30, `+${s.newMemesUnlocked.length - shown.length} more`, { fontFamily: FONT_SANS, fontSize: '15px', color: HEX.muted })
             .setOrigin(0.5)
         );
       }
@@ -890,7 +904,7 @@ export class UIScene extends Phaser.Scene {
     } else {
       curtain.add(
         this.add
-          .text(GAME_W / 2, slotY(1) - 30, 'no new memes today', { fontFamily: FONT_DISPLAY, fontSize: '22px', color: HEX.muted })
+          .text(GAME_W / 2, slotY(1) - 30, 'no new memes today', { fontFamily: FONT_DISPLAY, fontSize: '28px', color: HEX.muted })
           .setOrigin(0.5)
       );
       const continueBtn1 = ctaBtn(1, 'CONTINUE', false, () => this.curtainReady && this.curtainAdvance?.());
@@ -971,15 +985,15 @@ export class UIScene extends Phaser.Scene {
    *  feed comment rows ("🔓 unlocked · <meme name>"). Returns the block's height. */
   private buildUnlocksSection(parent: Phaser.GameObjects.Container, y: number, width: number, ids: string[]): number {
     const shown = ids.slice(0, 6);
-    const rowH = 32;
-    const h = 34 + shown.length * rowH + (ids.length > shown.length ? 22 : 0);
+    const rowH = 36;
+    const h = 38 + shown.length * rowH + (ids.length > shown.length ? 24 : 0);
     const block = this.add.container(0, y + h / 2);
     block.add(
       this.add
-        .text(-width / 2, -h / 2 + 6, '🎉 new memes unlocked', { fontFamily: FONT_DISPLAY, fontSize: '18px', color: HEX.gold })
+        .text(-width / 2, -h / 2 + 6, '🎉 new memes unlocked', { fontFamily: FONT_DISPLAY, fontSize: '21px', color: HEX.gold })
         .setOrigin(0, 0)
     );
-    let rowY = -h / 2 + 34;
+    let rowY = -h / 2 + 38;
     shown.forEach(id => {
       const tpl = MEMES.templates[id];
       block.add(
@@ -999,7 +1013,7 @@ export class UIScene extends Phaser.Scene {
         this.add
           .text(0, rowY, `+${ids.length - shown.length} more`, {
             fontFamily: FONT_SANS,
-            fontSize: '14px',
+            fontSize: '15px',
             fontStyle: 'bold',
             color: HEX.muted
           })
@@ -1114,7 +1128,7 @@ export class UIScene extends Phaser.Scene {
       this.add
         .text(-width / 2 + 18, -h / 2 + 15, header, {
           fontFamily: FONT_SANS,
-          fontSize: '12px',
+          fontSize: '13px',
           fontStyle: 'bold',
           color: '#AAB4BD'
         })
@@ -1125,7 +1139,7 @@ export class UIScene extends Phaser.Scene {
         this.add
           .text(0, -h / 2 + padTop + i * lineH, ln.text, {
             fontFamily: FONT_SANS,
-            fontSize: ln.size ?? '15px',
+            fontSize: ln.size ?? '16px',
             fontStyle: 'bold',
             color: ln.color,
             align: 'center',
@@ -1157,7 +1171,7 @@ export class UIScene extends Phaser.Scene {
     // scaling by feel) so it never spills past the card's edges
     const sumInvAspect = shown.reduce((s, id) => s + 1 / MEMES.templates[id].aspect, 0);
     const fitH = sumInvAspect ? (maxRowW - 8 - (shown.length - 1) * gap) / sumInvAspect : 0;
-    const thumbH = shown.length ? Math.max(30, Math.min(84, Math.round(fitH))) : 0;
+    const thumbH = shown.length ? Math.max(30, Math.min(108, Math.round(fitH))) : 0;
     const widths = shown.map(id => Math.max(24, Math.floor(thumbH / MEMES.templates[id].aspect)));
     const rowW = widths.reduce((a, b) => a + b + gap, -gap);
     const h = 20 + thumbH + (shown.length ? 8 : 0) + 20 + 8;
@@ -1167,7 +1181,7 @@ export class UIScene extends Phaser.Scene {
       this.add
         .text(-width / 2 + 18, -h / 2 + 15, 'MEMES', {
           fontFamily: FONT_SANS,
-          fontSize: '12px',
+          fontSize: '13px',
           fontStyle: 'bold',
           color: '#AAB4BD'
         })
@@ -1218,7 +1232,7 @@ export class UIScene extends Phaser.Scene {
       this.add
         .text(0, h / 2 - 16, tallyText, {
           fontFamily: FONT_SANS,
-          fontSize: '14px',
+          fontSize: '16px',
           fontStyle: 'bold',
           color: shown.length ? HEX.gold : HEX.cream
         })

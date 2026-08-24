@@ -9,6 +9,8 @@ import MEMES_DATA from '../config/memes.json';
 const CORE_ART: Record<string, string> = {
   map_bg: 'map_bg.png',
   world_map: 'world_map.png',
+  map_gulf: 'map_gulf.png',
+  map_strait_close: 'map_strait_close.png',
   tanker0: 'tanker_red.png',
   tanker1: 'tanker_blue.png',
   tankerVip: 'tanker_vip.png',

@@ -13,6 +13,18 @@ import { fetchLeaderboard } from '../backend/api';
 // Hairline divider color shared with feedChrome's card borders.
 const DIVIDER = 0x2f3336;
 
+// Hand-picked "best of" rotation for the front-page carousel.
+const FEATURED_MEME_IDS = [
+  'twoButtons2Trump',
+  'templeIran',
+  'successTrump',
+  'saltTrump',
+  'saltKhamenei',
+  'rejectApproveTrump',
+  'rejectApproveKhamenei',
+  'podcastKhamenei'
+];
+
 export class MenuScene extends Phaser.Scene {
   constructor() {
     super('Menu');
@@ -186,12 +198,42 @@ export class MenuScene extends Phaser.Scene {
         /* server unreachable — leave the line empty */
       });
 
-    // static menu memes (fixed picks — not part of the run's meme log)
+    // front-page meme carousel — rotates through the featured picks above
+    // (not part of the run's meme log; purely a "best of" showcase).
     const MEME_Y = 900;
-    const memeLeft = this.add.container(190, MEME_Y).setAngle(-4);
-    renderMeme(this, memeLeft, { id: 'rejectApproveKhamenei', tpl: MEMES.templates.rejectApproveKhamenei, captions: [], isNew: false }, 280, 280);
-    const memeRight = this.add.container(GAME_W - 190, MEME_Y).setAngle(4);
-    renderMeme(this, memeRight, { id: 'twoButtons2Trump', tpl: MEMES.templates.twoButtons2Trump, captions: [], isNew: false }, 280, 280);
+    const memeCarousel = this.add.container(cx, MEME_Y).setAngle(-3);
+    let carouselIndex = 0;
+    const drawCarouselMeme = (): void => {
+      memeCarousel.removeAll(true);
+      const id = FEATURED_MEME_IDS[carouselIndex];
+      renderMeme(this, memeCarousel, { id, tpl: MEMES.templates[id], captions: [], isNew: false }, 320, 320);
+    };
+    drawCarouselMeme();
+    const advanceCarousel = (): void => {
+      carouselIndex = (carouselIndex + 1) % FEATURED_MEME_IDS.length;
+      if (settings.reducedMotion) {
+        drawCarouselMeme();
+        return;
+      }
+      this.tweens.add({
+        targets: memeCarousel,
+        alpha: 0,
+        duration: 220,
+        ease: 'Cubic.easeIn',
+        onComplete: () => {
+          drawCarouselMeme();
+          memeCarousel.setAlpha(0);
+          this.tweens.add({ targets: memeCarousel, alpha: 1, duration: 220, ease: 'Cubic.easeOut' });
+        }
+      });
+    };
+    const carouselTimer = this.time.addEvent({ delay: 3200, loop: true, callback: advanceCarousel });
+    this.events.once('shutdown', () => carouselTimer.remove());
+    // Meme art loads in the background after Boot hands off to Menu (see
+    // BootScene/loadMemeArt) — refresh from placeholder to real art once it lands.
+    const onMemeArtLoaded = (): void => drawCarouselMeme();
+    this.game.events.on('meme-art-loaded', onMemeArtLoaded);
+    this.events.once('shutdown', () => this.game.events.off('meme-art-loaded', onMemeArtLoaded));
     gallery.setInteractive({ useHandCursor: true });
     gallery.on('pointerdown', () => {
       if (leaving) return;
@@ -222,8 +264,7 @@ export class MenuScene extends Phaser.Scene {
     flyIn(start, 320);
     flyIn(lb, 430);
     flyIn(gallery, 500);
-    flyIn(memeLeft, 590, 30);
-    flyIn(memeRight, 650, 30);
+    flyIn(memeCarousel, 590, 30);
 
     // static muted stat line replacing the old scrolling ticker crawl
     this.add

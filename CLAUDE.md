@@ -172,13 +172,47 @@ cert outright with no click-through, so it can't open `localhost:5173` at
 all as configured; verifying UI changes in this pane requires temporarily
 flipping `server.https` to `false` in `vite.config.ts`, restarting the
 dev-server process, verifying, then reverting the config (never leave it
-reverted-to-http — Nadav's own long-running dev server expects https).
+reverted-to-http — Nadav's own long-running dev server expects https). Use a
+different port than Nadav's own server (5173) so his session isn't touched
+— e.g. `npm run dev -- --port 5180 --strictPort` in the background, then
+`preview_start` with that URL directly (the `.claude/launch.json` named
+config hardcodes 5173 and its process wrapper has been flaky in this sandbox
+— a raw `npm run dev` background command is more reliable). One session hit
+the pane's `document.hidden` throttle escalate all the way to **frame 0
+forever** — Phaser's entire game loop (not just tweens) never ticks, so
+nothing loads or renders, and screenshots return a stale/unrelated frame
+from whatever last really composited. Workaround: grab `window.phaserGame`
+and manually drive `game.loop.step(t)` yourself in small batches (~10-20
+calls per `javascript_tool` invocation, incrementing a fake timestamp
+~16.7ms per step, with a short real `setTimeout` between batches so pending
+fetch/loader promises can resolve) instead of waiting on real time to pass —
+this is enough to get scenes to load art and progress through
+`create()`/tweens/`delayedCall`s, verifiable via scene/texture state
+(`scene.getScenes(true)`, `textures.exists(...)`, a scene's own
+`children.list`), even though the actual screenshot pixels can't be trusted
+as reflecting current state in this failure mode — treat state assertions
+via `javascript_tool`, not `computer` screenshots, as the source of truth
+when this happens. Also: some preview-pane tooling has been observed
+auto-editing `src/main.ts`'s Phaser `scale` config (adding
+`expandParent: false`) as an apparent iframe-sizing side effect — check
+`git diff src/main.ts` after any browser-pane session and revert it if
+present, since it's not an intentional code change.
 
 ## Repo layout
 
 - `Front/` — Hormuz Hold'em client (the only game so far).
   - `src/main.ts` — Phaser game bootstrap and scene registration.
-  - `src/scenes/` — Boot, Menu, Game, UI, Results, Leaderboard, Gallery scenes.
+  - `src/scenes/` — Boot, Menu, Intro, Game, UI, Results, Leaderboard, Gallery
+    scenes. `IntroScene.ts` (Menu → Game establishing shot) is a 3-stage
+    cinematic drill-down through separate map images — `world_map` →
+    `map_gulf` → `map_strait_close` (each its own asset, not one image
+    zoomed further, so labels/flags stay crisp) — joined by `broadcast.ts`'s
+    channel-cut static between stages, each stage's own camera zoom+pan tween
+    landing on a hand-picked `fracTarget` (normalized Strait-of-Hormuz
+    position on that image's own pixels — re-verify if any of the three map
+    assets is regenerated), ending with the original zoom+fade-to-black into
+    `GameScene`. Tap-anywhere-to-skip and `settings.reducedMotion` (flat
+    per-stage hold, no zoom) work across all 3 stages, not just one.
   - `src/core/` — game-side systems: `state.ts` (run state + `computeScore()`,
     the canonical submitted score, plus the `DayMission`/`DaySummary` types and
     day-system bus events), `art.ts`, `juice.ts`, `sfx.ts` (synthesized SFX +
