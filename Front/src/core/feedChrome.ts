@@ -150,18 +150,18 @@ export function createEngagementBar(scene: Phaser.Scene, opts: EngagementBarOpts
     const podW = slot - 8;
     const bg = roundedRect(scene, podW, 42, 0x101820, 0.98, 8, DIVIDER, 1).setPosition(cx, 0);
     const glyphX = cx - podW / 2 + 15;
-    const glyph = scene.add.image(glyphX, 0, icon.textureKey).setDisplaySize(14, 14).setTint(tint).setOrigin(0.5);
-    const label = scene.add.text(glyphX + 14, -9, labels[i] ?? 'STAT', {
+    const glyph = scene.add.image(glyphX, 0, icon.textureKey).setDisplaySize(16, 16).setTint(tint).setOrigin(0.5);
+    const label = scene.add.text(glyphX + 15, -10, labels[i] ?? 'STAT', {
       fontFamily: FONT_SANS,
-      fontSize: '8px',
+      fontSize: '10px',
       fontStyle: 'bold',
       color: HEX.muted,
       letterSpacing: 1
     }).setOrigin(0, 0.5);
     const countTxt = scene.add
-      .text(glyphX + 14, 9, formatCount(icon.count), {
+      .text(glyphX + 15, 10, formatCount(icon.count), {
         fontFamily: FONT_SANS,
-        fontSize: '13px',
+        fontSize: '17px',
         fontStyle: 'bold',
         color
       })

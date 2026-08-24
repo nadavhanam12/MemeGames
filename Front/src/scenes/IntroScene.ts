@@ -1,18 +1,18 @@
 // Menu -> Game establishing shot: a 3-stage cinematic drill-down into the
 // Strait of Hormuz. Each stage is its own map image (world -> Gulf region ->
 // Strait close-up) so labels/flags stay crisp instead of blurring out under
-// one continuous zoom on a single texture. Stages are joined with the
-// existing broadcast "channel cut" static language; the final stage ends
-// with the same zoom+fade-to-black finish the old single-image intro had.
-// Uses its own camera zoom/pan (excluded from main.ts's default DPR-zoom
-// hook, same as GameScene) so it can move freely; broadcastCutAt/RevealAt
-// take explicit world rects so the shared static-cut look still covers the
-// screen correctly at each stage's own (non-default) zoom/scroll.
+// one continuous zoom on a single texture. Stages are joined with an instant
+// cut (no static/broadcast transition) straight into the next stage's zoom;
+// the final stage ends with the same zoom+fade-to-black finish the old
+// single-image intro had. Uses its own camera zoom/pan (excluded from
+// main.ts's default DPR-zoom hook, same as GameScene) so it can move freely.
 import Phaser from 'phaser';
 import { DPR, GAME_H, GAME_W } from '../core/palette';
 import { hasArt } from '../core/art';
 import { settings } from '../core/settings';
-import { broadcastCutAt, broadcastRevealAt } from '../core/broadcast';
+
+const SCAN_COLOR = 0x8cffe0; // cyan-green "signal reacquiring" tint
+const SCAN_DURATION = 320;
 
 interface Stage {
   key: string;
@@ -20,26 +20,30 @@ interface Stage {
   // source pixels (verified against the source image at high zoom) —
   // adjust here if the corresponding map asset is ever regenerated.
   fracTarget: { x: number; y: number };
-  // How many times closer than this stage's full-image fit the camera
-  // pushes to before cutting/fading to the next stage.
+  // How many times closer than this stage's own full-image fit the camera
+  // pushes to before cutting to the next stage.
   zoomEnd: number;
-  holdBefore: number; // ms to sit on the full fit before pushing in, so labels/flags are readable
+  holdBefore: number; // stage 0 only: ms to sit on the full fit before pushing in, so labels/flags are readable
   zoomDuration: number;
 }
 
 const STAGES: Stage[] = [
-  { key: 'world_map', fracTarget: { x: 0.6074, y: 0.4809 }, zoomEnd: 3.2, holdBefore: 500, zoomDuration: 650 },
-  { key: 'map_gulf', fracTarget: { x: 0.55, y: 0.478 }, zoomEnd: 2.4, holdBefore: 700, zoomDuration: 650 },
-  { key: 'map_strait_close', fracTarget: { x: 0.566, y: 0.364 }, zoomEnd: 2.6, holdBefore: 700, zoomDuration: 900 }
+  { key: 'world_map', fracTarget: { x: 0.6074, y: 0.4809 }, zoomEnd: 3.2, holdBefore: 500, zoomDuration: 1300 },
+  { key: 'map_gulf', fracTarget: { x: 0.55, y: 0.478 }, zoomEnd: 2.4, holdBefore: 700, zoomDuration: 1300 },
+  { key: 'map_strait_close', fracTarget: { x: 0.566, y: 0.364 }, zoomEnd: 2.6, holdBefore: 700, zoomDuration: 1800 }
 ];
 
 const HOLD_AFTER_FINAL = 250;
 const REDUCED_MOTION_HOLD_PER_STAGE = 500;
 const FADE_DURATION = 500;
 const FADE_COLOR = { r: 5, g: 11, b: 22 }; // matches the scene's #050b16 background
-const CUT_STATIC_MS = 160; // matches broadcastCutAt's internal delayedCall
 
 export class IntroScene extends Phaser.Scene {
+  // fixed-zoom overlay camera for the scan-sweep VFX, so it reads as a
+  // screen-space effect instead of being warped by the world camera's own
+  // (constantly changing) zoom/pan into the map texture
+  private uiCam!: Phaser.Cameras.Scene2D.Camera;
+
   constructor() {
     super('Intro');
   }
@@ -55,6 +59,12 @@ export class IntroScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBackgroundColor('#050b16');
 
+    // viewport size is in physical canvas pixels (GAME_W/H × DPR), same as
+    // the canvas itself — passing logical GAME_W/H here would only cover a
+    // fraction of the screen on a DPR>1 device
+    this.uiCam = this.cameras.add(0, 0, GAME_W * DPR, GAME_H * DPR);
+    this.uiCam.setZoom(DPR).centerOn(GAME_W / 2, GAME_H / 2);
+
     let done = false;
     const finish = () => {
       if (done) return;
@@ -68,6 +78,64 @@ export class IntroScene extends Phaser.Scene {
     this.runStage(0, stages, cam, finish);
   }
 
+  // full-screen scanline flicker + a bright horizontal sweep line, like a
+  // satellite feed re-acquiring its target — plays once at each map cut
+  private playScanSweep(cam: Phaser.Cameras.Scene2D.Camera): void {
+    if (settings.reducedMotion) return;
+
+    if (!this.textures.exists('introScan')) {
+      const w = 4;
+      const h = 4;
+      const canvas = this.textures.createCanvas('introScan', w, h);
+      if (canvas) {
+        const ctx = canvas.getContext();
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, 1);
+        canvas.refresh();
+      }
+    }
+
+    // these VFX objects render only on uiCam (fixed zoom, screen-space) —
+    // the world camera, which is mid-zoom/pan into the map, ignores them
+    const lines = this.add
+      .tileSprite(0, 0, GAME_W, GAME_H, 'introScan')
+      .setOrigin(0, 0)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setTint(SCAN_COLOR)
+      .setAlpha(0);
+    const glow = this.add
+      .rectangle(0, -30, GAME_W, 30, SCAN_COLOR, 0.15)
+      .setOrigin(0, 0.5)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const beam = this.add
+      .rectangle(0, -30, GAME_W, 4, SCAN_COLOR, 0.9)
+      .setOrigin(0, 0.5)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    cam.ignore([lines, glow, beam]);
+
+    const cleanup = () => {
+      lines.destroy();
+      glow.destroy();
+      beam.destroy();
+    };
+
+    this.tweens.add({
+      targets: lines,
+      alpha: { from: 0, to: 0.32 },
+      duration: SCAN_DURATION * 0.35,
+      yoyo: true,
+      ease: 'Sine.easeOut'
+    });
+    this.tweens.add({
+      targets: [glow, beam],
+      y: GAME_H + 30,
+      duration: SCAN_DURATION,
+      ease: 'Sine.easeInOut',
+      onComplete: cleanup
+    });
+  }
+
   private runStage(
     idx: number,
     stages: Stage[],
@@ -77,11 +145,16 @@ export class IntroScene extends Phaser.Scene {
     const stage = stages[idx];
     const isLast = idx === stages.length - 1;
 
-    // destroy the previous stage's map image + any leftover cut-static tile
-    // (broadcastCutAt doesn't self-destroy its tile — it assumes a scene
-    // switch — so this scene has to clean up between same-scene stages)
+    // destroy the previous stage's map image before adding this one
     this.children.removeAll(true);
-    this.add.image(0, 0, stage.key).setOrigin(0, 0);
+    const mapImg = this.add.image(0, 0, stage.key).setOrigin(0, 0);
+    this.uiCam.ignore(mapImg);
+
+    // play the scan-sweep VFX right on the cut, for every stage but the
+    // first (that one is the intro's own opening shot, not a map switch)
+    if (idx > 0) {
+      this.playScanSweep(cam);
+    }
 
     const tex = this.textures.get(stage.key).getSourceImage() as HTMLImageElement;
     const fitZoom = (GAME_W * DPR) / tex.width;
@@ -93,15 +166,12 @@ export class IntroScene extends Phaser.Scene {
     cam.setZoom(fitZoom);
     cam.centerOn(startX, startY);
 
-    const rect = { x: startX, y: startY, w: tex.width, h: (GAME_H * tex.width) / GAME_W };
-    broadcastRevealAt(this, rect);
-
     const advance = () => {
       if (isLast) {
         this.time.delayedCall(HOLD_AFTER_FINAL, finish);
         return;
       }
-      broadcastCutAt(this, rect, () => this.runStage(idx + 1, stages, cam, finish));
+      this.runStage(idx + 1, stages, cam, finish);
     };
 
     if (settings.reducedMotion) {
@@ -110,7 +180,7 @@ export class IntroScene extends Phaser.Scene {
       return;
     }
 
-    this.time.delayedCall(stage.holdBefore, () => {
+    const startZoomTween = () => {
       // drive zoom and pan off ONE eased progress value so the camera heads
       // straight at the target from frame one, instead of two independent
       // tweens (zoom + pan) drifting apart mid-flight and "correcting" later.
@@ -126,6 +196,15 @@ export class IntroScene extends Phaser.Scene {
         },
         onComplete: advance
       });
-    });
+    };
+
+    // only the first stage gets a still beat on the full establishing shot —
+    // every later stage cuts straight into its own full-fit-to-zoom push so
+    // the motion never idles at the map switch, it just keeps going
+    if (idx === 0) {
+      this.time.delayedCall(stage.holdBefore, startZoomTween);
+    } else {
+      startZoomTween();
+    }
   }
 }
