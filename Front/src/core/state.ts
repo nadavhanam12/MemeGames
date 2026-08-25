@@ -98,6 +98,7 @@ export const EV = {
   DAY_END: 'day-end', // (DaySummary) — shown in the news band during the break
   DAY_BREAK: 'day-break', // (null) — fires when the player dismisses the frozen recap
   NEXT_DAY_REQUEST: 'next-day-request', // () — player clicked NEXT DAY on the recap card
+  DECISION: 'decision-made', // (eventId, optionIdx, DecisionOption) — day-break choice committed; GameScene applies the instant oilDelta
   WORLD_FREEZE: 'world-freeze', // (frozen: boolean) — pauses/resumes gameplay update for a mid-run interstitial (e.g. new-meme reveal)
   UPGRADE_REVEAL: 'upgrade-reveal', // (upgradeKey) — button unlocks in the shop
   MARKET_NUDGE: 'market-nudge', // (delta) — silent prediction-market push, no headline

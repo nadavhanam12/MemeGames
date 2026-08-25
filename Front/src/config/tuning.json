@@ -2,8 +2,8 @@
   "session": {
     "startPrice": 112,
     "startCredits": 30,
-    "failPrice": 195,
-    "failSeconds": 8
+    "failPrice": 185,
+    "failSeconds": 6
   },
   "spawn": {
     "tankerInterval": 8,
@@ -15,13 +15,15 @@
     "mineMinReactSec": 3
   },
   "speeds": {
-    "missile": 76.5,
-    "drone": 63,
+    "missile": 114.75,
+    "drone": 105,
     "mine": 48,
-    "patrol": 67.5,
+    "patrol": 101.25,
     "tankerMin": 30,
     "tankerMax": 58.5,
-    "vipTanker": 69
+    "vipTanker": 69,
+    "droneWobbleAmp": 0.75,
+    "droneWobbleFreq": 8
   },
   "economy": {
     "jitterAmp": 0.45,
@@ -35,10 +37,10 @@
     "vipDrop": 6,
     "hitSpike": 8,
     "vipHitSpike": 12,
-    "interceptCredits": 2,
-    "tankerCredits": 15,
-    "vipCredits": 30,
-    "eventWinCredits": 20
+    "interceptCredits": 1,
+    "tankerCredits": 11,
+    "vipCredits": 22,
+    "eventWinCredits": 15
   },
   "upgrades": {
     "airCooldownBase": 7.5,
@@ -52,40 +54,40 @@
     "hullDamagedSpikeFactor": 0.5,
     "goldBonusPerLevel": 0.25,
     "airCosts": [
-      60,
-      120,
-      210,
-      340,
-      520,
-      760,
-      1070,
-      1460,
-      1940,
-      2520
+      70,
+      140,
+      240,
+      390,
+      600,
+      875,
+      1230,
+      1680,
+      2230,
+      2900
     ],
     "hullCosts": [
-      50,
-      100,
-      180,
-      300,
-      470,
-      700,
-      1000,
-      1380,
-      1850,
-      2420
+      60,
+      115,
+      205,
+      345,
+      540,
+      805,
+      1150,
+      1590,
+      2130,
+      2785
     ],
     "goldCosts": [
-      40,
-      90,
-      160,
-      270,
-      430,
-      650,
-      940,
-      1310,
-      1770,
-      2330
+      45,
+      105,
+      185,
+      310,
+      495,
+      750,
+      1080,
+      1510,
+      2035,
+      2680
     ]
   },
   "market": {
@@ -112,49 +114,102 @@
   "days": {
     "difficulty": {
       "spawnInterval": [
-        5.2,
-        4.6,
-        4,
-        3.5,
+        5,
+        4.2,
+        3.6,
         3,
-        2.6,
-        2.2,
-        1.9,
-        1.6,
+        2.5,
+        2.1,
+        1.7,
         1.4,
-        1.2
+        1.15,
+        1,
+        0.85
       ],
       "maxThreats": [
         4,
-        5,
         5,
         6,
         6,
         7,
         8,
-        8,
+        9,
         9,
         10,
-        10
+        11,
+        12
       ],
       "speedMult": [
         1,
-        1.05,
-        1.1,
-        1.2,
-        1.3,
-        1.4,
-        1.55,
-        1.7,
+        1.08,
+        1.15,
+        1.25,
+        1.35,
+        1.5,
+        1.65,
         1.85,
-        2,
-        2.2
-      ]
+        2.05,
+        2.3,
+        2.6
+      ],
+      "hp": {
+        "missile": [
+          1,
+          2,
+          2,
+          3,
+          3,
+          3,
+          4,
+          4,
+          4,
+          5,
+          5
+        ],
+        "drone": [
+          1,
+          1,
+          2,
+          2,
+          3,
+          3,
+          3,
+          4,
+          4,
+          4,
+          5
+        ],
+        "patrol": [
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3,
+          4,
+          4
+        ],
+        "mine": [
+          1,
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          3
+        ]
+      }
     },
     "threatUnlockDays": {
       "mine": 2,
-      "patrol": 3,
-      "armored": 5
+      "patrol": 3
     },
     "upgradeRevealDays": {
       "hull": 1,
@@ -177,9 +232,9 @@
     "fireInterval": 0.13,
     "lockRadius": 130,
     "bulletHitRadius": 30,
-    "heatPerShot": 0.07,
-    "heatCoolPerSec": 0.35,
-    "overheatRecoverAt": 0.3,
+    "heatPerShot": 0.1,
+    "heatCoolPerSec": 0.22,
+    "overheatRecoverAt": 0.25,
     "poseSwitchDx": 110,
     "muzzleOffsetX": 75,
     "muzzleLeftDy": -14
@@ -252,40 +307,41 @@
       ]
     ],
     "sellRefundFrac": 0.5,
-    "bulletSpeed": 450,
+    "bulletSpeed": 112.5,
     "revealDay": 2,
     "buildCosts": [
-      70,
-      90,
-      110,
-      140,
-      170,
-      200,
-      240,
-      280,
-      330,
+      80,
+      105,
+      125,
+      160,
+      195,
+      230,
+      275,
+      320,
       380,
-      440,
-      500,
-      570,
-      650,
-      740,
-      840
+      435,
+      505,
+      575,
+      655,
+      745,
+      850,
+      965
     ],
     "upgradeCosts": [
       90,
       160
     ],
     "range": [
-      540,
-      630,
-      720
+      220,
+      280,
+      340
     ],
     "fireInterval": [
-      4,
-      4,
-      4
-    ]
+      24,
+      20,
+      16
+    ],
+    "lockSec": 0.7
   },
   "juice": {
     "tapRadius": 80,
@@ -507,6 +563,363 @@
   },
   "social": {
     "shareGrowthMin": 50,
-    "shareGrowthMax": 100
+    "shareGrowthMax": 100,
+    "unlockBannerHoldMs": 2600
+  },
+  "decisions": {
+    "repAggroThreshold": 40,
+    "repAggroRateMult": 1.15,
+    "repTaxThreshold": -40,
+    "repTaxCreditsMult": 0.85,
+    "events": [
+      {
+        "id": "angry_iran",
+        "handle": "IRGC Navy Watch",
+        "subtext": "BREAKING · now",
+        "story": "Tehran is FURIOUS after yesterday's interceptions. Commanders vow to \"double the fire on every tanker in the Strait\" unless they get an apology. The feed is going wild.",
+        "minDay": 2,
+        "options": [
+          {
+            "label": "LET THEM TRY 😤",
+            "effectLines": [
+              "⚠ enemy attacks +50% today",
+              "🛢 oil jumps +$6 as markets panic"
+            ],
+            "effects": [
+              {
+                "stat": "enemyRate",
+                "mult": 1.5,
+                "days": 1
+              }
+            ],
+            "oilDelta": 6,
+            "repDelta": 15
+          },
+          {
+            "label": "OK OK, WE SORRY 🕊️",
+            "effectLines": [
+              "⏱ all weapons reload ×2 for 2 days",
+              "🛢 oil eases -$4 as tensions cool"
+            ],
+            "effects": [
+              {
+                "stat": "weaponCooldown",
+                "mult": 2,
+                "days": 2
+              }
+            ],
+            "oilDelta": -4,
+            "repDelta": -15
+          }
+        ]
+      },
+      {
+        "id": "oil_lobby",
+        "handle": "Crude Intentions",
+        "subtext": "SPONSORED · now",
+        "story": "A Big Oil lobby slid into your DMs: \"A little chaos is great for margins. Look the other way and we'll make it worth your while.\" There are eyes everywhere.",
+        "minDay": 2,
+        "options": [
+          {
+            "label": "TAKE THE MONEY 🤑",
+            "effectLines": [
+              "💰 all income +50% for 2 days",
+              "🛢 oil spikes +$8 — chaos is priced in"
+            ],
+            "effects": [
+              {
+                "stat": "credits",
+                "mult": 1.5,
+                "days": 2
+              }
+            ],
+            "oilDelta": 8,
+            "repDelta": 5
+          },
+          {
+            "label": "WE DON'T DEAL 🚫",
+            "effectLines": [
+              "💰 income -20% today (lawyers are expensive)",
+              "🛢 oil dips -$5 on clean-hands optics"
+            ],
+            "effects": [
+              {
+                "stat": "credits",
+                "mult": 0.8,
+                "days": 1
+              }
+            ],
+            "oilDelta": -5,
+            "repDelta": -5
+          }
+        ]
+      },
+      {
+        "id": "un_speech",
+        "handle": "UN Situation Room",
+        "subtext": "LIVE · emergency session",
+        "story": "The UN called an emergency session on the Strait. Delegates expect a formal statement from your side within the hour. Your comms team drafted two versions.",
+        "minDay": 2,
+        "options": [
+          {
+            "label": "POST A MEME INSTEAD 💀",
+            "effectLines": [
+              "⚠ enemy attacks +25% for 2 days",
+              "🛢 oil +$4 — diplomats are typing…"
+            ],
+            "effects": [
+              {
+                "stat": "enemyRate",
+                "mult": 1.25,
+                "days": 2
+              }
+            ],
+            "oilDelta": 4,
+            "repDelta": 10
+          },
+          {
+            "label": "READ THE APOLOGY 📜",
+            "effectLines": [
+              "⏱ weapons reload ×1.5 today (de-escalation rules)",
+              "🛢 oil -$6 as markets exhale"
+            ],
+            "effects": [
+              {
+                "stat": "weaponCooldown",
+                "mult": 1.5,
+                "days": 1
+              }
+            ],
+            "oilDelta": -6,
+            "repDelta": -20
+          }
+        ]
+      },
+      {
+        "id": "drone_parade",
+        "handle": "Tehran Prime Time",
+        "subtext": "STATE TV · now",
+        "story": "Iran just unveiled a new drone fleet on live TV, flying in a formation that spells 'DELETE YOUR NAVY'. Analysts are calling it \"a whole vibe\".",
+        "minDay": 3,
+        "options": [
+          {
+            "label": "CUTE TOYS 🥱",
+            "effectLines": [
+              "🚀 enemy speed +25% for 2 days",
+              "🛢 oil +$3 on saber-rattling"
+            ],
+            "effects": [
+              {
+                "stat": "enemySpeed",
+                "mult": 1.25,
+                "days": 2
+              }
+            ],
+            "oilDelta": 3,
+            "repDelta": 10
+          },
+          {
+            "label": "BUY THEM OFF 💸",
+            "effectLines": [
+              "💰 income -30% for 2 days (hush money)",
+              "🛢 oil -$3 — quiet skies, calm markets"
+            ],
+            "effects": [
+              {
+                "stat": "credits",
+                "mult": 0.7,
+                "days": 2
+              }
+            ],
+            "oilDelta": -3,
+            "repDelta": -10
+          }
+        ]
+      },
+      {
+        "id": "insurance_panic",
+        "handle": "Lloyd's Group Chat",
+        "subtext": "LEAKED · 2m ago",
+        "story": "Shipping insurers are threatening to pull coverage for the whole Strait: \"one more burning tanker and everyone pays triple.\" Captains are refreshing their premiums mid-voyage.",
+        "minDay": 3,
+        "options": [
+          {
+            "label": "SAIL ANYWAY ⛵",
+            "effectLines": [
+              "⚠ enemy attacks +20% today",
+              "🛢 oil +$7 on uninsured cargo fear"
+            ],
+            "effects": [
+              {
+                "stat": "enemyRate",
+                "mult": 1.2,
+                "days": 1
+              }
+            ],
+            "oilDelta": 7,
+            "repDelta": 5
+          },
+          {
+            "label": "SUBSIDIZE PREMIUMS 🏦",
+            "effectLines": [
+              "💰 income -25% for 2 days (you're the insurer now)",
+              "🛢 oil -$6 as coverage holds"
+            ],
+            "effects": [
+              {
+                "stat": "credits",
+                "mult": 0.75,
+                "days": 2
+              }
+            ],
+            "oilDelta": -6,
+            "repDelta": 0
+          }
+        ]
+      },
+      {
+        "id": "hawk_general",
+        "handle": "Gen. Buck Stryker",
+        "subtext": "DM · encrypted",
+        "story": "Your most decorated general wants a green light for a preemptive strike: \"They respect strength. Also I already fueled the jets.\" Half the war room is nodding.",
+        "minDay": 4,
+        "repMin": 20,
+        "options": [
+          {
+            "label": "GREENLIGHT IT 🎯",
+            "effectLines": [
+              "⏱ weapons reload 25% FASTER for 2 days",
+              "⚠ enemy attacks +40% for 2 days",
+              "🛢 oil rockets +$10"
+            ],
+            "effects": [
+              {
+                "stat": "weaponCooldown",
+                "mult": 0.75,
+                "days": 2
+              },
+              {
+                "stat": "enemyRate",
+                "mult": 1.4,
+                "days": 2
+              }
+            ],
+            "oilDelta": 10,
+            "repDelta": 20
+          },
+          {
+            "label": "STAND DOWN, GENERAL 🧊",
+            "effectLines": [
+              "⏱ weapons reload ×1.25 today (morale hit)",
+              "🛢 oil -$5 on cooler heads"
+            ],
+            "effects": [
+              {
+                "stat": "weaponCooldown",
+                "mult": 1.25,
+                "days": 1
+              }
+            ],
+            "oilDelta": -5,
+            "repDelta": -10
+          }
+        ]
+      },
+      {
+        "id": "peace_summit",
+        "handle": "Strait Talks Official",
+        "subtext": "INVITATION · now",
+        "story": "Unexpected: Tehran is offering face-to-face talks on a neutral carrier deck. \"Bring baklava, not battleships.\" The doves in your cabinet are already packing.",
+        "minDay": 4,
+        "repMax": -20,
+        "options": [
+          {
+            "label": "ATTEND THE SUMMIT 🤝",
+            "effectLines": [
+              "🕊 enemy attacks -30% for 2 days",
+              "💰 income -20% for 2 days (concessions)",
+              "🛢 oil slides -$8"
+            ],
+            "effects": [
+              {
+                "stat": "enemyRate",
+                "mult": 0.7,
+                "days": 2
+              },
+              {
+                "stat": "credits",
+                "mult": 0.8,
+                "days": 2
+              }
+            ],
+            "oilDelta": -8,
+            "repDelta": -15
+          },
+          {
+            "label": "GHOST THEM 👻",
+            "effectLines": [
+              "⚠ enemy attacks +30% today (they saw the read receipt)",
+              "🛢 oil +$5"
+            ],
+            "effects": [
+              {
+                "stat": "enemyRate",
+                "mult": 1.3,
+                "days": 1
+              }
+            ],
+            "oilDelta": 5,
+            "repDelta": 25
+          }
+        ]
+      },
+      {
+        "id": "meme_embassy",
+        "handle": "Ratio Watch",
+        "subtext": "TRENDING · now",
+        "story": "Iran's foreign ministry just ratioed your navy's official account with a single emoji. The quote tweets are merciless. Your social team awaits orders.",
+        "minDay": 2,
+        "options": [
+          {
+            "label": "POST THROUGH IT 🔥",
+            "effectLines": [
+              "⚠ enemy attacks +20% today",
+              "💰 income +20% today (engagement farming)",
+              "🛢 oil +$3"
+            ],
+            "effects": [
+              {
+                "stat": "enemyRate",
+                "mult": 1.2,
+                "days": 1
+              },
+              {
+                "stat": "credits",
+                "mult": 1.2,
+                "days": 1
+              }
+            ],
+            "oilDelta": 3,
+            "repDelta": 10
+          },
+          {
+            "label": "DELETE THE APP 📵",
+            "effectLines": [
+              "⏱ weapons reload ×1.25 today (comms blackout)",
+              "🛢 oil -$3 as the feed moves on"
+            ],
+            "effects": [
+              {
+                "stat": "weaponCooldown",
+                "mult": 1.25,
+                "days": 1
+              }
+            ],
+            "oilDelta": -3,
+            "repDelta": -10
+          }
+        ]
+      }
+    ]
   }
 }

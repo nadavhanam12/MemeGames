@@ -22,6 +22,7 @@ import {
   towerRefund,
   towerUpgradeCost
 } from '../core/towers';
+import { DecisionEvent, DecisionOption, chooseDecision, getPendingDecision } from '../core/decisions';
 import { registerLayout } from '../dev/layout';
 import { devState } from '../dev/state';
 
@@ -135,6 +136,9 @@ export class UIScene extends Phaser.Scene {
   private curtainReady = false;
   private curtainBaseY = 0;
   private curtainAdvance?: () => void;
+  // day-break decision interstitial (see showDecisionScreen)
+  private decisionOverlay?: Phaser.GameObjects.Container;
+  private decisionChosen = false;
   // feed-scroll swipe-to-dismiss on the day summary: finalY is the panel's
   // resting position (drag offsets it from there), ready gates swipes until
   // the entrance beat (stamp + slide-in) has actually finished
@@ -156,6 +160,11 @@ export class UIScene extends Phaser.Scene {
   private upgradeLevels: Record<string, number> = { air: 0, hull: 0, gold: 0 };
   private upgradeButtons: Record<string, Phaser.GameObjects.Container> = {};
   private lastMemeAt = -Infinity;
+  // in-play "new meme unlocked" banner: first-ever unlocks queue here as they
+  // fire and play one at a time over the ENGAGEMENT icon row, but only while
+  // the water is clear of live threats (see tryShowUnlockBanner)
+  private unlockBannerQueue: string[] = [];
+  private unlockBanner?: Phaser.GameObjects.Container;
 
   // SEA TURRETS shop card (a 4th card in the TACTICAL UPGRADES row) + the
   // placement overlay it opens: the summary panel hides, GameScene fades the
@@ -1772,7 +1781,20 @@ export class UIScene extends Phaser.Scene {
   /** Shared dismiss path for the day-summary panel — fired by both the NEXT
    *  DAY button and a confirmed swipe-up gesture on the panel. */
   private requestNextDay(): void {
-    if (!this.summaryPanel?.active || this.placementOpen) return;
+    if (!this.summaryPanel?.active || this.placementOpen || this.decisionOverlay) return;
+    const pending = getPendingDecision();
+    if (pending) {
+      if (import.meta.env.DEV && devState.autoPlay === 'full') {
+        // full autoplay never sees the decision screen — pick blind and move on
+        const idx = Math.random() < 0.5 ? 0 : 1;
+        const opt = chooseDecision(idx);
+        if (opt) bus.emit(EV.DECISION, pending.id, idx, opt);
+      } else {
+        sfx.tap();
+        this.showDecisionScreen(pending);
+        return;
+      }
+    }
     sfx.tap();
     bus.emit(EV.NEXT_DAY_REQUEST);
   }
@@ -1792,6 +1814,290 @@ export class UIScene extends Phaser.Scene {
       const price = costsOf(u.key)[this.upgradeLevels[u.key]];
       bus.emit('buy-upgrade', u.key, price);
     }
+  }
+
+  // ------------------------------------------------ day-break decision screen
+  /** Full-screen interstitial between NEXT DAY and the day actually starting:
+   *  the pending decision event rendered as a viral post (feed chrome), an
+   *  oil-price graph projecting each choice's instant market move, and the
+   *  two choices as quote-reply cards. No swipe-skip — the player must pick. */
+  private showDecisionScreen(ev: DecisionEvent): void {
+    this.decisionChosen = false;
+    this.summaryPanelReady = false; // panel scrolls away; stop its swipe/tap input
+    const overlay = this.add.container(0, settings.reducedMotion ? 0 : GAME_H).setDepth(2650);
+    this.decisionOverlay = overlay;
+
+    const bg = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, PAL.ink, 1);
+    bg.setInteractive(); // swallow taps so nothing under the overlay reacts
+    overlay.add(bg);
+    const inner = this.add.container(0, 0);
+    overlay.add(inner);
+
+    const W = GAME_W - 64;
+    const cx = GAME_W / 2;
+    const nextDay = this.summaryNextDay;
+    let y = 0;
+
+    // ---- title
+    inner.add(
+      this.add.text(cx, y, `DAY ${nextDay} — DECISION`, { fontFamily: FONT_DISPLAY, fontSize: '40px', color: HEX.gold }).setOrigin(0.5, 0)
+    );
+    y += 52;
+    inner.add(
+      this.add
+        .text(cx, y, 'your call, commander — the market is watching', { fontFamily: FONT_SANS, fontSize: '14px', color: HEX.muted })
+        .setOrigin(0.5, 0)
+    );
+    y += 40;
+
+    // ---- the "viral post" card (top-anchored: children measured, then bg drawn)
+    const postCard = this.add.container(cx, y);
+    const postBg = this.add.graphics();
+    postCard.add(postBg);
+    postCard.add(createPostHeader(this, { x: -W / 2 + 18, y: 42, w: W - 36, handle: ev.handle, subtext: ev.subtext, live: true }));
+    const story = this.add
+      .text(-W / 2 + 18, 78, ev.story, {
+        fontFamily: FONT_SANS,
+        fontSize: '17px',
+        color: HEX.cream,
+        wordWrap: { width: W - 36 },
+        lineSpacing: 5
+      })
+      .setOrigin(0, 0);
+    postCard.add(story);
+    const engageY = 78 + story.height + 14;
+    postCard.add(
+      this.add
+        .text(-W / 2 + 18, engageY, `💬 ${nextDay * 3 + 7}K      🔁 ${nextDay * 11 + 40}K      ❤️ ${nextDay * 23 + 120}K      👁 ${nextDay * 2 + 3}M`, {
+          fontFamily: FONT_SANS,
+          fontSize: '14px',
+          color: HEX.muted
+        })
+        .setOrigin(0, 0)
+    );
+    const postH = engageY + 34;
+    postBg.fillStyle(PANEL, 0.98);
+    postBg.fillRoundedRect(-W / 2, 0, W, postH, 14);
+    postBg.lineStyle(2, DIVIDER, 1);
+    postBg.strokeRoundedRect(-W / 2, 0, W, postH, 14);
+    inner.add(postCard);
+    y += postH + 18;
+
+    // ---- oil projection graph
+    const branchColor = (o: DecisionOption) => (o.oilDelta > 0 ? PAL.red : o.oilDelta < 0 ? PAL.green : PAL.muted);
+    const graphH = 200;
+    inner.add(this.buildDecisionGraph(cx, y, W, graphH, ev.options, branchColor));
+    y += graphH + 18;
+
+    // ---- choice cards (quote-reply style), tagged A/B to match the graph
+    ev.options.forEach((opt, idx) => {
+      const lines = opt.effectLines;
+      const cardH = 52 + lines.length * 22 + 16;
+      const card = this.add.container(cx, y);
+      const cardBg = this.add.graphics();
+      cardBg.fillStyle(PANEL, 0.98);
+      cardBg.fillRoundedRect(-W / 2, 0, W, cardH, 14);
+      cardBg.lineStyle(2, DIVIDER, 1);
+      cardBg.strokeRoundedRect(-W / 2, 0, W, cardH, 14);
+      card.add(cardBg);
+      const bColor = branchColor(opt);
+      card.add(this.add.circle(-W / 2 + 34, 30, 15, bColor, 0.18).setStrokeStyle(2, bColor));
+      card.add(
+        this.add
+          .text(-W / 2 + 34, 30, 'AB'[idx], { fontFamily: FONT_DISPLAY, fontSize: '17px', color: `#${bColor.toString(16).padStart(6, '0')}` })
+          .setOrigin(0.5)
+      );
+      card.add(
+        this.add
+          .text(-W / 2 + 62, 30, opt.label, { fontFamily: FONT_DISPLAY, fontSize: '23px', color: HEX.cream })
+          .setOrigin(0, 0.5)
+      );
+      lines.forEach((line, li) => {
+        card.add(
+          this.add
+            .text(-W / 2 + 62, 56 + li * 22, line, { fontFamily: FONT_SANS, fontSize: '14px', color: HEX.muted })
+            .setOrigin(0, 0)
+        );
+      });
+      card.setSize(W, cardH);
+      // explicit top-anchored hit area (container default centers on origin)
+      card.setInteractive(new Phaser.Geom.Rectangle(-W / 2, 0, W, cardH), Phaser.Geom.Rectangle.Contains);
+      card.input!.cursor = 'pointer';
+      card.on('pointerover', () => !this.decisionChosen && this.tweens.add({ targets: card, scale: 1.02, duration: 100 }));
+      card.on('pointerout', () => this.tweens.add({ targets: card, scale: 1, duration: 100 }));
+      card.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, e: Phaser.Types.Input.EventData) => {
+        e.stopPropagation();
+        this.commitDecision(ev, idx, card, cardBg, W, cardH);
+      });
+      card.setData('optIdx', idx);
+      inner.add(card);
+      y += cardH + 14;
+    });
+
+    // center the stack in the canvas (bg stays full-bleed)
+    inner.y = Math.max(24, (GAME_H - y) / 2);
+
+    // scroll in from below, same motion grammar as the feed curtain
+    if (!settings.reducedMotion) {
+      this.tweens.add({ targets: overlay, y: 0, duration: 420, ease: EASE.inOut });
+      if (this.summaryPanel?.active) {
+        this.tweens.add({ targets: this.summaryPanel, y: this.summaryPanel.y - GAME_H, duration: 420, ease: EASE.inOut });
+      }
+    }
+  }
+
+  /** Card with the recent oil-price sparkline plus a dashed projected branch
+   *  per option (colored by direction), so each choice's instant market move
+   *  is readable before committing. Top-anchored at (cx, top). */
+  private buildDecisionGraph(
+    cx: number,
+    top: number,
+    w: number,
+    h: number,
+    options: DecisionOption[],
+    branchColor: (o: DecisionOption) => number
+  ): Phaser.GameObjects.Container {
+    const c = this.add.container(cx, top);
+    const bg = this.add.graphics();
+    bg.fillStyle(PANEL, 0.98);
+    bg.fillRoundedRect(-w / 2, 0, w, h, 14);
+    bg.lineStyle(2, DIVIDER, 1);
+    bg.strokeRoundedRect(-w / 2, 0, w, h, 14);
+    c.add(bg);
+    c.add(
+      this.add
+        .text(-w / 2 + 18, 14, '🛢 BRENT CRUDE — PROJECTED REACTION', { fontFamily: FONT_SANS, fontSize: '13px', fontStyle: 'bold', color: HEX.muted, letterSpacing: 1 })
+        .setOrigin(0, 0)
+    );
+
+    const hist = (((this.registry.get('priceHistory') as number[] | undefined) ?? []).slice(-40)).slice();
+    if (!hist.length) hist.push(TUNING.session.startPrice);
+    const cur = hist[hist.length - 1];
+    const ends = options.map(o => Phaser.Math.Clamp(cur + o.oilDelta, 40, 220));
+    const lo = Math.min(...hist, ...ends) - 4;
+    const hi = Math.max(...hist, ...ends) + 4;
+    const padX = 22;
+    const labelGutter = 74;
+    const plotW = w - padX * 2 - labelGutter;
+    const histW = plotW * 0.62;
+    const x0 = -w / 2 + padX;
+    const yTop = 46;
+    const plotH = h - yTop - 22;
+    const yFor = (v: number) => yTop + (1 - (v - lo) / (hi - lo)) * plotH;
+
+    // history line
+    const line = this.add.graphics();
+    line.lineStyle(3, PAL.cream, 1);
+    line.beginPath();
+    hist.forEach((v, i) => {
+      const x = x0 + (hist.length === 1 ? histW : (i / (hist.length - 1)) * histW);
+      i === 0 ? line.moveTo(x, yFor(v)) : line.lineTo(x, yFor(v));
+    });
+    line.strokePath();
+    c.add(line);
+    const nowX = x0 + histW;
+    c.add(this.add.circle(nowX, yFor(cur), 4, PAL.gold));
+    c.add(
+      this.add
+        .text(nowX - 6, yFor(cur) - 8, `$${Math.round(cur)}`, { fontFamily: FONT_SANS, fontSize: '13px', fontStyle: 'bold', color: HEX.gold })
+        .setOrigin(1, 1)
+    );
+
+    // dashed projection branches + right-edge labels (nudged apart on overlap)
+    const endX = x0 + plotW;
+    const labelYs = options.map((o, i) => yFor(ends[i]));
+    if (Math.abs(labelYs[0] - labelYs[1]) < 18) {
+      const firstOnTop = labelYs[0] <= labelYs[1];
+      const mid = (labelYs[0] + labelYs[1]) / 2;
+      labelYs[0] = mid + (firstOnTop ? -9 : 9);
+      labelYs[1] = mid + (firstOnTop ? 9 : -9);
+    }
+    options.forEach((o, i) => {
+      const color = branchColor(o);
+      const yEnd = yFor(ends[i]);
+      const dash = this.add.graphics();
+      dash.lineStyle(3, color, 0.95);
+      const segs = 9;
+      for (let s = 0; s < segs; s += 2) {
+        const t0 = s / segs;
+        const t1 = (s + 1) / segs;
+        dash.lineBetween(
+          nowX + (endX - nowX) * t0,
+          yFor(cur) + (yEnd - yFor(cur)) * t0,
+          nowX + (endX - nowX) * t1,
+          yFor(cur) + (yEnd - yFor(cur)) * t1
+        );
+      }
+      c.add(dash);
+      const hex = `#${color.toString(16).padStart(6, '0')}`;
+      c.add(
+        this.add
+          .text(endX + 8, labelYs[i], `${'AB'[i]} $${Math.round(ends[i])}`, { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: hex })
+          .setOrigin(0, 0.5)
+      );
+    });
+    return c;
+  }
+
+  /** Lock in a choice: gold-stamp the picked card, fade the other, apply the
+   *  effects (rep + multi-day mods via decisions.ts, instant oil move via
+   *  EV.DECISION in GameScene), then scroll the overlay away into the new day. */
+  private commitDecision(
+    ev: DecisionEvent,
+    idx: number,
+    card: Phaser.GameObjects.Container,
+    cardBg: Phaser.GameObjects.Graphics,
+    w: number,
+    cardH: number
+  ): void {
+    if (this.decisionChosen) return;
+    this.decisionChosen = true;
+    const opt = chooseDecision(idx);
+    if (!opt) return;
+    sfx.tap();
+    pressPulse(this, card);
+    cardBg.lineStyle(3, PAL.gold, 1);
+    cardBg.strokeRoundedRect(-w / 2, 0, w, cardH, 14);
+    this.decisionOverlay?.getAll().forEach(obj => {
+      if (obj instanceof Phaser.GameObjects.Container) obj.disableInteractive();
+    });
+    // fade the road not taken
+    const inner = this.decisionOverlay?.list[1] as Phaser.GameObjects.Container | undefined;
+    inner?.list.forEach(obj => {
+      if (obj instanceof Phaser.GameObjects.Container && obj.getData('optIdx') !== undefined) {
+        obj.disableInteractive();
+        if (obj.getData('optIdx') !== idx && !settings.reducedMotion) {
+          this.tweens.add({ targets: obj, alpha: 0.35, duration: 250 });
+        } else if (obj.getData('optIdx') !== idx) {
+          obj.setAlpha(0.35);
+        }
+      }
+    });
+    bus.emit(EV.DECISION, ev.id, idx, opt);
+    this.time.delayedCall(settings.reducedMotion ? 80 : 800, () => this.exitDecisionScreen());
+  }
+
+  /** Kick off the next day underneath, then scroll the decision overlay up
+   *  and off — mirroring the summary panel's own exit motion. */
+  private exitDecisionScreen(): void {
+    const overlay = this.decisionOverlay;
+    if (!overlay) return;
+    bus.emit(EV.NEXT_DAY_REQUEST);
+    if (settings.reducedMotion) {
+      overlay.destroy();
+      this.decisionOverlay = undefined;
+      return;
+    }
+    this.tweens.add({
+      targets: overlay,
+      y: -GAME_H,
+      duration: 420,
+      ease: EASE.inOut,
+      onComplete: () => {
+        overlay.destroy();
+        if (this.decisionOverlay === overlay) this.decisionOverlay = undefined;
+      }
+    });
   }
 
   private onDayBreak(_remaining: null): void {
@@ -1854,7 +2160,8 @@ export class UIScene extends Phaser.Scene {
     // back-to-back moments don't turn the feed into a meme channel
     if (!force && this.time.now - this.lastMemeAt < MEMES.settings.minGapMs) return;
     this.lastMemeAt = this.time.now;
-    pickMeme(label, ctx);
+    const pick = pickMeme(label, ctx);
+    if (pick.isNew) this.unlockBannerQueue.push(pick.id);
     this.onHeadline('📸 new post added to today’s feed', 'event', 2000);
     sfx.tap();
   }
@@ -1936,6 +2243,63 @@ export class UIScene extends Phaser.Scene {
     if (this.graphFlash > 0) this.graphFlash = Math.max(0, this.graphFlash - dt * 2);
     // price missions read off the live price, so the caption tracks it each frame
     if (this.mission?.type === 'price' && !this.mission.done) this.renderMissionCaption();
+    this.tryShowUnlockBanner();
+  }
+
+  /** Plays the next queued first-ever unlock as a banner over the engagement
+   *  row — but only during calm gameplay: no live threats on the water, no
+   *  day-end UI up, world not frozen. Queued unlocks wait for the next lull. */
+  private tryShowUnlockBanner(): void {
+    if (!this.unlockBannerQueue.length || this.unlockBanner) return;
+    if (this.summaryPanel?.active || this.placementOpen) return;
+    const game = this.scene.get('Game') as any;
+    if (!game || game.over || game.frozen) return;
+    const aliveThreats = ((game.threats ?? []) as { dead: boolean }[]).filter(t => !t.dead).length;
+    if (aliveThreats > 0) return;
+    this.showUnlockBanner(this.unlockBannerQueue.shift()!);
+  }
+
+  private showUnlockBanner(id: string): void {
+    const tpl = MEMES.templates[id];
+    if (!tpl) return;
+    const cx = ENGAGEMENT.x + ENGAGEMENT.w / 2;
+    const cy = ENGAGEMENT.y + ENGAGEMENT.h / 2;
+    const banner = this.add.container(cx, cy).setDepth(1100);
+    this.unlockBanner = banner;
+    banner.add(this.add.rectangle(0, 0, ENGAGEMENT.w, ENGAGEMENT.h, 0x1a2027, 1).setStrokeStyle(2, PAL.gold, 1));
+    const thumbH = ENGAGEMENT.h - 10;
+    const thumbW = Math.max(24, Math.floor(thumbH / tpl.aspect));
+    const tx = -ENGAGEMENT.w / 2 + 10 + thumbW / 2;
+    if (hasArt(this, tpl.artKey)) {
+      banner.add(this.add.image(tx, 0, tpl.artKey).setDisplaySize(thumbW, thumbH));
+    } else {
+      banner.add(this.add.rectangle(tx, 0, thumbW, thumbH, 0x39424e));
+    }
+    banner.add(this.add.rectangle(tx, 0, thumbW, thumbH).setStrokeStyle(2, PAL.gold));
+    const total = Object.keys(MEMES.templates).length;
+    banner.add(
+      this.add
+        .text(tx + thumbW / 2 + 14, 0, `✨ NEW MEME UNLOCKED · ${getUnlockedTemplates().size}/${total}`, {
+          fontFamily: FONT_SANS,
+          fontSize: '19px',
+          fontStyle: 'bold',
+          color: HEX.gold
+        })
+        .setOrigin(0, 0.5)
+    );
+    sfx.tap();
+    const hold = TUNING.social.unlockBannerHoldMs;
+    const done = () => {
+      banner.destroy();
+      this.unlockBanner = undefined;
+    };
+    if (settings.reducedMotion) {
+      this.time.delayedCall(hold, done);
+    } else {
+      banner.setAlpha(0).setY(cy + 26);
+      this.tweens.add({ targets: banner, alpha: 1, y: cy, duration: 240, ease: EASE.pop });
+      this.tweens.add({ targets: banner, alpha: 0, y: cy + 26, duration: 240, ease: EASE.inOut, delay: hold, onComplete: done });
+    }
   }
 
   private drawGraph(hist: number[], dt: number): void {

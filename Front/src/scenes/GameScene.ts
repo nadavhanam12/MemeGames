@@ -7,6 +7,7 @@ import { MemeContext, MEMES, resetMemeLog } from '../core/memes';
 import { getDayFired, getDayUnlocks, recordDayReached, resetDayUnlocks, resetRunUnlocks } from '../core/memeUnlocks';
 import { TUNING, persistTuningLocal } from '../config/tuning';
 import { towerBuildCost, towerMaxLevel, towerRefund, towerUpgradeCost } from '../core/towers';
+import { DecisionOption, decisionMult, resetDecisions, rollDecision, tickDecisionDay } from '../core/decisions';
 import { devState } from '../dev/state';
 import { leaderboard } from '../backend/leaderboard';
 import { analytics } from '../backend/analytics';
@@ -51,7 +52,7 @@ interface Tower {
   invested: number; // credits sunk in (build + upgrades) — drives sell refund
   container: Phaser.GameObjects.Container;
   pips: Phaser.GameObjects.Graphics;
-  cooldownRing: Phaser.GameObjects.Graphics;
+  cooldownGfx: Phaser.GameObjects.Graphics;
   fireTimer: number;
   // brief lock-on before firing: target is picked, then held under a
   // shrinking reticle for LOCK_TIME before the round actually launches
@@ -231,6 +232,7 @@ export class GameScene extends Phaser.Scene {
     analytics.startRun();
     resetMemeLog();
     resetRunUnlocks();
+    resetDecisions();
     this.stats = freshStats();
     this.tankers = [];
     this.threats = [];
@@ -317,7 +319,7 @@ export class GameScene extends Phaser.Scene {
       const wp = this.cameras.main.getWorldPoint(p.x, p.y);
       // tap = one shot; holding keeps the burst going (see update())
       this.firingHeld = true;
-      this.fireTimer = TUNING.turret.fireInterval;
+      this.fireTimer = TUNING.turret.fireInterval * decisionMult('weaponCooldown');
       sfx.unlock();
       sfx.startAmbient(); // ocean bed can only start once audio is unlocked
       shockwave(this, wp.x, wp.y, 0xffffff, 36); // designation marker
@@ -338,6 +340,15 @@ export class GameScene extends Phaser.Scene {
     bus.on('defense-map-close', () => this.closePlacementMode());
     bus.removeAllListeners(EV.NEXT_DAY_REQUEST);
     bus.on(EV.NEXT_DAY_REQUEST, this.onNextDayRequest, this);
+
+    bus.removeAllListeners(EV.DECISION);
+    bus.on(EV.DECISION, (eventId: string, optionIdx: number, opt: DecisionOption) => {
+      // instant market reaction to the day-break choice — same clamp as every
+      // other price move; UIScene's price card picks it up via EV.PRICE
+      this.stats.oilPrice = Phaser.Math.Clamp(this.stats.oilPrice + opt.oilDelta, 40, 220);
+      bus.emit(EV.PRICE, this.stats.oilPrice, opt.oilDelta);
+      analytics.track('decision', { day: this.day, event: eventId, option: optionIdx, oilDelta: opt.oilDelta });
+    });
     bus.removeAllListeners(EV.WORLD_FREEZE);
     bus.on(EV.WORLD_FREEZE, (frozen: boolean) => (this.frozen = frozen));
 
@@ -348,6 +359,7 @@ export class GameScene extends Phaser.Scene {
       bus.removeAllListeners('defense-map-open');
       bus.removeAllListeners('defense-map-close');
       bus.removeAllListeners(EV.NEXT_DAY_REQUEST);
+      bus.removeAllListeners(EV.DECISION);
       this.input.setDefaultCursor('default');
       sfx.stopAmbient();
     });
@@ -763,14 +775,12 @@ export class GameScene extends Phaser.Scene {
       }
     }
     sprite.setDepth(30);
-    const late = this.dayCurve(TUNING.days.difficulty.speedMult);
-    // difficulty step: from the armored day on, flying weapons take two hits
-    const armored = (t === 'missile' || t === 'drone') && this.day >= TUNING.days.threatUnlockDays.armored;
+    const late = this.dayCurve(TUNING.days.difficulty.speedMult) * decisionMult('enemySpeed');
     const threat: Threat = {
       sprite,
       type: t,
       speed: speed * late,
-      hp: armored ? 2 : 1,
+      hp: this.dayCurve(TUNING.days.difficulty.hp[t]),
       target: t === 'missile' ? null : target,
       dead: false,
       swarmId,
@@ -1252,8 +1262,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private addCredits(gain: number, x: number, y: number): void {
-    // OIL MONEY: all credit income scales with the gold upgrade
-    const boosted = Math.round(gain * (1 + this.upgrades.gold * TUNING.upgrades.goldBonusPerLevel));
+    // OIL MONEY: all credit income scales with the gold upgrade (and any
+    // active day-break decision income modifier)
+    const boosted = Math.round(gain * (1 + this.upgrades.gold * TUNING.upgrades.goldBonusPerLevel) * decisionMult('credits'));
     this.stats.credits += boosted;
     // x,y are world coords; UIScene draws over the full canvas in 1280×720
     // logical coords, so translate through this scene's viewport+zoom+origin
@@ -1354,8 +1365,8 @@ export class GameScene extends Phaser.Scene {
       const spr = this.add.sprite(0, 0, 'tower_idle_1');
       if (!settings.reducedMotion) spr.play('tower-idle');
       const pips = this.add.graphics();
-      const cooldownRing = this.add.graphics();
-      return this.add.container(slot.x, slot.y, [spr, pips, cooldownRing]).setDepth(26);
+      const cooldownGfx = this.add.graphics();
+      return this.add.container(slot.x, slot.y, [spr, pips, cooldownGfx]).setDepth(26);
     }
     const key = 'towerGen2x';
     if (!this.textures.exists(key)) {
@@ -1374,8 +1385,8 @@ export class GameScene extends Phaser.Scene {
     }
     const body = this.add.image(0, 0, key);
     const pips = this.add.graphics();
-    const cooldownRing = this.add.graphics();
-    const container = this.add.container(slot.x, slot.y, [body, pips, cooldownRing]).setDepth(26);
+    const cooldownGfx = this.add.graphics();
+    const container = this.add.container(slot.x, slot.y, [body, pips, cooldownGfx]).setDepth(26);
     return container;
   }
 
@@ -1388,25 +1399,33 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Ring around the tower showing reload progress — dim arc fills clockwise
-   *  from 12 o'clock as fireTimer counts down, pulses gold solid when ready. */
+  private static readonly COOLDOWN_PIPS = 4;
+
+  /** Row of dots above the tower showing reload progress — they light up
+   *  left to right as fireTimer counts down, all pulse gold when ready. */
   private drawTowerCooldown(tw: Tower, interval: number): void {
-    const g = tw.cooldownRing;
+    const g = tw.cooldownGfx;
     g.clear();
-    const R = 78;
-    g.lineStyle(4, 0x0e141b, 0.5);
-    g.strokeCircle(0, 0, R);
+    const n = GameScene.COOLDOWN_PIPS;
     const progress = Phaser.Math.Clamp(1 - tw.fireTimer / interval, 0, 1);
-    if (progress >= 1) {
-      const pulse = settings.reducedMotion ? 1 : 0.75 + 0.25 * Math.sin(this.time.now / 220);
-      g.lineStyle(4, PAL.gold, pulse);
-      g.strokeCircle(0, 0, R);
-    } else {
-      g.lineStyle(4, 0x8fd6ef, 0.9);
-      const start = -Math.PI / 2;
-      g.beginPath();
-      g.arc(0, 0, R, start, start + progress * Math.PI * 2, false);
-      g.strokePath();
+    const ready = progress >= 1;
+    const pulse = settings.reducedMotion ? 1 : 0.75 + 0.25 * Math.sin(this.time.now / 220);
+    const lit = ready ? n : Math.floor(progress * n);
+    for (let i = 0; i < n; i++) {
+      const x = (i - (n - 1) / 2) * 24;
+      g.fillStyle(0x0e141b, 0.5);
+      g.fillCircle(x, -90, 8);
+      if (ready) {
+        g.fillStyle(PAL.gold, pulse);
+        g.fillCircle(x, -90, 6);
+      } else if (i < lit) {
+        g.fillStyle(0x8fd6ef, 0.9);
+        g.fillCircle(x, -90, 6);
+      } else if (i === lit) {
+        // pip currently filling — fades in with sub-pip progress
+        g.fillStyle(0x8fd6ef, (progress * n) % 1);
+        g.fillCircle(x, -90, 6);
+      }
     }
   }
 
@@ -1431,7 +1450,7 @@ export class GameScene extends Phaser.Scene {
       invested: cost,
       container,
       pips: container.list[1] as Phaser.GameObjects.Graphics,
-      cooldownRing: container.list[2] as Phaser.GameObjects.Graphics,
+      cooldownGfx: container.list[2] as Phaser.GameObjects.Graphics,
       fireTimer: 0
     };
     this.drawTowerPips(tw);
@@ -1552,18 +1571,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Auto-fire loop: each tower locks the nearest threat in range (any type)
-   *  on its own cooldown. */
-  /** Seconds a tower holds its reticle on a target before the round actually
-   *  launches — the anticipation beat that sells "taking aim". */
-  private static readonly TOWER_LOCK_SEC = 0.3;
-
+   *  on its own cooldown. Lock-on duration (seconds a tower holds its
+   *  reticle before the round launches) lives in TUNING.towers.lockSec. */
   private updateTowers(rawDt: number): void {
     const cfg = TUNING.towers;
     this.towerLockGfx.clear();
     for (const tw of this.towers) {
       if (!tw) continue;
       tw.fireTimer = Math.max(0, tw.fireTimer - rawDt);
-      this.drawTowerCooldown(tw, cfg.fireInterval[tw.level - 1]);
+      this.drawTowerCooldown(tw, cfg.fireInterval[tw.level - 1] * decisionMult('weaponCooldown'));
 
       // mid lock-on: keep the reticle on the target, then fire when it closes
       if (tw.lockTarget) {
@@ -1572,12 +1588,12 @@ export class GameScene extends Phaser.Scene {
           tw.lockTimer = 0;
         } else {
           tw.lockTimer = Math.max(0, (tw.lockTimer ?? 0) - rawDt);
-          const progress = 1 - (tw.lockTimer ?? 0) / GameScene.TOWER_LOCK_SEC;
+          const progress = 1 - (tw.lockTimer ?? 0) / cfg.lockSec;
           this.drawTowerLockReticle(tw.lockTarget.sprite.x, tw.lockTarget.sprite.y, progress);
           if (tw.lockTimer <= 0) {
             const target = tw.lockTarget;
             tw.lockTarget = null;
-            tw.fireTimer = cfg.fireInterval[tw.level - 1];
+            tw.fireTimer = cfg.fireInterval[tw.level - 1] * decisionMult('weaponCooldown');
             this.towerFire(tw, target);
           }
         }
@@ -1600,7 +1616,7 @@ export class GameScene extends Phaser.Scene {
       if (!best) continue;
       // begin lock-on instead of firing instantly — towerFire() runs once it expires
       tw.lockTarget = best;
-      tw.lockTimer = GameScene.TOWER_LOCK_SEC;
+      tw.lockTimer = cfg.lockSec;
     }
   }
 
@@ -1883,6 +1899,12 @@ export class GameScene extends Phaser.Scene {
       price: Math.round(this.stats.oilPrice)
     });
     analytics.track('mission_result', { day: this.day, type: m.type, done: m.done });
+    // day-break decision: age yesterday's effects, then roll the choice the
+    // player will face before tomorrow starts (UIScene reads the pending
+    // event + this price history snapshot for the projection graph)
+    tickDecisionDay();
+    rollDecision(this.day + 1);
+    this.registry.set('priceHistory', [...this.stats.priceHistory]);
     this.firingHeld = false;
     this.awaitingNextDay = true;
     // hide the whole world (tankers, threats, gun) behind the recap panel —
@@ -1919,7 +1941,12 @@ export class GameScene extends Phaser.Scene {
     const out: string[] = [];
     if (nextDay === d.threatUnlockDays.mine) out.push('INTEL: MINES EXPECTED IN THE STRAIT TOMORROW');
     if (nextDay === d.threatUnlockDays.patrol) out.push('INTEL: ENEMY PATROL BOATS INBOUND TOMORROW');
-    if (nextDay === d.threatUnlockDays.armored) out.push('INTEL: ARMORED WEAPONS TOMORROW — TWO HITS TO DOWN');
+    // fires the first day any threat type's hp curve steps up to 2+ — reads as
+    // "armor" flavor text regardless of which type actually toughened up
+    const armorDay = Math.min(
+      ...Object.values(d.difficulty.hp).map(curve => curve.findIndex(v => v > 1) + 1).filter(day => day > 0)
+    );
+    if (nextDay === armorDay) out.push('INTEL: ARMORED WEAPONS TOMORROW — TWO HITS TO DOWN');
     for (const key of ['air', 'hull', 'gold'] as const) {
       if (nextDay === d.upgradeRevealDays[key] && !this.revealed[key]) {
         const names = { air: 'AIR ASSISTANCE', hull: 'HULL ARMOR', gold: 'OIL MONEY' };
@@ -1967,6 +1994,7 @@ export class GameScene extends Phaser.Scene {
       camImpulse(this, TUNING.juice.shakeSmall, 150);
       vibrate(25);
       impactFlash(this, t.sprite.x, t.sprite.y, PAL.orange, 60);
+      shockwave(this, t.sprite.x, t.sprite.y, PAL.orange, 50);
       this.burst(t.sprite.x, t.sprite.y, PAL.orange, 'puff', 8);
       const dmgSpike = Math.round(
         (t.vip ? TUNING.economy.vipHitSpike : TUNING.economy.hitSpike) * TUNING.upgrades.hullDamagedSpikeFactor
@@ -2060,7 +2088,7 @@ export class GameScene extends Phaser.Scene {
       const px = p.x / DPR;
       const py = p.y / DPR;
       if (p.isDown && px >= VIEW.x && px <= VIEW.x + VIEW.w && py >= VIEW.y && py <= VIEW.y + VIEW.h) {
-        this.fireTimer = tu.fireInterval;
+        this.fireTimer = tu.fireInterval * decisionMult('weaponCooldown');
         const wp = this.cameras.main.getWorldPoint(p.x, p.y);
         this.fireShot(wp.x, wp.y);
       }
@@ -2357,7 +2385,7 @@ export class GameScene extends Phaser.Scene {
     // day-authored difficulty: spawn pressure comes from the current day's
     // entry in days.difficulty (clamped to the last entry for endless play)
     const sp = TUNING.spawn;
-    const interval = this.dayCurve(TUNING.days.difficulty.spawnInterval);
+    const interval = this.dayCurve(TUNING.days.difficulty.spawnInterval) / decisionMult('enemyRate');
     const maxThreats = this.dayCurve(TUNING.days.difficulty.maxThreats);
     this.spawnTimer -= rawDt;
     if (this.spawnTimer <= 0 && !overtime && this.threats.filter(t => !t.dead).length < maxThreats) {
@@ -2558,7 +2586,10 @@ export class GameScene extends Phaser.Scene {
       }
       const ang = Math.atan2(ty - s.y, tx - s.x);
       // missiles fly dead straight; drones weave
-      const wob = th.type === 'drone' ? Math.sin(this.elapsed * 6 + s.x) * 0.5 : 0;
+      const wob =
+        th.type === 'drone'
+          ? Math.sin(this.elapsed * TUNING.speeds.droneWobbleFreq + s.x) * TUNING.speeds.droneWobbleAmp
+          : 0;
       s.x += Math.cos(ang + wob) * th.speed * dt;
       s.y += Math.sin(ang + wob) * th.speed * dt;
       if (th.type === 'missile') s.rotation = ang + wob;
