@@ -8,7 +8,7 @@
 // selected it shows an ambient backdrop that also hosts the new-unlock toast
 // (paired with a glow/badge on the corresponding tile in the left grid).
 import { MEMES } from './memes';
-import { getUnlockedTemplates } from './memeUnlocks';
+import { getBestDayReached, getUnlockedTemplates } from './memeUnlocks';
 import { bus, EV, type DaySummary } from './state';
 import { settings } from './settings';
 import { drawWatermark, shareImage, shareCanvasTo, type SharePlatform } from './share';
@@ -19,7 +19,20 @@ const SHARE_ICONS: { platform: SharePlatform; icon: string }[] = [
   { platform: 'facebook', icon: 'icons/share-facebook.png' }
 ];
 
+/** One DAY-tier section of the left grid — mirrors GalleryScene's grouping
+ *  (buildSectionHeader/buildLockedStamp) so the panel reads like the in-game
+ *  gallery: a "DAY N" header, "n/m unlocked" subtitle, and a locked stamp
+ *  over tiers the account hasn't reached yet (getBestDayReached, account-wide). */
+interface TierSection {
+  tier: number;
+  ids: string[];
+  sectionEl: HTMLElement;
+  subEl: HTMLElement;
+  stampEl: HTMLElement | null;
+}
+
 let availableArt = new Set<string>();
+let sections: TierSection[] = [];
 let gridEl: HTMLElement | null = null;
 let countEl: HTMLElement | null = null;
 let previewHintEl: HTMLElement | null = null;
@@ -44,7 +57,11 @@ export async function initSidePanels(): Promise<void> {
 
   bus.on(EV.DAY_END, (summary: DaySummary) => {
     if (summary.newMemesUnlocked?.length) onNewUnlocks(summary.newMemesUnlocked);
+    refreshSections();
   });
+  // A new day can push getBestDayReached() past a tier gate — un-dim that
+  // section live, the way GalleryScene would on its next rebuild.
+  bus.on(EV.DAY_START, () => refreshSections());
 }
 
 function tileArtHtml(id: string): string {
@@ -77,19 +94,68 @@ function buildGalleryPanel(panel: HTMLElement): void {
   updateCount();
 
   if (!gridEl) return;
+  const bestDay = Math.max(1, getBestDayReached());
+
+  // Group by dayTier, same as GalleryScene.buildGrid.
+  const tiers = new Map<number, string[]>();
   for (const id of ids) {
-    const isUnlocked = unlocked.has(id);
-    const tile = document.createElement('button');
-    tile.type = 'button';
-    tile.className = `gallery-tile ${isUnlocked ? 'unlocked' : 'locked'}`;
-    tile.dataset.label = MEMES.templates[id].label.toLowerCase();
-    tile.dataset.unlocked = isUnlocked ? 'true' : 'false';
-    tile.setAttribute('aria-label', `${MEMES.templates[id].label}${isUnlocked ? '' : ' (locked)'}`);
-    tile.innerHTML = `${tileArtHtml(id)}<span class="gallery-tile-badge">NEW</span>`;
-    if (isUnlocked) tile.addEventListener('click', () => selectTile(id));
-    gridEl.appendChild(tile);
-    tileEls.set(id, tile);
+    const tier = MEMES.templates[id].dayTier;
+    const bucket = tiers.get(tier);
+    if (bucket) bucket.push(id);
+    else tiers.set(tier, [id]);
   }
+
+  sections = [];
+  for (const tier of [...tiers.keys()].sort((a, b) => a - b)) {
+    const tierIds = tiers.get(tier)!;
+    const reached = tier <= bestDay;
+
+    const sectionEl = document.createElement('div');
+    sectionEl.className = `gallery-section${reached ? '' : ' tier-locked'}`;
+    sectionEl.innerHTML = `
+      <div class="gallery-section-header">
+        <span class="gallery-section-title">DAY ${tier}</span>
+        <span class="gallery-section-sub"></span>
+      </div>
+      <div class="gallery-section-grid"></div>
+    `;
+    const sectionGrid = sectionEl.querySelector('.gallery-section-grid')!;
+
+    for (const id of tierIds) {
+      const isUnlocked = unlocked.has(id);
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = `gallery-tile ${isUnlocked ? 'unlocked' : 'locked'}`;
+      tile.dataset.label = MEMES.templates[id].label.toLowerCase();
+      tile.dataset.unlocked = isUnlocked ? 'true' : 'false';
+      tile.setAttribute('aria-label', `${MEMES.templates[id].label}${isUnlocked ? '' : ' (locked)'}`);
+      tile.innerHTML = `${tileArtHtml(id)}<span class="gallery-tile-badge">NEW</span>`;
+      if (isUnlocked) tile.addEventListener('click', () => selectTile(id));
+      sectionGrid.appendChild(tile);
+      tileEls.set(id, tile);
+    }
+
+    let stampEl: HTMLElement | null = null;
+    if (!reached) {
+      stampEl = document.createElement('div');
+      stampEl.className = 'gallery-locked-stamp';
+      stampEl.innerHTML = `
+        <span class="gallery-locked-stamp-icon">🔒</span>
+        <span class="gallery-locked-stamp-text">available in day ${tier}</span>
+      `;
+      sectionGrid.appendChild(stampEl);
+    }
+
+    gridEl.appendChild(sectionEl);
+    sections.push({
+      tier,
+      ids: tierIds,
+      sectionEl,
+      subEl: sectionEl.querySelector('.gallery-section-sub')!,
+      stampEl
+    });
+  }
+  refreshSections();
 
   let filter: 'all' | 'unlocked' = 'all';
   const search = panel.querySelector<HTMLInputElement>('#gallery-search');
@@ -100,6 +166,11 @@ function buildGalleryPanel(panel: HTMLElement): void {
       const labelMatches = !query || tile.dataset.label?.includes(query);
       const stateMatches = filter === 'all' || tile.dataset.unlocked === 'true';
       tile.style.display = labelMatches && stateMatches ? '' : 'none';
+    }
+    // Collapse a whole DAY section when the filter hides every tile in it.
+    for (const s of sections) {
+      const anyVisible = s.ids.some(id => tileEls.get(id)?.style.display !== 'none');
+      s.sectionEl.style.display = anyVisible ? '' : 'none';
     }
   };
   search?.addEventListener('input', applyFilters);
@@ -124,6 +195,29 @@ function buildPreviewPanel(panel: HTMLElement): void {
     </div>
   `;
   previewHintEl = panel.querySelector('#preview-hint');
+}
+
+/** Re-derives each DAY section's reached state + subtitle from the persisted
+ *  account progress. Subtitle wording matches GalleryScene.buildSectionHeader. */
+function refreshSections(): void {
+  const unlocked = getUnlockedTemplates();
+  const bestDay = Math.max(1, getBestDayReached());
+  for (const s of sections) {
+    const reached = s.tier <= bestDay;
+    if (reached) {
+      s.sectionEl.classList.remove('tier-locked');
+      s.stampEl?.remove();
+      s.stampEl = null;
+    }
+    if (s.tier === 1) {
+      s.subEl.textContent = `${s.ids.length} memes · always in the mix`;
+    } else if (reached) {
+      const n = s.ids.filter(id => unlocked.has(id)).length;
+      s.subEl.textContent = `${s.ids.length} memes · reached — ${n}/${s.ids.length} unlocked`;
+    } else {
+      s.subEl.textContent = `${s.ids.length} memes`;
+    }
+  }
 }
 
 function updateCount(): void {
