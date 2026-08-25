@@ -353,31 +353,16 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Tower slots are authored as (route, fraction-along, lateral offset) so
-   *  they hug the shipping lanes whatever the map art's route data says.
-   *  World positions land in the registry for the shop mini-map, along with a
-   *  sampled polyline of each route's visible stretch. */
+  /** Tower slots are authored as absolute world coords hugging the two
+   *  shorelines (derived by sampling map_bg's land/water boundary — re-derive
+   *  if the map art is ever regenerated). Published to the registry for
+   *  UIScene's shop card counts. */
   private computeTowerSlots(): void {
-    this.towerSlots = TUNING.towers.slots.map(s => {
-      const ri = Math.min(s.ri, this.routes.length - 1);
-      const route = this.routes[ri];
-      const p = route.getPoint(s.t);
-      const tan = route.getTangent(s.t).normalize();
-      return {
-        x: Phaser.Math.Clamp(p.x - tan.y * s.off, 40, GAME_W - 40),
-        y: Phaser.Math.Clamp(p.y + tan.x * s.off, 40, GAME_H - 40)
-      };
-    });
+    this.towerSlots = TUNING.towers.slots.map(([x, y]) => ({
+      x: Phaser.Math.Clamp(x, 40, GAME_W - 40),
+      y: Phaser.Math.Clamp(y, 40, GAME_H - 40)
+    }));
     this.registry.set('towerSlots', this.towerSlots);
-    this.registry.set(
-      'routePreview',
-      this.routes.map(r =>
-        r
-          .getPoints(40)
-          .filter(p => p.x >= 0 && p.x <= GAME_W && p.y >= 0 && p.y <= GAME_H)
-          .map(p => [p.x, p.y] as [number, number])
-      )
-    );
   }
 
   /** True while a tanker is inside its route's targetable window. */
@@ -1292,22 +1277,23 @@ export class GameScene extends Phaser.Scene {
     bus.emit('towers-changed');
   }
 
-  /** Generated art: a raft base with a CIWS-style dome + barrel cluster. */
+  /** Generated art: a raft base with a CIWS-style dome + barrel cluster,
+   *  drawn at 2x (112px) so turrets read clearly on the map. */
   private spawnTowerSprite(slotIdx: number): Phaser.GameObjects.Container {
     const slot = this.towerSlots[slotIdx];
-    const key = 'towerGen';
+    const key = 'towerGen2x';
     if (!this.textures.exists(key)) {
       const g = this.make.graphics({ x: 0, y: 0 }, false);
       g.fillStyle(0x2b3a52, 1);
-      g.fillRoundedRect(6, 34, 44, 18, 6); // raft base
-      g.lineStyle(2, 0x0e141b, 1);
-      g.strokeRoundedRect(6, 34, 44, 18, 6);
+      g.fillRoundedRect(12, 68, 88, 36, 12); // raft base
+      g.lineStyle(4, 0x0e141b, 1);
+      g.strokeRoundedRect(12, 68, 88, 36, 12);
       g.fillStyle(0x8a939b, 1);
-      g.fillCircle(28, 30, 11); // dome
+      g.fillCircle(56, 60, 22); // dome
       g.fillStyle(0x3a4048, 1);
-      g.fillRect(24, 6, 8, 20); // barrel cluster
-      g.fillRect(20, 10, 16, 5);
-      g.generateTexture(key, 56, 56);
+      g.fillRect(48, 12, 16, 40); // barrel cluster
+      g.fillRect(40, 20, 32, 10);
+      g.generateTexture(key, 112, 112);
       g.destroy();
     }
     const body = this.add.image(0, 0, key);
@@ -1321,7 +1307,7 @@ export class GameScene extends Phaser.Scene {
     const n = towerMaxLevel();
     for (let i = 0; i < n; i++) {
       tw.pips.fillStyle(i < tw.level ? PAL.gold : 0x3a4048, 1);
-      tw.pips.fillCircle((i - (n - 1) / 2) * 10, 34, 3);
+      tw.pips.fillCircle((i - (n - 1) / 2) * 18, 66, 5);
     }
   }
 
@@ -1453,7 +1439,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.towers.forEach((tw, i) => {
       if (!tw) return;
-      tw.container.setSize(72, 72);
+      tw.container.setSize(112, 112);
       if (!tw.container.input) tw.container.setInteractive({ useHandCursor: true });
       else tw.container.setInteractive();
       tw.container.off('pointerdown');
@@ -1496,7 +1482,7 @@ export class GameScene extends Phaser.Scene {
   private towerFire(tw: Tower, target: Threat): void {
     const slot = this.towerSlots[tw.slotIdx];
     const mx = slot.x;
-    const my = slot.y - 22;
+    const my = slot.y - 44;
     const spr = this.add.image(mx, my, 'tracerGen').setDepth(55);
     spr.setTint(0x9be8ff);
     spr.setRotation(Math.atan2(target.sprite.y - my, target.sprite.x - mx));

@@ -235,11 +235,12 @@ present, since it's not an intentional code change.
     `src/core/towers.ts` is the shared typed view (TOWER_NAME/GLYPH,
     towerBuildCost — escalates with count — towerUpgradeCost, towerRefund,
     towerMaxLevel, TowerStateEntry); numbers live in `tuning.json` → `towers`
-    (8 coastal slots authored as `{ri, t, off}` = route index / fraction
-    along / lateral offset — GameScene.computeTowerSlots resolves them
-    against the live splines and publishes world positions into the Phaser
-    registry as 'towerSlots'; 'routePreview' is also published but currently
-    unused). **Buy flow**: the day-end shop's TACTICAL UPGRADES row has 4
+    (16 shoreline slots — 8 upper/Iran coast, 8 lower/UAE-Oman coast —
+    authored as absolute `[x, y]` world coords, derived by pixel-sampling
+    map_bg's land/water boundary; re-derive them if the map art is ever
+    regenerated. GameScene.computeTowerSlots publishes them into the Phaser
+    registry as 'towerSlots'. Turret art is generated at 2x, 112px
+    'towerGen2x'.) **Buy flow**: the day-end shop's TACTICAL UPGRADES row has 4
     cards (air/hull/gold + SEA TURRET, 150px wide at (i-1.5)*step). Tapping
     the turret card hides the summary panel and enters **placement mode**
     (UIScene.enterPlacementMode → bus 'defense-map-open' → GameScene.
