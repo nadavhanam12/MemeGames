@@ -17,7 +17,8 @@
     "ui_chyron_frame.png",
     "meme_frame_broadcast.png",
     "characters_atlas.png",
-    "meme_twobuttons_blank.png"
+    "meme_twobuttons_blank.png",
+    "sea_turret_atlas.png"
   ],
   "assets": [
     {
@@ -763,6 +764,70 @@
           "y": 724,
           "w": 362,
           "h": 362
+        }
+      }
+    },
+    {
+      "name": "sea_turret",
+      "file": "sea_turret_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        1024
+      ],
+      "alpha": true,
+      "trim": false,
+      "pivot": "center",
+      "targetWidth": 120,
+      "use": "SEA TURRET tower-defense unit: Trump from behind at a 4-tube missile launcher console. 8 cells of 512x512 — top row idle 1-4 (breathing loop), bottom row fire 1-4 (button press / contained ignition flash / empty tube + smoke puff / recovery). trim:false on purpose — frames must keep identical geometry so pose swaps don't jitter.",
+      "frames": {
+        "tower_idle_1": {
+          "x": 0,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        },
+        "tower_idle_2": {
+          "x": 512,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        },
+        "tower_idle_3": {
+          "x": 1024,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        },
+        "tower_idle_4": {
+          "x": 1536,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        },
+        "tower_fire_1": {
+          "x": 0,
+          "y": 512,
+          "w": 512,
+          "h": 512
+        },
+        "tower_fire_2": {
+          "x": 512,
+          "y": 512,
+          "w": 512,
+          "h": 512
+        },
+        "tower_fire_3": {
+          "x": 1024,
+          "y": 512,
+          "w": 512,
+          "h": 512
+        },
+        "tower_fire_4": {
+          "x": 1536,
+          "y": 512,
+          "w": 512,
+          "h": 512
         }
       }
     },

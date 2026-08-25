@@ -1277,10 +1277,30 @@ export class GameScene extends Phaser.Scene {
     bus.emit('towers-changed');
   }
 
-  /** Generated art: a raft base with a CIWS-style dome + barrel cluster,
-   *  drawn at 2x (112px) so turrets read clearly on the map. */
+  /** Trump interceptor atlas (idle loop + one-shot fire), falling back to the
+   *  generated raft + CIWS dome when the sliced art isn't available. */
   private spawnTowerSprite(slotIdx: number): Phaser.GameObjects.Container {
     const slot = this.towerSlots[slotIdx];
+    if (hasArt(this, 'tower_idle_1')) {
+      if (!this.anims.exists('tower-idle')) {
+        this.anims.create({
+          key: 'tower-idle',
+          frames: [1, 2, 3, 4].map(i => ({ key: `tower_idle_${i}` })),
+          frameRate: 4,
+          repeat: -1
+        });
+        this.anims.create({
+          key: 'tower-fire',
+          frames: [1, 2, 3, 4].map(i => ({ key: `tower_fire_${i}` })),
+          frameRate: 12,
+          repeat: 0
+        });
+      }
+      const spr = this.add.sprite(0, 0, 'tower_idle_1');
+      if (!settings.reducedMotion) spr.play('tower-idle');
+      const pips = this.add.graphics();
+      return this.add.container(slot.x, slot.y, [spr, pips]).setDepth(26);
+    }
     const key = 'towerGen2x';
     if (!this.textures.exists(key)) {
       const g = this.make.graphics({ x: 0, y: 0 }, false);
@@ -1493,6 +1513,11 @@ export class GameScene extends Phaser.Scene {
       aimY: target.sprite.y,
       speed: TUNING.towers.bulletSpeed
     });
+    const body = tw.container.list[0];
+    if (body instanceof Phaser.GameObjects.Sprite && this.anims.exists('tower-fire') && !settings.reducedMotion) {
+      body.play('tower-fire');
+      body.once(Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + 'tower-fire', () => body.play('tower-idle'));
+    }
     sfx.tap();
     if (!settings.reducedMotion) {
       const flash = this.add
