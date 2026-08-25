@@ -184,6 +184,38 @@
     "muzzleOffsetX": 75,
     "muzzleLeftDy": -14
   },
+  "towers": {
+    "slots": [
+      { "ri": 0, "t": 0.3, "off": -85 },
+      { "ri": 0, "t": 0.45, "off": 85 },
+      { "ri": 0, "t": 0.6, "off": 85 },
+      { "ri": 1, "t": 0.4, "off": -85 },
+      { "ri": 1, "t": 0.6, "off": -85 },
+      { "ri": 1, "t": 0.75, "off": 85 }
+    ],
+    "sellRefundFrac": 0.5,
+    "bulletSpeed": 900,
+    "types": {
+      "ciws": {
+        "costs": [70, 130, 220],
+        "range": [180, 210, 240],
+        "fireInterval": [1.1, 0.85, 0.6],
+        "revealDay": 2
+      },
+      "depth": {
+        "costs": [60, 110, 190],
+        "range": [160, 185, 210],
+        "fireInterval": [1.7, 1.35, 1.0],
+        "revealDay": 4
+      },
+      "jammer": {
+        "costs": [80, 140, 230],
+        "range": [170, 200, 230],
+        "slowMult": [0.6, 0.45, 0.3],
+        "revealDay": 5
+      }
+    }
+  },
   "juice": {
     "tapRadius": 80,
     "nearMissDist": 130,

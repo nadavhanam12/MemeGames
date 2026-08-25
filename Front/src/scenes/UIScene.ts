@@ -13,6 +13,7 @@ import { ENGAGEMENT_ICON_KEYS } from '../core/engagementIcons';
 import { DayMission, DaySummary, EV, SessionStats, bus } from '../core/state';
 import { dayPerfScore, repercussionHeadline, repercussionSubhead } from '../core/repercussions';
 import { TUNING } from '../config/tuning';
+import { TOWER_DEFS, TowerStateEntry, towerCfg, towerRefund } from '../core/towers';
 import { registerLayout } from '../dev/layout';
 import { devState } from '../dev/state';
 
@@ -148,6 +149,13 @@ export class UIScene extends Phaser.Scene {
   private upgradeButtons: Record<string, Phaser.GameObjects.Container> = {};
   private lastMemeAt = -Infinity;
 
+  // SEA DEFENSES shop mini-map (inside the day-end panel): slot/tower state
+  // comes from the registry ('towerSlots'/'towerState'/'routePreview',
+  // published by GameScene); selectedSlot drives the build/manage popup.
+  private defenseInner?: Phaser.GameObjects.Container;
+  private defenseGeom = { y: 0, w: 0, h: 0 };
+  private selectedSlot: number | null = null;
+
   // engagement bar (reply=day, retweet=combo, heart=cash, bar-chart=oil
   // "hype", share=viral growth — see shareCount/dayShareStart/dayShareTarget)
   private engagementBar!: { container: Phaser.GameObjects.Container; setCounts(counts: number[]): void };
@@ -209,6 +217,7 @@ export class UIScene extends Phaser.Scene {
     bus.on(EV.DANGER, this.onDanger, this);
     bus.on(EV.UPGRADE_DEMO, this.onUpgradeBought, this);
     bus.on('tanker-safe', this.onTankerSafe, this);
+    bus.on('towers-changed', this.onTowersChanged, this);
     bus.on('meme-moment', this.showMemeReaction, this);
     bus.on(EV.DEV_FORCE_MEME, this.onDevForceMeme, this);
     this.input.on('pointerdown', this.onSwipePointerDown, this);
@@ -231,6 +240,7 @@ export class UIScene extends Phaser.Scene {
       bus.off(EV.DANGER, this.onDanger, this);
       bus.off(EV.UPGRADE_DEMO, this.onUpgradeBought, this);
       bus.off('tanker-safe', this.onTankerSafe, this);
+      bus.off('towers-changed', this.onTowersChanged, this);
       bus.off('meme-moment', this.showMemeReaction, this);
       bus.off(EV.DEV_FORCE_MEME, this.onDevForceMeme, this);
     });
@@ -493,6 +503,232 @@ export class UIScene extends Phaser.Scene {
     subtitle.setText(`${def.caption} · $${price} ${pips}`).setColor(affordable ? HEX.green : HEX.muted);
   }
 
+  // ------------------------------------------------- sea defenses (shop map)
+  /** Static frame of the STRAIT DEFENSES card; the live content (routes,
+   *  slots, popup) is rebuilt by refreshDefenseCard on every state change. */
+  private buildDefenseCard(parent: Phaser.GameObjects.Container, y: number, cardW: number): number {
+    const h = 190;
+    this.defenseGeom = { y, w: cardW, h };
+    this.selectedSlot = null;
+    this.defenseInner = undefined;
+    const bg = this.add.graphics();
+    bg.fillStyle(PANEL, 1);
+    bg.fillRoundedRect(-cardW / 2, y, cardW, h, 12);
+    bg.lineStyle(1, DIVIDER, 1);
+    bg.strokeRoundedRect(-cardW / 2, y, cardW, h, 12);
+    parent.add(bg);
+    parent.add(
+      this.add
+        .text(-cardW / 2 + 14, y + 10, 'STRAIT DEFENSES', {
+          fontFamily: FONT_SANS, fontSize: '12px', fontStyle: 'bold', color: HEX.muted, letterSpacing: 1
+        })
+        .setOrigin(0, 0)
+    );
+    parent.add(
+      this.add
+        .text(cardW / 2 - 14, y + 10, 'tap a slot to build', { fontFamily: FONT_SANS, fontSize: '11px', color: '#8B98A5' })
+        .setOrigin(1, 0)
+    );
+    this.refreshDefenseCard();
+    return h;
+  }
+
+  private onTowersChanged(): void {
+    this.refreshDefenseCard();
+  }
+
+  /** Redraws the mini-map: lane polylines, empty slot markers, built towers,
+   *  and (when a slot is selected) the build/manage popup. */
+  private refreshDefenseCard(): void {
+    const panel = this.summaryPanel;
+    if (!panel?.active || !this.defenseGeom.w) return;
+    this.defenseInner?.destroy();
+    const { y, w, h } = this.defenseGeom;
+    const inner = this.add.container(0, 0);
+    this.defenseInner = inner;
+    panel.add(inner);
+
+    const slots = (this.registry.get('towerSlots') ?? []) as Array<{ x: number; y: number }>;
+    const state = (this.registry.get('towerState') ?? []) as Array<TowerStateEntry | null>;
+    const routes = (this.registry.get('routePreview') ?? []) as Array<Array<[number, number]>>;
+
+    // uniform fit of the world's lane band into the card's map area
+    const mapTop = y + 34;
+    const mapH = h - 46;
+    const mapW = w - 32;
+    const all: Array<[number, number]> = [...routes.flat(), ...slots.map(s => [s.x, s.y] as [number, number])];
+    if (!all.length) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [px, py] of all) {
+      minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+      minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+    }
+    const pad = 40;
+    const sc = Math.min(mapW / (maxX - minX + pad * 2), mapH / (maxY - minY + pad * 2));
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const tx = (wx: number) => (wx - cx) * sc;
+    const ty = (wy: number) => mapTop + mapH / 2 + (wy - cy) * sc;
+
+    const g = this.add.graphics();
+    inner.add(g);
+    for (const route of routes) {
+      if (route.length < 2) continue;
+      g.lineStyle(2, PAL.cream, 0.3);
+      g.beginPath();
+      g.moveTo(tx(route[0][0]), ty(route[0][1]));
+      for (const [px, py] of route.slice(1)) g.lineTo(tx(px), ty(py));
+      g.strokePath();
+    }
+
+    slots.forEach((s, i) => {
+      const px = tx(s.x);
+      const py = ty(s.y);
+      const st = state[i];
+      if (!st) {
+        // empty slot: dashed teal circle + faint plus
+        g.lineStyle(2, 0x8fd6ef, this.selectedSlot === i ? 0.9 : 0.45);
+        for (let a = 0; a < 8; a++) {
+          const a0 = (a / 8) * Math.PI * 2;
+          g.beginPath();
+          g.arc(px, py, 13, a0, a0 + Math.PI / 10);
+          g.strokePath();
+        }
+        inner.add(
+          this.add.text(px, py, '+', { fontFamily: FONT_SANS, fontSize: '15px', color: '#8FD6EF' }).setOrigin(0.5).setAlpha(0.8)
+        );
+      } else {
+        const def = TOWER_DEFS.find(d => d.key === st.type)!;
+        g.lineStyle(2, PAL.gold, this.selectedSlot === i ? 1 : 0.6);
+        g.strokeCircle(px, py, 15);
+        inner.add(this.add.text(px, py - 1, def.glyph, { fontSize: '16px' }).setOrigin(0.5));
+        const pips = '●'.repeat(st.level) + '○'.repeat(Math.max(0, towerCfg(st.type).costs.length - st.level));
+        inner.add(
+          this.add.text(px, py + 20, pips, { fontFamily: FONT_SANS, fontSize: '8px', color: HEX.gold }).setOrigin(0.5)
+        );
+      }
+      const zone = this.add.circle(px, py, 22, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+        ev.stopPropagation();
+        sfx.tap();
+        this.selectedSlot = this.selectedSlot === i ? null : i;
+        this.refreshDefenseCard();
+      });
+      inner.add(zone);
+    });
+
+    if (this.selectedSlot != null && this.selectedSlot < slots.length) {
+      inner.add(this.buildDefensePopup(this.selectedSlot, state[this.selectedSlot] ?? null, y + h / 2));
+    }
+  }
+
+  /** Popup over the mini-map: tower picker for an empty slot, or
+   *  upgrade/sell for a built one. Purchases go over the bus to GameScene,
+   *  which owns credits and republishes 'towers-changed'. */
+  private buildDefensePopup(slotIdx: number, st: TowerStateEntry | null, centerY: number): Phaser.GameObjects.Container {
+    const popup = this.add.container(0, centerY);
+    const rows: Array<{
+      left: string; right: string; rightColor: string; enabled: boolean; onTap?: () => void;
+    }> = [];
+    if (!st) {
+      for (const def of TOWER_DEFS) {
+        const cfg = towerCfg(def.key);
+        const locked = this.summaryNextDay < cfg.revealDay;
+        const cost = cfg.costs[0];
+        const affordable = this.displayedCredits >= cost;
+        rows.push({
+          left: `${def.glyph} ${def.name}`,
+          right: locked ? `🔒 DAY ${cfg.revealDay}` : `$${cost}`,
+          rightColor: locked ? HEX.muted : affordable ? HEX.green : HEX.muted,
+          enabled: !locked && affordable,
+          onTap: () => {
+            bus.emit('build-tower', slotIdx, def.key);
+            this.selectedSlot = null;
+          }
+        });
+      }
+    } else {
+      const def = TOWER_DEFS.find(d => d.key === st.type)!;
+      const cfg = towerCfg(st.type);
+      rows.push({ left: `${def.glyph} ${def.name} LV${st.level}`, right: '', rightColor: HEX.cream, enabled: false });
+      const maxed = st.level >= cfg.costs.length;
+      const upCost = maxed ? 0 : cfg.costs[st.level];
+      const affordable = !maxed && this.displayedCredits >= upCost;
+      rows.push({
+        left: '⬆ UPGRADE',
+        right: maxed ? 'MAX' : `$${upCost}`,
+        rightColor: maxed ? HEX.muted : affordable ? HEX.green : HEX.muted,
+        enabled: affordable,
+        onTap: () => {
+          bus.emit('upgrade-tower', slotIdx);
+        }
+      });
+      rows.push({
+        left: '⚓ SELL',
+        right: `+$${towerRefund(st.type, st.level)}`,
+        rightColor: HEX.gold,
+        enabled: true,
+        onTap: () => {
+          bus.emit('sell-tower', slotIdx);
+          this.selectedSlot = null;
+        }
+      });
+    }
+    const rowH = 40;
+    const pw = this.defenseGeom.w - 120;
+    const ph = rows.length * rowH + 20;
+    const bg = this.add.graphics();
+    bg.fillStyle(0x0b1118, 0.97);
+    bg.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 10);
+    bg.lineStyle(1, 0x8fd6ef, 0.7);
+    bg.strokeRoundedRect(-pw / 2, -ph / 2, pw, ph, 10);
+    popup.add(bg);
+    rows.forEach((row, i) => {
+      const ry = -ph / 2 + 10 + i * rowH + rowH / 2;
+      popup.add(
+        this.add
+          .text(-pw / 2 + 16, ry, row.left, { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: HEX.cream })
+          .setOrigin(0, 0.5)
+      );
+      if (row.right) {
+        popup.add(
+          this.add
+            .text(pw / 2 - 16, ry, row.right, { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: row.rightColor })
+            .setOrigin(1, 0.5)
+        );
+      }
+      if (!row.onTap) return;
+      const zone = this.add.rectangle(0, ry, pw - 8, rowH - 4, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+        ev.stopPropagation();
+        if (!row.enabled) {
+          // locked / can't afford: shake, same language as the upgrade cards
+          this.tweens.add({ targets: popup, x: -6, duration: 40, yoyo: true, repeat: 2 });
+          sfx.tap();
+          return;
+        }
+        sfx.tap();
+        row.onTap!();
+        this.refreshDefenseCard();
+      });
+      popup.add(zone);
+    });
+    // close chip in the corner
+    const close = this.add
+      .text(pw / 2 - 4, -ph / 2 + 4, '✕', { fontFamily: FONT_SANS, fontSize: '13px', color: '#8B98A5' })
+      .setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true });
+    close.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+      ev.stopPropagation();
+      sfx.tap();
+      this.selectedSlot = null;
+      this.refreshDefenseCard();
+    });
+    popup.add(close);
+    if (!settings.reducedMotion) popIn(this, popup, 140);
+    return popup;
+  }
+
   // ---------------------------------------------------------------- events
   private onPrice(price: number, delta: number, jitter = false): void {
     const from = this.displayedPrice;
@@ -563,6 +799,7 @@ export class UIScene extends Phaser.Scene {
 
   private refreshUpgradeAffordability(): void {
     for (const u of UPGRADES) this.refreshUpgradeCardVisual(u.key);
+    this.refreshDefenseCard();
   }
 
   private onUpgradeBought(key: string, level: number): void {
@@ -1378,10 +1615,12 @@ export class UIScene extends Phaser.Scene {
 
     // shop — form a distinct decision zone near the foot of a short report, but
     // keep flowing downward if warnings/rewards made the recap taller
-    y = Math.max(y, H / 2 - 414);
+    // (anchor raised from -414 when the STRAIT DEFENSES card joined the shop —
+    // upgrades + defenses + NEXT DAY must all still fit above the fold)
+    y = Math.max(y, H / 2 - 600);
     panel.add(this.add.rectangle(0, y, cardW, 1, DIVIDER));
     y += 22;
-    const upgradeCardH = 170;
+    const upgradeCardH = 150;
     // live cash readout right above the shop; onCredits keeps it current on buys
     this.summaryCashText = this.add
       .text(-cardW / 2, y + 12, `CASH  $${Math.round(this.displayedCredits)}`, {
@@ -1408,7 +1647,11 @@ export class UIScene extends Phaser.Scene {
       this.buildUpgradeCard(panel, u, (i - 1) * upgradeCardStep, upgradeCardsY, upgradeCardH, upgradeCardW)
     );
 
-    const nextBtnY = Math.max(upgradeCardsY + upgradeCardH / 2 + 36, H / 2 - 76);
+    // tower-defense build phase: the STRAIT DEFENSES mini-map card
+    let defY = upgradeCardsY + upgradeCardH / 2 + 20;
+    defY += this.buildDefenseCard(panel, defY, cardW);
+
+    const nextBtnY = Math.max(defY + 50, H / 2 - 76);
     // size the panel's own opaque background to however far the content
     // actually ran (+ the swipe hint under the button), floored at a full
     // screen — this panel is the next full-bleed "post" replacing the game
