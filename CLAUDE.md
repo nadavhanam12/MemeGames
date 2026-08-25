@@ -260,7 +260,13 @@ present, since it's not an intentional code change.
     'towers-changed'. Sell refunds pay `towerRefund(invested)` and bypass
     `addCredits` on purpose so OIL MONEY can't inflate build+sell cycles.
     Unlocks via `towers.revealDay` (checked as `day + 1 >= revealDay`),
-    announced through `warningsFor`.
+    announced through `warningsFor`. **Tower art**: `assets/raw/
+    sea_turret_atlas.png` (manifest entry `sea_turret`, 8×512px cells,
+    trim:false) slices into `tower_idle_1..4`/`tower_fire_1..4` keys;
+    `GameScene.spawnTowerSprite` builds the `tower-idle` (4fps loop) and
+    `tower-fire` (12fps one-shot, played from `towerFire`, returns to idle)
+    anims, falling back to the old generated `towerGen2x` raft when the
+    sliced art is missing.
   - **Meme collection system**: `src/core/memeUnlocks.ts` persists which meme
     templates have ever fired (localStorage `hormuz-memes-v1`, per-account like
     `src/backend/`), populated by `pickMeme()` in `src/core/memes.ts`.
