@@ -51,6 +51,7 @@ interface Tower {
   invested: number; // credits sunk in (build + upgrades) — drives sell refund
   container: Phaser.GameObjects.Container;
   pips: Phaser.GameObjects.Graphics;
+  cooldownRing: Phaser.GameObjects.Graphics;
   fireTimer: number;
 }
 
@@ -84,6 +85,12 @@ interface Bullet {
   fromAir?: boolean; // air-support rounds don't count as player intercepts
   speed?: number; // overrides turret.bulletSpeed (tower rounds fly slower)
   kind?: 'tracer' | 'rocket'; // rocket = tower rounds: missile sprite + smoke trail
+  // rocket-only: wanders off the direct line to the target, straightening out
+  // as it closes in (see the bullet-movement loop's steer-point calc)
+  wobbleAmp?: number;
+  wobbleFreq?: number;
+  wobbleSeed?: number;
+  birthDist?: number;
 }
 
 interface Tanker {
@@ -1341,7 +1348,8 @@ export class GameScene extends Phaser.Scene {
       const spr = this.add.sprite(0, 0, 'tower_idle_1');
       if (!settings.reducedMotion) spr.play('tower-idle');
       const pips = this.add.graphics();
-      return this.add.container(slot.x, slot.y, [spr, pips]).setDepth(26);
+      const cooldownRing = this.add.graphics();
+      return this.add.container(slot.x, slot.y, [spr, pips, cooldownRing]).setDepth(26);
     }
     const key = 'towerGen2x';
     if (!this.textures.exists(key)) {
@@ -1360,7 +1368,8 @@ export class GameScene extends Phaser.Scene {
     }
     const body = this.add.image(0, 0, key);
     const pips = this.add.graphics();
-    const container = this.add.container(slot.x, slot.y, [body, pips]).setDepth(26);
+    const cooldownRing = this.add.graphics();
+    const container = this.add.container(slot.x, slot.y, [body, pips, cooldownRing]).setDepth(26);
     return container;
   }
 
@@ -1370,6 +1379,28 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < n; i++) {
       tw.pips.fillStyle(i < tw.level ? PAL.gold : 0x3a4048, 1);
       tw.pips.fillCircle((i - (n - 1) / 2) * 27, 99, 7);
+    }
+  }
+
+  /** Ring around the tower showing reload progress — dim arc fills clockwise
+   *  from 12 o'clock as fireTimer counts down, pulses gold solid when ready. */
+  private drawTowerCooldown(tw: Tower, interval: number): void {
+    const g = tw.cooldownRing;
+    g.clear();
+    const R = 78;
+    g.lineStyle(4, 0x0e141b, 0.5);
+    g.strokeCircle(0, 0, R);
+    const progress = Phaser.Math.Clamp(1 - tw.fireTimer / interval, 0, 1);
+    if (progress >= 1) {
+      const pulse = settings.reducedMotion ? 1 : 0.75 + 0.25 * Math.sin(this.time.now / 220);
+      g.lineStyle(4, PAL.gold, pulse);
+      g.strokeCircle(0, 0, R);
+    } else {
+      g.lineStyle(4, 0x8fd6ef, 0.9);
+      const start = -Math.PI / 2;
+      g.beginPath();
+      g.arc(0, 0, R, start, start + progress * Math.PI * 2, false);
+      g.strokePath();
     }
   }
 
@@ -1394,6 +1425,7 @@ export class GameScene extends Phaser.Scene {
       invested: cost,
       container,
       pips: container.list[1] as Phaser.GameObjects.Graphics,
+      cooldownRing: container.list[2] as Phaser.GameObjects.Graphics,
       fireTimer: 0
     };
     this.drawTowerPips(tw);
@@ -1520,6 +1552,7 @@ export class GameScene extends Phaser.Scene {
     for (const tw of this.towers) {
       if (!tw) continue;
       tw.fireTimer = Math.max(0, tw.fireTimer - rawDt);
+      this.drawTowerCooldown(tw, cfg.fireInterval[tw.level - 1]);
       if (tw.fireTimer > 0) continue;
       const slot = this.towerSlots[tw.slotIdx];
       const range = cfg.range[tw.level - 1];
@@ -1559,13 +1592,19 @@ export class GameScene extends Phaser.Scene {
     }
     const spr = this.add.image(mx, my, 'towerRocketGen').setDepth(55);
     spr.setRotation(Math.atan2(target.sprite.y - my, target.sprite.x - mx));
+    const birthDist = Phaser.Math.Distance.Between(mx, my, target.sprite.x, target.sprite.y);
     this.bullets.push({
       sprite: spr,
       target,
       aimX: target.sprite.x,
       aimY: target.sprite.y,
       speed: TUNING.towers.bulletSpeed,
-      kind: 'rocket'
+      kind: 'rocket',
+      // wide, lazy S-curve off the direct line — straightens out on final approach
+      wobbleAmp: Phaser.Math.FloatBetween(0.22, 0.36) * birthDist,
+      wobbleFreq: Phaser.Math.FloatBetween(1.3, 2.1),
+      wobbleSeed: Math.random() * Math.PI * 2,
+      birthDist
     });
     const body = tw.container.list[0];
     if (body instanceof Phaser.GameObjects.Sprite && this.anims.exists('tower-fire') && !settings.reducedMotion) {
@@ -1970,7 +2009,21 @@ export class GameScene extends Phaser.Scene {
         b.done = true;
         continue;
       }
-      const ang = Math.atan2(b.aimY - b.sprite.y, b.aimX - b.sprite.x);
+      let steerX = b.aimX;
+      let steerY = b.aimY;
+      if (b.kind === 'rocket' && b.wobbleAmp) {
+        const dx = b.aimX - b.sprite.x;
+        const dy = b.aimY - b.sprite.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const px = -dy / len;
+        const py = dx / len;
+        const progress = Phaser.Math.Clamp(1 - d / (b.birthDist ?? d), 0, 1);
+        const decay = 1 - progress; // straightens out on final approach
+        const wobble = b.wobbleAmp * decay * Math.sin(progress * (b.wobbleFreq ?? 1.6) * Math.PI * 2 + (b.wobbleSeed ?? 0));
+        steerX = b.aimX + px * wobble;
+        steerY = b.aimY + py * wobble;
+      }
+      const ang = Math.atan2(steerY - b.sprite.y, steerX - b.sprite.x);
       b.sprite.x += Math.cos(ang) * step;
       b.sprite.y += Math.sin(ang) * step;
       b.sprite.setRotation(ang);

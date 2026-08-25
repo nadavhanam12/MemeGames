@@ -215,8 +215,8 @@
         465
       ],
       [
-        822,
-        530
+        864,
+        536
       ],
       [
         -9,
@@ -252,7 +252,7 @@
       ]
     ],
     "sellRefundFrac": 0.5,
-    "bulletSpeed": 900,
+    "bulletSpeed": 450,
     "revealDay": 2,
     "buildCosts": [
       70,
@@ -282,9 +282,9 @@
       720
     ],
     "fireInterval": [
-      1.1,
-      0.85,
-      0.6
+      4,
+      4,
+      4
     ]
   },
   "juice": {
