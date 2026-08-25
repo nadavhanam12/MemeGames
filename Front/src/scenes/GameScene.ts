@@ -6,7 +6,7 @@ import { hasArt } from '../core/art';
 import { MemeContext, MEMES, resetMemeLog } from '../core/memes';
 import { getDayFired, getDayUnlocks, recordDayReached, resetDayUnlocks, resetRunUnlocks } from '../core/memeUnlocks';
 import { TUNING, persistTuningLocal } from '../config/tuning';
-import { TowerType, towerCfg, towerRefund } from '../core/towers';
+import { towerBuildCost, towerMaxLevel, towerRefund, towerUpgradeCost } from '../core/towers';
 import { devState } from '../dev/state';
 import { leaderboard } from '../backend/leaderboard';
 import { analytics } from '../backend/analytics';
@@ -30,22 +30,13 @@ import {
 
 type ThreatType = 'missile' | 'drone' | 'mine' | 'patrol';
 
-// which threat types each tower can shoot (jammer shoots nothing — it slows).
-// Kept in code, not tuning.json: it's behavior, not a tweakable number.
-const TOWER_TARGETS: Record<TowerType, ThreatType[]> = {
-  ciws: ['missile', 'drone'],
-  depth: ['mine', 'patrol'],
-  jammer: []
-};
-
 interface Tower {
   slotIdx: number;
-  type: TowerType;
   level: number; // 1-based
+  invested: number; // credits sunk in (build + upgrades) — drives sell refund
   container: Phaser.GameObjects.Container;
   pips: Phaser.GameObjects.Graphics;
   fireTimer: number;
-  pulseT: number;
 }
 
 interface Threat {
@@ -61,7 +52,6 @@ interface Threat {
   // missiles lock onto a point once their target is gone — no retargeting
   aimX?: number;
   aimY?: number;
-  jammedShown?: boolean; // "JAMMED" float shown once per threat
   armed?: boolean; // mines: only live once a ship has come close
   // patrols are lane-bound: they sail a shipping-lane spline, never open water
   routeIdx?: number;
@@ -127,16 +117,17 @@ export class GameScene extends Phaser.Scene {
   private jet?: Phaser.GameObjects.Image;
   private airTimer = 0;
 
-  // SEA DEFENSES (tower-defense layer): fixed slots near the shipping lanes,
-  // bought/upgraded from the day-end shop's mini-map, auto-firing in-day.
-  // Kills route through the same intercept() path as the player's own gun —
-  // full credits, mission quota, and combo (per design: towers are "more you").
+  // SEA TURRETS (tower-defense layer): fixed coastal slots, bought from the
+  // day-end shop card and placed by tapping a marker on the live map
+  // (placement mode below), auto-firing at any threat in-day. Kills route
+  // through the same intercept() path as the player's own gun — full
+  // credits, mission quota, and combo (per design: towers are "more you").
   private towerSlots: Array<{ x: number; y: number }> = [];
   private towers: Array<Tower | null> = [];
-  private towerFxGfx!: Phaser.GameObjects.Graphics; // jammer rings, per-frame
-  // deploy/upgrade juice deferred to the next day start — the shop panel
-  // covers the world while the purchase actually happens
-  private pendingDeploys: Array<{ slotIdx: number; kind: 'build' | 'upgrade' }> = [];
+  // placement mode: during the day break the summary panel hides, the world
+  // fades back in, and empty slots grow tappable marker rings
+  private placementOpen = false;
+  private placementMarkers: Phaser.GameObjects.Container[] = [];
 
   // day / mission system: each day is a mini-level with one mission; between
   // days the world freezes for the recap card and waits for the player to
@@ -248,16 +239,18 @@ export class GameScene extends Phaser.Scene {
     this.firingHeld = false;
     this.fireTimer = 0;
     this.lastShotAt = -10;
-    this.towers = [];
-    this.pendingDeploys = [];
+    this.placementOpen = false;
+    this.placementMarkers = [];
     this.buildRoute();
     this.computeTowerSlots();
+    // one entry per slot, null = empty — sized up front so slot counts and
+    // registry snapshots are stable from frame one
+    this.towers = this.towerSlots.map(() => null);
     this.publishTowerState();
     this.drawWorld();
     this.spawnTurret();
     if (import.meta.env.DEV && devState.routeEdit) this.enableRouteEdit(true);
     this.waveGfx = this.add.graphics().setDepth(6);
-    this.towerFxGfx = this.add.graphics().setDepth(28);
     this.trailGfx = this.add.graphics().setDepth(54);
     this.lastHitstopAt = -10;
     this.tensionTimer = 0;
@@ -302,12 +295,14 @@ export class GameScene extends Phaser.Scene {
 
     bus.removeAllListeners('buy-upgrade');
     bus.on('buy-upgrade', (key: 'air' | 'hull' | 'gold', cost: number) => this.buyUpgrade(key, cost));
-    bus.removeAllListeners('build-tower');
-    bus.on('build-tower', (slotIdx: number, type: TowerType) => this.buildTower(slotIdx, type));
     bus.removeAllListeners('upgrade-tower');
     bus.on('upgrade-tower', (slotIdx: number) => this.upgradeTower(slotIdx));
     bus.removeAllListeners('sell-tower');
     bus.on('sell-tower', (slotIdx: number) => this.sellTower(slotIdx));
+    bus.removeAllListeners('defense-map-open');
+    bus.on('defense-map-open', () => this.openPlacementMode());
+    bus.removeAllListeners('defense-map-close');
+    bus.on('defense-map-close', () => this.closePlacementMode());
     bus.removeAllListeners(EV.NEXT_DAY_REQUEST);
     bus.on(EV.NEXT_DAY_REQUEST, this.onNextDayRequest, this);
     bus.removeAllListeners(EV.WORLD_FREEZE);
@@ -315,9 +310,10 @@ export class GameScene extends Phaser.Scene {
 
     this.events.on('shutdown', () => {
       bus.removeAllListeners('buy-upgrade');
-      bus.removeAllListeners('build-tower');
       bus.removeAllListeners('upgrade-tower');
       bus.removeAllListeners('sell-tower');
+      bus.removeAllListeners('defense-map-open');
+      bus.removeAllListeners('defense-map-close');
       bus.removeAllListeners(EV.NEXT_DAY_REQUEST);
       sfx.stopAmbient();
     });
@@ -1291,42 +1287,26 @@ export class GameScene extends Phaser.Scene {
   private publishTowerState(): void {
     this.registry.set(
       'towerState',
-      this.towers.map(t => (t ? { type: t.type, level: t.level } : null))
+      this.towers.map(t => (t ? { level: t.level, invested: t.invested } : null))
     );
     bus.emit('towers-changed');
   }
 
-  /** Simple generated art per type: a buoy base + a distinct silhouette. */
-  private spawnTowerSprite(slotIdx: number, type: TowerType): Phaser.GameObjects.Container {
+  /** Generated art: a raft base with a CIWS-style dome + barrel cluster. */
+  private spawnTowerSprite(slotIdx: number): Phaser.GameObjects.Container {
     const slot = this.towerSlots[slotIdx];
-    const key = `tower_${type}Gen`;
+    const key = 'towerGen';
     if (!this.textures.exists(key)) {
       const g = this.make.graphics({ x: 0, y: 0 }, false);
-      // shared raft base
       g.fillStyle(0x2b3a52, 1);
-      g.fillRoundedRect(6, 34, 44, 18, 6);
+      g.fillRoundedRect(6, 34, 44, 18, 6); // raft base
       g.lineStyle(2, 0x0e141b, 1);
       g.strokeRoundedRect(6, 34, 44, 18, 6);
-      if (type === 'ciws') {
-        g.fillStyle(0x8a939b, 1);
-        g.fillCircle(28, 30, 11); // dome
-        g.fillStyle(0x3a4048, 1);
-        g.fillRect(24, 6, 8, 20); // stubby barrel cluster
-        g.fillRect(20, 10, 16, 5);
-      } else if (type === 'depth') {
-        g.fillStyle(0x7a4a21, 1);
-        g.fillRoundedRect(18, 14, 20, 22, 4); // charge drum
-        g.lineStyle(2, 0x14181d, 1);
-        g.strokeRoundedRect(18, 14, 20, 22, 4);
-        g.fillStyle(0xe6483d, 1);
-        g.fillCircle(28, 18, 3); // primer cap
-      } else {
-        g.lineStyle(3, 0x8fd6ef, 1);
-        g.lineBetween(28, 34, 28, 8); // mast
-        g.strokeCircle(28, 12, 7); // dish
-        g.fillStyle(0x8fd6ef, 1);
-        g.fillCircle(28, 8, 3);
-      }
+      g.fillStyle(0x8a939b, 1);
+      g.fillCircle(28, 30, 11); // dome
+      g.fillStyle(0x3a4048, 1);
+      g.fillRect(24, 6, 8, 20); // barrel cluster
+      g.fillRect(20, 10, 16, 5);
       g.generateTexture(key, 56, 56);
       g.destroy();
     }
@@ -1338,153 +1318,167 @@ export class GameScene extends Phaser.Scene {
 
   private drawTowerPips(tw: Tower): void {
     tw.pips.clear();
-    const n = towerCfg(tw.type).costs.length;
+    const n = towerMaxLevel();
     for (let i = 0; i < n; i++) {
       tw.pips.fillStyle(i < tw.level ? PAL.gold : 0x3a4048, 1);
       tw.pips.fillCircle((i - (n - 1) / 2) * 10, 34, 3);
     }
   }
 
-  private buildTower(slotIdx: number, type: TowerType): void {
-    const cfg = towerCfg(type);
-    if (this.over || this.towers[slotIdx] || !this.towerSlots[slotIdx]) return;
-    if (this.day + 1 < cfg.revealDay) return;
-    const cost = cfg.costs[0];
-    if (this.stats.credits < cost) return;
+  /** Placement-mode tap on an empty slot marker. The world is visible here,
+   *  so all deploy juice plays immediately. */
+  private tryPlaceTower(slotIdx: number): void {
+    const slot = this.towerSlots[slotIdx];
+    if (this.over || this.towers[slotIdx] || !slot) return;
+    if (this.day + 1 < TUNING.towers.revealDay) return;
+    const cost = towerBuildCost(this.towers.filter(Boolean).length);
+    if (this.stats.credits < cost) {
+      floatText(this, slot.x, slot.y - 44, `NEED $${cost}`, HEX.red, 22);
+      sfx.tap();
+      return;
+    }
     this.stats.credits -= cost;
     bus.emit(EV.CREDITS, this.stats.credits, 0, 0, 0);
-    const container = this.spawnTowerSprite(slotIdx, type);
-    // hidden until the deploy pop at next day start — the shop covers the
-    // world right now, so the entrance would play unseen
-    container.setScale(0);
+    const container = this.spawnTowerSprite(slotIdx);
     const tw: Tower = {
       slotIdx,
-      type,
       level: 1,
+      invested: cost,
       container,
       pips: container.list[1] as Phaser.GameObjects.Graphics,
-      fireTimer: 0,
-      pulseT: Math.random() * Math.PI * 2
+      fireTimer: 0
     };
     this.drawTowerPips(tw);
     this.towers[slotIdx] = tw;
-    this.pendingDeploys.push({ slotIdx, kind: 'build' });
-    analytics.track('tower_built', { type, slot: slotIdx });
+    analytics.track('tower_built', { slot: slotIdx, cost });
     sfx.upgrade();
+    sfx.splash();
     vibrate(30);
+    shockwave(this, slot.x, slot.y, 0x8fd6ef, 80);
+    floatText(this, slot.x, slot.y - 50, 'DEPLOYED', HEX.green, 22);
+    if (settings.reducedMotion) container.setScale(1);
+    else {
+      container.setScale(0);
+      this.tweens.add({ targets: container, scale: { from: 0, to: 1 }, duration: 280, ease: 'Back.easeOut' });
+    }
     this.publishTowerState();
+    this.refreshPlacementMarkers();
   }
 
   private upgradeTower(slotIdx: number): void {
     const tw = this.towers[slotIdx];
-    if (this.over || !tw) return;
-    const cfg = towerCfg(tw.type);
-    if (tw.level >= cfg.costs.length) return;
-    const cost = cfg.costs[tw.level];
+    if (this.over || !tw || tw.level >= towerMaxLevel()) return;
+    const cost = towerUpgradeCost(tw.level);
     if (this.stats.credits < cost) return;
     this.stats.credits -= cost;
     bus.emit(EV.CREDITS, this.stats.credits, 0, 0, 0);
     tw.level++;
+    tw.invested += cost;
     this.drawTowerPips(tw);
-    this.pendingDeploys.push({ slotIdx, kind: 'upgrade' });
-    analytics.track('tower_upgraded', { type: tw.type, level: tw.level, slot: slotIdx });
+    analytics.track('tower_upgraded', { level: tw.level, slot: slotIdx });
     sfx.upgrade();
     vibrate(30);
+    const slot = this.towerSlots[slotIdx];
+    shockwave(this, slot.x, slot.y, PAL.gold, 70);
+    floatText(this, slot.x, slot.y - 50, `LV${tw.level}`, HEX.gold, 22);
+    if (!settings.reducedMotion) {
+      this.tweens.add({ targets: tw.container, scale: { from: 1.35, to: 1 }, duration: 220, ease: 'Back.easeOut' });
+    }
     this.publishTowerState();
   }
 
   private sellTower(slotIdx: number): void {
     const tw = this.towers[slotIdx];
     if (this.over || !tw) return;
-    const refund = towerRefund(tw.type, tw.level);
+    const refund = towerRefund(tw.invested);
     // straight refund — deliberately NOT addCredits(), so OIL MONEY's income
     // bonus can't turn build+sell cycles into a money printer
     this.stats.credits += refund;
     bus.emit(EV.CREDITS, this.stats.credits, 0, 0, 0);
+    const slot = this.towerSlots[slotIdx];
+    this.burst(slot.x, slot.y, 0x8fd6ef, 'dot', 6);
     tw.container.destroy();
     this.towers[slotIdx] = null;
-    this.pendingDeploys = this.pendingDeploys.filter(d => d.slotIdx !== slotIdx);
-    analytics.track('tower_sold', { type: tw.type, level: tw.level, slot: slotIdx });
+    analytics.track('tower_sold', { level: tw.level, slot: slotIdx });
     sfx.tap();
     this.publishTowerState();
+    this.refreshPlacementMarkers();
   }
 
-  /** Entrance juice for overnight purchases, played once the world is visible
-   *  again at day start — staggered pops so a shopping spree reads as a
-   *  deployment sequence, not a blink. */
-  private playPendingDeploys(): void {
-    this.pendingDeploys.forEach((d, i) => {
-      const tw = this.towers[d.slotIdx];
-      if (!tw) return;
-      const { x, y } = tw.container;
-      if (settings.reducedMotion) {
-        tw.container.setScale(1);
-        return;
+  /** Day-break placement mode: fade the frozen world back in and mark every
+   *  empty coastal slot with a pulsing tappable ring. Built towers become
+   *  tappable too ('tower-tapped' -> UIScene's upgrade/sell popup). */
+  private openPlacementMode(): void {
+    if (this.placementOpen || this.over) return;
+    this.placementOpen = true;
+    this.cameras.main.fadeIn(settings.reducedMotion ? 0 : 250, 7, 59, 92);
+    this.refreshPlacementMarkers();
+  }
+
+  private closePlacementMode(): void {
+    if (!this.placementOpen) return;
+    this.placementOpen = false;
+    this.refreshPlacementMarkers();
+    // placement only happens during the day break — hide the world again so
+    // the summary panel returns over the usual dark backdrop
+    if (this.awaitingNextDay) {
+      this.cameras.main.fadeOut(settings.reducedMotion ? 0 : 250, 7, 59, 92);
+    }
+  }
+
+  private refreshPlacementMarkers(): void {
+    this.placementMarkers.forEach(m => m.destroy());
+    this.placementMarkers = [];
+    if (!this.placementOpen) {
+      this.towers.forEach(tw => tw?.container.disableInteractive());
+      return;
+    }
+    this.towerSlots.forEach((slot, i) => {
+      if (this.towers[i]) return;
+      const ring = this.add.circle(0, 0, 26).setStrokeStyle(3, 0x8fd6ef, 0.95);
+      const plus = this.add
+        .text(0, 0, '+', { fontFamily: FONT_DISPLAY, fontSize: '26px', color: '#8FD6EF' })
+        .setOrigin(0.5);
+      const marker = this.add.container(slot.x, slot.y, [ring, plus]).setDepth(950);
+      marker.setSize(72, 72);
+      marker.setInteractive({ useHandCursor: true });
+      marker.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+        ev.stopPropagation();
+        this.tryPlaceTower(i);
+      });
+      if (!settings.reducedMotion) {
+        this.tweens.add({ targets: ring, scale: { from: 1, to: 1.18 }, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       }
-      this.time.delayedCall(450 + i * 180, () => {
-        if (!tw.container.active) return;
-        sfx.splash();
-        shockwave(this, x, y, 0x8fd6ef, 70);
-        if (d.kind === 'build') {
-          this.tweens.add({ targets: tw.container, scale: { from: 0, to: 1 }, duration: 260, ease: 'Back.easeOut' });
-          floatText(this, x, y - 50, 'DEPLOYED', HEX.green, 20);
-        } else {
-          this.tweens.add({ targets: tw.container, scale: { from: 1.35, to: 1 }, duration: 220, ease: 'Back.easeOut' });
-          floatText(this, x, y - 50, `LV${tw.level}`, HEX.gold, 20);
-        }
+      this.placementMarkers.push(marker);
+    });
+    this.towers.forEach((tw, i) => {
+      if (!tw) return;
+      tw.container.setSize(72, 72);
+      if (!tw.container.input) tw.container.setInteractive({ useHandCursor: true });
+      else tw.container.setInteractive();
+      tw.container.off('pointerdown');
+      tw.container.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+        ev.stopPropagation();
+        sfx.tap();
+        bus.emit('tower-tapped', i);
       });
     });
-    this.pendingDeploys = [];
   }
 
-  /** Jam factor for a moving threat, flashing "JAMMED" the first time one
-   *  wanders into a jammer bubble so the slowdown reads as caused, not laggy. */
-  private threatJam(th: Threat): number {
-    const m = this.jamSlowAt(th.sprite.x, th.sprite.y);
-    if (m < 1 && !th.jammedShown) {
-      th.jammedShown = true;
-      floatText(this, th.sprite.x, th.sprite.y - 40, 'JAMMED', '#8FD6EF', 18);
-    }
-    return m;
-  }
-
-  /** Combined slow factor from every jammer whose radius covers (x, y). */
-  private jamSlowAt(x: number, y: number): number {
-    let m = 1;
-    for (const tw of this.towers) {
-      if (!tw || tw.type !== 'jammer') continue;
-      const cfg = towerCfg(tw.type);
-      const slot = this.towerSlots[tw.slotIdx];
-      if (Phaser.Math.Distance.Between(x, y, slot.x, slot.y) < cfg.range[tw.level - 1]) {
-        m = Math.min(m, cfg.slowMult![tw.level - 1]);
-      }
-    }
-    return m;
-  }
-
-  /** Auto-fire loop: each shooting tower locks the nearest valid threat in
-   *  range on its own cooldown; jammers just pulse their radius ring. */
+  /** Auto-fire loop: each tower locks the nearest threat in range (any type)
+   *  on its own cooldown. */
   private updateTowers(rawDt: number): void {
-    this.towerFxGfx.clear();
+    const cfg = TUNING.towers;
     for (const tw of this.towers) {
       if (!tw) continue;
-      const slot = this.towerSlots[tw.slotIdx];
-      const cfg = towerCfg(tw.type);
-      if (tw.type === 'jammer') {
-        tw.pulseT += rawDt;
-        const range = cfg.range[tw.level - 1];
-        const pulse = settings.reducedMotion ? 1 : 0.92 + 0.08 * Math.sin(tw.pulseT * 2.4);
-        this.towerFxGfx.lineStyle(2, 0x8fd6ef, 0.22);
-        this.towerFxGfx.strokeCircle(slot.x, slot.y, range * pulse);
-        continue;
-      }
       tw.fireTimer = Math.max(0, tw.fireTimer - rawDt);
       if (tw.fireTimer > 0) continue;
+      const slot = this.towerSlots[tw.slotIdx];
       const range = cfg.range[tw.level - 1];
       let best: Threat | null = null;
       let bestD = range;
       for (const th of this.threats) {
-        if (th.dead || !TOWER_TARGETS[tw.type].includes(th.type)) continue;
+        if (th.dead) continue;
         const d = Phaser.Math.Distance.Between(slot.x, slot.y, th.sprite.x, th.sprite.y);
         if (d < bestD) {
           bestD = d;
@@ -1492,7 +1486,7 @@ export class GameScene extends Phaser.Scene {
         }
       }
       if (!best) continue;
-      tw.fireTimer = cfg.fireInterval![tw.level - 1];
+      tw.fireTimer = cfg.fireInterval[tw.level - 1];
       this.towerFire(tw, best);
     }
   }
@@ -1504,7 +1498,7 @@ export class GameScene extends Phaser.Scene {
     const mx = slot.x;
     const my = slot.y - 22;
     const spr = this.add.image(mx, my, 'tracerGen').setDepth(55);
-    spr.setTint(tw.type === 'depth' ? 0xffa46b : 0x9be8ff);
+    spr.setTint(0x9be8ff);
     spr.setRotation(Math.atan2(target.sprite.y - my, target.sprite.x - mx));
     this.bullets.push({
       sprite: spr,
@@ -1614,7 +1608,6 @@ export class GameScene extends Phaser.Scene {
     this.mission = this.rollMission(n);
     bus.emit(EV.MISSION, { ...this.mission });
     bus.emit(EV.DAY_START, n, this.mission.text, reveals);
-    this.playPendingDeploys();
   }
 
   /** Day-indexed difficulty lookup: entry [day-1], clamped to the last entry
@@ -1750,12 +1743,9 @@ export class GameScene extends Phaser.Scene {
         out.push(`NEW TECH TOMORROW: ${names[key]}`);
       }
     }
-    // sea defenses become buyable in the shop shown alongside these warnings
-    for (const key of ['ciws', 'depth', 'jammer'] as const) {
-      if (nextDay === towerCfg(key).revealDay) {
-        const names = { ciws: 'CIWS PLATFORM', depth: 'DEPTH CHARGES', jammer: 'SIGNAL JAMMER' };
-        out.push(`NEW DEFENSE AVAILABLE TONIGHT: ${names[key]}`);
-      }
+    // sea turrets become buyable in the shop shown alongside these warnings
+    if (nextDay === TUNING.towers.revealDay) {
+      out.push('NEW DEFENSE AVAILABLE TONIGHT: SEA TURRETS');
     }
     return out;
   }
@@ -2272,7 +2262,7 @@ export class GameScene extends Phaser.Scene {
           th.target = this.aliveTankers().find(tk => tk.routeIdx === ri && this.targetable(tk)) ?? null;
         }
         const dir = th.target ? Math.sign(th.target.dist - th.dist!) || -1 : -1;
-        th.dist = Phaser.Math.Clamp(th.dist! + dir * th.speed * this.threatJam(th) * dt, 0, this.routeLengths[ri]);
+        th.dist = Phaser.Math.Clamp(th.dist! + dir * th.speed * dt, 0, this.routeLengths[ri]);
         const p = this.routePoint(th.dist, ri);
         // rotate to face the direction of travel along the lane, like tankers
         // (art faces left, fallback faces right; dir can run the spline backwards)
@@ -2345,9 +2335,8 @@ export class GameScene extends Phaser.Scene {
       const ang = Math.atan2(ty - s.y, tx - s.x);
       // missiles fly dead straight; drones weave
       const wob = th.type === 'drone' ? Math.sin(this.elapsed * 6 + s.x) * 0.5 : 0;
-      const jam = this.threatJam(th);
-      s.x += Math.cos(ang + wob) * th.speed * jam * dt;
-      s.y += Math.sin(ang + wob) * th.speed * jam * dt;
+      s.x += Math.cos(ang + wob) * th.speed * dt;
+      s.y += Math.sin(ang + wob) * th.speed * dt;
       if (th.type === 'missile') s.rotation = ang + wob;
       if (th.type === 'drone') s.angle += 120 * dt;
       if (th.target && !th.target.dead) {

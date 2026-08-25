@@ -1,48 +1,36 @@
-// Shared definitions for the SEA DEFENSES tower layer. Numbers live in
+// Shared definitions for the SEA TURRETS tower-defense layer. Numbers live in
 // src/config/tuning.json ("towers"); this module is the typed view both
-// GameScene (combat + purchases) and UIScene (day-end shop mini-map) share.
+// GameScene (combat + purchases + placement mode) and UIScene (day-end shop
+// card + upgrade/sell popup) share. One universal tower type: it shoots any
+// threat in range.
 import { TUNING } from '../config/tuning';
 
-export type TowerType = 'ciws' | 'depth' | 'jammer';
+export const TOWER_NAME = 'SEA TURRET';
+export const TOWER_GLYPH = '🎯';
+export const TOWER_DESC = 'Auto-fires at any threat in range';
 
-// per-type tuning entry (jammer swaps fireInterval for slowMult)
-export interface TowerCfg {
-  costs: number[];
-  range: number[];
-  fireInterval?: number[];
-  slowMult?: number[];
-  revealDay: number;
+export function towerMaxLevel(): number {
+  return TUNING.towers.upgradeCosts.length + 1;
 }
 
-export function towerCfg(type: TowerType): TowerCfg {
-  return (TUNING.towers.types as Record<TowerType, TowerCfg>)[type];
+/** Price of the NEXT turret, escalating with how many are already built. */
+export function towerBuildCost(builtCount: number): number {
+  const costs = TUNING.towers.buildCosts;
+  return costs[Math.min(builtCount, costs.length - 1)];
 }
 
-/** Total credits sunk into a tower at `level` (for sell refunds). */
-export function towerInvested(type: TowerType, level: number): number {
-  return towerCfg(type).costs.slice(0, level).reduce((a, b) => a + b, 0);
+/** Price of upgrading FROM `level` (1-based) to the next one. */
+export function towerUpgradeCost(level: number): number {
+  return TUNING.towers.upgradeCosts[level - 1];
 }
 
-/** Refund paid when selling a tower at `level`. */
-export function towerRefund(type: TowerType, level: number): number {
-  return Math.round(towerInvested(type, level) * TUNING.towers.sellRefundFrac);
+/** Refund paid when selling a tower that has `invested` credits sunk in. */
+export function towerRefund(invested: number): number {
+  return Math.round(invested * TUNING.towers.sellRefundFrac);
 }
-
-export interface TowerDef {
-  key: TowerType;
-  name: string;
-  glyph: string;
-  desc: string;
-}
-
-export const TOWER_DEFS: TowerDef[] = [
-  { key: 'ciws', name: 'CIWS PLATFORM', glyph: '🎯', desc: 'Auto-flak vs missiles & drones' },
-  { key: 'depth', name: 'DEPTH CHARGES', glyph: '💣', desc: 'Clears mines & patrol boats' },
-  { key: 'jammer', name: 'SIGNAL JAMMER', glyph: '📡', desc: 'Slows threats in its radius' }
-];
 
 /** Snapshot of one occupied slot, published to the registry by GameScene. */
 export interface TowerStateEntry {
-  type: TowerType;
   level: number;
+  invested: number;
 }

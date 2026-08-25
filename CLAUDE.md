@@ -229,32 +229,37 @@ present, since it's not an intentional code change.
     warnings. Threats and upgrades unlock by day (`tuning.json` → `days`).
     The news band is **reserved for day-system news** — per-event gameplay
     headlines were removed; silent market nudges use `EV.MARKET_NUDGE`.
-  - **Tower-defense layer ("SEA DEFENSES")**: fixed tower slots near the
-    shipping lanes, bought/upgraded/sold from a mini-map card in the day-end
-    shop panel, auto-firing during the day. `src/core/towers.ts` holds the
-    shared typed view (TowerType, towerCfg/towerInvested/towerRefund,
-    TOWER_DEFS names/glyphs); numbers live in `tuning.json` → `towers`
-    (slots authored as `{ri, t, off}` = route index / fraction along /
-    lateral offset — GameScene.computeTowerSlots resolves them against the
-    live splines and publishes world positions + a sampled `routePreview`
-    into the Phaser registry). Three types: `ciws` (flak vs missiles/drones),
-    `depth` (mines/patrol boats), `jammer` (no damage; slows threats in
-    radius — `jamSlowAt`/`threatJam` in GameScene). Type→threat matchups are
-    the code constant `TOWER_TARGETS` (GameScene.ts), not tuning. Tower kills
-    are DELIBERATELY full-fat player kills (Nadav's call): they route through
+  - **Tower-defense layer ("SEA TURRETS")**: ONE universal tower type that
+    auto-fires at any threat in range (Nadav simplified it down from an
+    earlier 3-type CIWS/depth/jammer design — don't reintroduce types).
+    `src/core/towers.ts` is the shared typed view (TOWER_NAME/GLYPH,
+    towerBuildCost — escalates with count — towerUpgradeCost, towerRefund,
+    towerMaxLevel, TowerStateEntry); numbers live in `tuning.json` → `towers`
+    (8 coastal slots authored as `{ri, t, off}` = route index / fraction
+    along / lateral offset — GameScene.computeTowerSlots resolves them
+    against the live splines and publishes world positions into the Phaser
+    registry as 'towerSlots'; 'routePreview' is also published but currently
+    unused). **Buy flow**: the day-end shop's TACTICAL UPGRADES row has 4
+    cards (air/hull/gold + SEA TURRET, 150px wide at (i-1.5)*step). Tapping
+    the turret card hides the summary panel and enters **placement mode**
+    (UIScene.enterPlacementMode → bus 'defense-map-open' → GameScene.
+    openPlacementMode fades the frozen world back in and draws pulsing
+    tappable rings on empty slots via refreshPlacementMarkers; UIScene
+    floats an instruction pill + DONE button over the VIEW). Tapping a ring
+    = GameScene.tryPlaceTower — charges escalating buildCosts[builtCount],
+    immediate deploy juice (world is visible, no deferred pendingDeploys
+    any more). Tapping a built turret emits 'tower-tapped' → UIScene.
+    showTowerPopup (upgrade/sell rows → bus 'upgrade-tower'/'sell-tower',
+    validated + charged in GameScene). DONE → 'defense-map-close', world
+    fades back out, panel returns. Swipe/NEXT DAY are gated on
+    `placementOpen` so the day can't advance mid-placement. Tower kills are
+    DELIBERATELY full-fat player kills (Nadav's call): they route through
     `intercept(th, true)` — full credits, mission quota, combo, near-miss
-    slowmo. Purchases flow over the bus ('build-tower'/'upgrade-tower'/
-    'sell-tower', validated + credit-charged in GameScene, state republished
-    via registry 'towerState' + bus 'towers-changed'); UIScene's
-    `buildDefenseCard`/`refreshDefenseCard`/`buildDefensePopup` render the
-    STRAIT DEFENSES card + picker inside `buildDaySummaryPanel` (shop anchor
-    moved H/2-414 → H/2-600 and upgrade cards 170→150 tall to fit it above
-    the fold). Deploy/upgrade juice is deferred to the next `startDay`
-    (`pendingDeploys`/`playPendingDeploys`) because the opaque summary panel
-    covers the world at purchase time. Sell refunds bypass `addCredits` on
-    purpose so OIL MONEY can't inflate build+sell cycles. Types unlock by
-    day via each type's `revealDay` (checked as `day + 1 >= revealDay` — the
-    end-of-day-N shop builds for day N+1), announced through `warningsFor`.
+    slowmo. State republishes via registry 'towerState' + bus
+    'towers-changed'. Sell refunds pay `towerRefund(invested)` and bypass
+    `addCredits` on purpose so OIL MONEY can't inflate build+sell cycles.
+    Unlocks via `towers.revealDay` (checked as `day + 1 >= revealDay`),
+    announced through `warningsFor`.
   - **Meme collection system**: `src/core/memeUnlocks.ts` persists which meme
     templates have ever fired (localStorage `hormuz-memes-v1`, per-account like
     `src/backend/`), populated by `pickMeme()` in `src/core/memes.ts`.

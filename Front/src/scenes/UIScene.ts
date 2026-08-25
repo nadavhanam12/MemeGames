@@ -13,7 +13,15 @@ import { ENGAGEMENT_ICON_KEYS } from '../core/engagementIcons';
 import { DayMission, DaySummary, EV, SessionStats, bus } from '../core/state';
 import { dayPerfScore, repercussionHeadline, repercussionSubhead } from '../core/repercussions';
 import { TUNING } from '../config/tuning';
-import { TOWER_DEFS, TowerStateEntry, towerCfg, towerRefund } from '../core/towers';
+import {
+  TOWER_GLYPH,
+  TOWER_NAME,
+  TowerStateEntry,
+  towerBuildCost,
+  towerMaxLevel,
+  towerRefund,
+  towerUpgradeCost
+} from '../core/towers';
 import { registerLayout } from '../dev/layout';
 import { devState } from '../dev/state';
 
@@ -149,12 +157,17 @@ export class UIScene extends Phaser.Scene {
   private upgradeButtons: Record<string, Phaser.GameObjects.Container> = {};
   private lastMemeAt = -Infinity;
 
-  // SEA DEFENSES shop mini-map (inside the day-end panel): slot/tower state
-  // comes from the registry ('towerSlots'/'towerState'/'routePreview',
-  // published by GameScene); selectedSlot drives the build/manage popup.
-  private defenseInner?: Phaser.GameObjects.Container;
-  private defenseGeom = { y: 0, w: 0, h: 0 };
-  private selectedSlot: number | null = null;
+  // SEA TURRETS shop card (a 4th card in the TACTICAL UPGRADES row) + the
+  // placement overlay it opens: the summary panel hides, GameScene fades the
+  // world in with tappable slot markers ('defense-map-open'), and this scene
+  // floats an instruction pill + DONE button over the view. Tower state
+  // comes from the registry ('towerState', published by GameScene).
+  private defenseCard?: Phaser.GameObjects.Container;
+  private placementOpen = false;
+  private placementUI?: Phaser.GameObjects.Container;
+  private placementPill?: Phaser.GameObjects.Text;
+  private towerPopup?: Phaser.GameObjects.Container;
+  private towerPopupSlot: number | null = null;
 
   // engagement bar (reply=day, retweet=combo, heart=cash, bar-chart=oil
   // "hype", share=viral growth — see shareCount/dayShareStart/dayShareTarget)
@@ -503,179 +516,176 @@ export class UIScene extends Phaser.Scene {
     subtitle.setText(`${def.caption} · $${price} ${pips}`).setColor(affordable ? HEX.green : HEX.muted);
   }
 
-  // ------------------------------------------------- sea defenses (shop map)
-  /** Static frame of the STRAIT DEFENSES card; the live content (routes,
-   *  slots, popup) is rebuilt by refreshDefenseCard on every state change. */
-  private buildDefenseCard(parent: Phaser.GameObjects.Container, y: number, cardW: number): number {
-    const h = 190;
-    this.defenseGeom = { y, w: cardW, h };
-    this.selectedSlot = null;
-    this.defenseInner = undefined;
-    const bg = this.add.graphics();
-    bg.fillStyle(PANEL, 1);
-    bg.fillRoundedRect(-cardW / 2, y, cardW, h, 12);
-    bg.lineStyle(1, DIVIDER, 1);
-    bg.strokeRoundedRect(-cardW / 2, y, cardW, h, 12);
-    parent.add(bg);
-    parent.add(
-      this.add
-        .text(-cardW / 2 + 14, y + 10, 'STRAIT DEFENSES', {
-          fontFamily: FONT_SANS, fontSize: '12px', fontStyle: 'bold', color: HEX.muted, letterSpacing: 1
-        })
-        .setOrigin(0, 0)
-    );
-    parent.add(
-      this.add
-        .text(cardW / 2 - 14, y + 10, 'tap a slot to build', { fontFamily: FONT_SANS, fontSize: '11px', color: '#8B98A5' })
-        .setOrigin(1, 0)
-    );
-    this.refreshDefenseCard();
-    return h;
+  // ------------------------------------------ sea turrets (shop + placement)
+  /** The SEA TURRET shop card — a 4th card in the TACTICAL UPGRADES row.
+   *  Tapping it hides the summary panel and opens placement mode on the live
+   *  map (GameScene draws the tappable slot markers along the coasts). */
+  private buildDefenseCard(
+    parent: Phaser.GameObjects.Container,
+    x: number,
+    y: number,
+    h: number,
+    w: number
+  ): void {
+    const card = createSuggestedCard(this, {
+      x,
+      y,
+      w,
+      h,
+      icon: TOWER_GLYPH,
+      title: TOWER_NAME,
+      subtitle: '',
+      onClick: () => {
+        if (this.summaryNextDay < TUNING.towers.revealDay) {
+          this.tweens.add({ targets: card, x: x - 6, duration: 40, yoyo: true, repeat: 2 });
+          sfx.tap();
+          return;
+        }
+        pressPulse(this, card);
+        this.enterPlacementMode();
+      }
+    });
+    parent.add(card);
+    this.defenseCard = card;
+    this.refreshDefenseCardVisual();
+  }
+
+  /** Re-renders the turret card's subtitle (lock / next cost / slot count). */
+  private refreshDefenseCardVisual(): void {
+    const card = this.defenseCard;
+    if (!card || !card.active) return;
+    const subtitle = card.list[card.list.length - 1] as Phaser.GameObjects.Text;
+    if (this.summaryNextDay < TUNING.towers.revealDay) {
+      subtitle.setText(`\u{1F512} unlocks day ${TUNING.towers.revealDay}`).setColor(HEX.muted);
+      card.setAlpha(0.6);
+      return;
+    }
+    card.setAlpha(1);
+    const state = (this.registry.get('towerState') ?? []) as Array<TowerStateEntry | null>;
+    const built = state.filter(Boolean).length;
+    const total = state.length;
+    if (built >= total && total > 0) {
+      subtitle.setText(`ALL ${total} BUILT \u00b7 TAP TO MANAGE`).setColor(HEX.green);
+      return;
+    }
+    const cost = towerBuildCost(built);
+    const affordable = this.displayedCredits >= cost;
+    subtitle
+      .setText(`PLACE ON MAP \u00b7 $${cost} (${built}/${total})`)
+      .setColor(affordable ? HEX.green : HEX.muted);
   }
 
   private onTowersChanged(): void {
-    this.refreshDefenseCard();
+    this.refreshDefenseCardVisual();
+    this.refreshPlacementPill();
+    // keep the upgrade/sell popup honest after a purchase or sale
+    if (this.towerPopupSlot != null && this.placementOpen) {
+      const state = (this.registry.get('towerState') ?? []) as Array<TowerStateEntry | null>;
+      const st = state[this.towerPopupSlot];
+      if (st) this.showTowerPopup(this.towerPopupSlot);
+      else this.closeTowerPopup();
+    }
   }
 
-  /** Redraws the mini-map: lane polylines, empty slot markers, built towers,
-   *  and (when a slot is selected) the build/manage popup. */
-  private refreshDefenseCard(): void {
-    const panel = this.summaryPanel;
-    if (!panel?.active || !this.defenseGeom.w) return;
-    this.defenseInner?.destroy();
-    const { y, w, h } = this.defenseGeom;
-    const inner = this.add.container(0, 0);
-    this.defenseInner = inner;
-    panel.add(inner);
-
-    const slots = (this.registry.get('towerSlots') ?? []) as Array<{ x: number; y: number }>;
-    const state = (this.registry.get('towerState') ?? []) as Array<TowerStateEntry | null>;
-    const routes = (this.registry.get('routePreview') ?? []) as Array<Array<[number, number]>>;
-
-    // uniform fit of the world's lane band into the card's map area
-    const mapTop = y + 34;
-    const mapH = h - 46;
-    const mapW = w - 32;
-    const all: Array<[number, number]> = [...routes.flat(), ...slots.map(s => [s.x, s.y] as [number, number])];
-    if (!all.length) return;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const [px, py] of all) {
-      minX = Math.min(minX, px); maxX = Math.max(maxX, px);
-      minY = Math.min(minY, py); maxY = Math.max(maxY, py);
-    }
-    const pad = 40;
-    const sc = Math.min(mapW / (maxX - minX + pad * 2), mapH / (maxY - minY + pad * 2));
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const tx = (wx: number) => (wx - cx) * sc;
-    const ty = (wy: number) => mapTop + mapH / 2 + (wy - cy) * sc;
-
-    const g = this.add.graphics();
-    inner.add(g);
-    for (const route of routes) {
-      if (route.length < 2) continue;
-      g.lineStyle(2, PAL.cream, 0.3);
-      g.beginPath();
-      g.moveTo(tx(route[0][0]), ty(route[0][1]));
-      for (const [px, py] of route.slice(1)) g.lineTo(tx(px), ty(py));
-      g.strokePath();
-    }
-
-    slots.forEach((s, i) => {
-      const px = tx(s.x);
-      const py = ty(s.y);
-      const st = state[i];
-      if (!st) {
-        // empty slot: dashed teal circle + faint plus
-        g.lineStyle(2, 0x8fd6ef, this.selectedSlot === i ? 0.9 : 0.45);
-        for (let a = 0; a < 8; a++) {
-          const a0 = (a / 8) * Math.PI * 2;
-          g.beginPath();
-          g.arc(px, py, 13, a0, a0 + Math.PI / 10);
-          g.strokePath();
-        }
-        inner.add(
-          this.add.text(px, py, '+', { fontFamily: FONT_SANS, fontSize: '15px', color: '#8FD6EF' }).setOrigin(0.5).setAlpha(0.8)
-        );
-      } else {
-        const def = TOWER_DEFS.find(d => d.key === st.type)!;
-        g.lineStyle(2, PAL.gold, this.selectedSlot === i ? 1 : 0.6);
-        g.strokeCircle(px, py, 15);
-        inner.add(this.add.text(px, py - 1, def.glyph, { fontSize: '16px' }).setOrigin(0.5));
-        const pips = '●'.repeat(st.level) + '○'.repeat(Math.max(0, towerCfg(st.type).costs.length - st.level));
-        inner.add(
-          this.add.text(px, py + 20, pips, { fontFamily: FONT_SANS, fontSize: '8px', color: HEX.gold }).setOrigin(0.5)
-        );
-      }
-      const zone = this.add.circle(px, py, 22, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
-      zone.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
-        ev.stopPropagation();
-        sfx.tap();
-        this.selectedSlot = this.selectedSlot === i ? null : i;
-        this.refreshDefenseCard();
-      });
-      inner.add(zone);
+  /** Hide the panel, reveal the frozen world, let GameScene mark the slots. */
+  private enterPlacementMode(): void {
+    if (this.placementOpen || !this.summaryPanel?.active) return;
+    this.placementOpen = true;
+    this.summaryPanel.setVisible(false);
+    bus.emit('defense-map-open');
+    sfx.tap();
+    const o = this.add.container(0, 0).setDepth(1800);
+    this.placementUI = o;
+    // instruction pill across the top of the game view (below the mission
+    // caption so the two don't overlap)
+    const pillY = VIEW.y + 74;
+    const pillBg = this.add.rectangle(GAME_W / 2, pillY, 460, 40, 0x0b1118, 0.92).setStrokeStyle(1, 0x8fd6ef, 0.7);
+    this.placementPill = this.add
+      .text(GAME_W / 2, pillY, '', { fontFamily: FONT_SANS, fontSize: '15px', fontStyle: 'bold', color: HEX.cream })
+      .setOrigin(0.5);
+    o.add([pillBg, this.placementPill]);
+    this.refreshPlacementPill();
+    // DONE pill at the foot of the view returns to the report
+    const doneY = VIEW.y + VIEW.h - 42;
+    const done = this.add.container(GAME_W / 2, doneY);
+    const doneBg = this.add.rectangle(0, 0, 220, 48, 0x171810, 1).setStrokeStyle(2, PAL.gold, 0.85);
+    const doneText = this.add
+      .text(0, 0, 'DONE \u25b8', { fontFamily: FONT_DISPLAY, fontSize: '20px', color: HEX.gold })
+      .setOrigin(0.5);
+    done.add([doneBg, doneText]);
+    done.setSize(220, 48);
+    done.setInteractive({ useHandCursor: true });
+    done.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
+      ev.stopPropagation();
+      this.exitPlacementMode();
     });
+    if (!settings.reducedMotion) {
+      this.tweens.add({ targets: done, scale: 1.04, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+    o.add(done);
+  }
 
-    if (this.selectedSlot != null && this.selectedSlot < slots.length) {
-      inner.add(this.buildDefensePopup(this.selectedSlot, state[this.selectedSlot] ?? null, y + h / 2));
+  private refreshPlacementPill(): void {
+    if (!this.placementPill?.active) return;
+    const state = (this.registry.get('towerState') ?? []) as Array<TowerStateEntry | null>;
+    const built = state.filter(Boolean).length;
+    if (built >= state.length && state.length > 0) {
+      this.placementPill.setText('ALL SLOTS BUILT \u2014 tap a turret to upgrade or sell');
+    } else {
+      this.placementPill.setText(`TAP A RING TO BUILD \u2014 $${towerBuildCost(built)} \u00b7 tap a turret to manage`);
     }
   }
 
-  /** Popup over the mini-map: tower picker for an empty slot, or
-   *  upgrade/sell for a built one. Purchases go over the bus to GameScene,
-   *  which owns credits and republishes 'towers-changed'. */
-  private buildDefensePopup(slotIdx: number, st: TowerStateEntry | null, centerY: number): Phaser.GameObjects.Container {
-    const popup = this.add.container(0, centerY);
-    const rows: Array<{
-      left: string; right: string; rightColor: string; enabled: boolean; onTap?: () => void;
-    }> = [];
-    if (!st) {
-      for (const def of TOWER_DEFS) {
-        const cfg = towerCfg(def.key);
-        const locked = this.summaryNextDay < cfg.revealDay;
-        const cost = cfg.costs[0];
-        const affordable = this.displayedCredits >= cost;
-        rows.push({
-          left: `${def.glyph} ${def.name}`,
-          right: locked ? `🔒 DAY ${cfg.revealDay}` : `$${cost}`,
-          rightColor: locked ? HEX.muted : affordable ? HEX.green : HEX.muted,
-          enabled: !locked && affordable,
-          onTap: () => {
-            bus.emit('build-tower', slotIdx, def.key);
-            this.selectedSlot = null;
-          }
-        });
-      }
-    } else {
-      const def = TOWER_DEFS.find(d => d.key === st.type)!;
-      const cfg = towerCfg(st.type);
-      rows.push({ left: `${def.glyph} ${def.name} LV${st.level}`, right: '', rightColor: HEX.cream, enabled: false });
-      const maxed = st.level >= cfg.costs.length;
-      const upCost = maxed ? 0 : cfg.costs[st.level];
-      const affordable = !maxed && this.displayedCredits >= upCost;
-      rows.push({
-        left: '⬆ UPGRADE',
+  /** Back to the report: markers away, world fades out, panel returns. */
+  private exitPlacementMode(): void {
+    if (!this.placementOpen) return;
+    this.placementOpen = false;
+    this.closeTowerPopup();
+    this.placementUI?.destroy();
+    this.placementUI = undefined;
+    this.placementPill = undefined;
+    bus.emit('defense-map-close');
+    sfx.tap();
+    this.summaryPanel?.setVisible(true);
+    this.refreshDefenseCardVisual();
+  }
+
+  /** Upgrade/sell popup for a built turret, floated over the game view while
+   *  placement mode is open (GameScene emits 'tower-tapped'). */
+  private showTowerPopup(slotIdx: number): void {
+    if (!this.placementOpen) return;
+    this.closeTowerPopup();
+    const state = (this.registry.get('towerState') ?? []) as Array<TowerStateEntry | null>;
+    const st = state[slotIdx];
+    if (!st) return;
+    this.towerPopupSlot = slotIdx;
+    const popup = this.add.container(GAME_W / 2, VIEW.y + VIEW.h - 160).setDepth(1810);
+    this.towerPopup = popup;
+    const maxed = st.level >= towerMaxLevel();
+    const upCost = maxed ? 0 : towerUpgradeCost(st.level);
+    const affordable = !maxed && this.displayedCredits >= upCost;
+    const rows: Array<{ left: string; right: string; rightColor: string; enabled: boolean; onTap?: () => void }> = [
+      { left: `${TOWER_GLYPH} ${TOWER_NAME} LV${st.level}`, right: '', rightColor: HEX.cream, enabled: false },
+      {
+        left: '\u2b06 UPGRADE',
         right: maxed ? 'MAX' : `$${upCost}`,
         rightColor: maxed ? HEX.muted : affordable ? HEX.green : HEX.muted,
         enabled: affordable,
-        onTap: () => {
-          bus.emit('upgrade-tower', slotIdx);
-        }
-      });
-      rows.push({
-        left: '⚓ SELL',
-        right: `+$${towerRefund(st.type, st.level)}`,
+        onTap: () => bus.emit('upgrade-tower', slotIdx)
+      },
+      {
+        left: '\u2693 SELL',
+        right: `+$${towerRefund(st.invested)}`,
         rightColor: HEX.gold,
         enabled: true,
         onTap: () => {
           bus.emit('sell-tower', slotIdx);
-          this.selectedSlot = null;
+          this.closeTowerPopup();
         }
-      });
-    }
+      }
+    ];
     const rowH = 40;
-    const pw = this.defenseGeom.w - 120;
+    const pw = 360;
     const ph = rows.length * rowH + 20;
     const bg = this.add.graphics();
     bg.fillStyle(0x0b1118, 0.97);
@@ -702,31 +712,32 @@ export class UIScene extends Phaser.Scene {
       zone.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
         ev.stopPropagation();
         if (!row.enabled) {
-          // locked / can't afford: shake, same language as the upgrade cards
-          this.tweens.add({ targets: popup, x: -6, duration: 40, yoyo: true, repeat: 2 });
+          this.tweens.add({ targets: popup, x: GAME_W / 2 - 6, duration: 40, yoyo: true, repeat: 2 });
           sfx.tap();
           return;
         }
         sfx.tap();
         row.onTap!();
-        this.refreshDefenseCard();
       });
       popup.add(zone);
     });
-    // close chip in the corner
     const close = this.add
-      .text(pw / 2 - 4, -ph / 2 + 4, '✕', { fontFamily: FONT_SANS, fontSize: '13px', color: '#8B98A5' })
+      .text(pw / 2 - 4, -ph / 2 + 4, '\u2715', { fontFamily: FONT_SANS, fontSize: '13px', color: '#8B98A5' })
       .setOrigin(1, 0)
       .setInteractive({ useHandCursor: true });
     close.on('pointerdown', (_p: Phaser.Input.Pointer, _lx: number, _ly: number, ev: Phaser.Types.Input.EventData) => {
       ev.stopPropagation();
       sfx.tap();
-      this.selectedSlot = null;
-      this.refreshDefenseCard();
+      this.closeTowerPopup();
     });
     popup.add(close);
     if (!settings.reducedMotion) popIn(this, popup, 140);
-    return popup;
+  }
+
+  private closeTowerPopup(): void {
+    this.towerPopup?.destroy();
+    this.towerPopup = undefined;
+    this.towerPopupSlot = null;
   }
 
   // ---------------------------------------------------------------- events
@@ -799,7 +810,7 @@ export class UIScene extends Phaser.Scene {
 
   private refreshUpgradeAffordability(): void {
     for (const u of UPGRADES) this.refreshUpgradeCardVisual(u.key);
-    this.refreshDefenseCard();
+    this.refreshDefenseCardVisual();
   }
 
   private onUpgradeBought(key: string, level: number): void {
@@ -1515,6 +1526,7 @@ export class UIScene extends Phaser.Scene {
   private buildDaySummaryPanel(s: DaySummary): void {
     this.summaryPanel?.destroy();
     this.upgradeButtons = {};
+    this.defenseCard = undefined;
     this.summaryNextDay = s.day + 1;
     const W = GAME_W;
     const H = GAME_H;
@@ -1615,12 +1627,10 @@ export class UIScene extends Phaser.Scene {
 
     // shop — form a distinct decision zone near the foot of a short report, but
     // keep flowing downward if warnings/rewards made the recap taller
-    // (anchor raised from -414 when the STRAIT DEFENSES card joined the shop —
-    // upgrades + defenses + NEXT DAY must all still fit above the fold)
-    y = Math.max(y, H / 2 - 600);
+    y = Math.max(y, H / 2 - 414);
     panel.add(this.add.rectangle(0, y, cardW, 1, DIVIDER));
     y += 22;
-    const upgradeCardH = 150;
+    const upgradeCardH = 170;
     // live cash readout right above the shop; onCredits keeps it current on buys
     this.summaryCashText = this.add
       .text(-cardW / 2, y + 12, `CASH  $${Math.round(this.displayedCredits)}`, {
@@ -1638,20 +1648,19 @@ export class UIScene extends Phaser.Scene {
         .setOrigin(1, 0.5)
     );
     const upgradeCardsY = upgradesHeaderY + 28 + upgradeCardH / 2;
-    // 3 cards side by side must fit the narrower portrait panel (cardW≈496)
-    // instead of the old landscape spacing — narrower cards, tighter gap
+    // 4 cards side by side (3 upgrades + the SEA TURRET defense card) must
+    // fit the portrait panel: 4x150 + 3x13 = 639 ≈ cardW
     const upgradeCardW = 150;
     const upgradeCardGap = 13;
     const upgradeCardStep = upgradeCardW + upgradeCardGap;
     UPGRADES.forEach((u, i) =>
-      this.buildUpgradeCard(panel, u, (i - 1) * upgradeCardStep, upgradeCardsY, upgradeCardH, upgradeCardW)
+      this.buildUpgradeCard(panel, u, (i - 1.5) * upgradeCardStep, upgradeCardsY, upgradeCardH, upgradeCardW)
     );
+    // the tower-defense shop entry: tap to hide the report and place turrets
+    // directly on the map (see enterPlacementMode)
+    this.buildDefenseCard(panel, 1.5 * upgradeCardStep, upgradeCardsY, upgradeCardH, upgradeCardW);
 
-    // tower-defense build phase: the STRAIT DEFENSES mini-map card
-    let defY = upgradeCardsY + upgradeCardH / 2 + 20;
-    defY += this.buildDefenseCard(panel, defY, cardW);
-
-    const nextBtnY = Math.max(defY + 50, H / 2 - 76);
+    const nextBtnY = Math.max(upgradeCardsY + upgradeCardH / 2 + 36, H / 2 - 76);
     // size the panel's own opaque background to however far the content
     // actually ran (+ the swipe hint under the button), floored at a full
     // screen — this panel is the next full-bleed "post" replacing the game
@@ -1711,6 +1720,7 @@ export class UIScene extends Phaser.Scene {
 
   // ------------------------------------------------ swipe-to-dismiss (day summary + curtain)
   private onSwipePointerDown(pointer: Phaser.Input.Pointer): void {
+    if (this.placementOpen) return; // map placement owns input while open
     if (this.feedCurtain?.active && this.curtainReady) {
       this.swipeStartX = pointer.x;
       this.swipeStartY = pointer.y;
@@ -1762,7 +1772,7 @@ export class UIScene extends Phaser.Scene {
   /** Shared dismiss path for the day-summary panel — fired by both the NEXT
    *  DAY button and a confirmed swipe-up gesture on the panel. */
   private requestNextDay(): void {
-    if (!this.summaryPanel?.active) return;
+    if (!this.summaryPanel?.active || this.placementOpen) return;
     sfx.tap();
     bus.emit(EV.NEXT_DAY_REQUEST);
   }
