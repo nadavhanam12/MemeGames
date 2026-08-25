@@ -28,6 +28,21 @@ import {
   freshStats
 } from '../core/state';
 
+// gold reticle with a dark outline so it reads on both sea and land;
+// hotspot at its center (16,16), falling back to the browser crosshair
+const AIM_CURSOR = (() => {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">` +
+    `<g fill="none" stroke="#0b1220" stroke-width="4" stroke-linecap="round">` +
+    `<circle cx="16" cy="16" r="9"/>` +
+    `<path d="M16 1v7M16 24v7M1 16h7M24 16h7"/></g>` +
+    `<g fill="none" stroke="#F4B942" stroke-width="2" stroke-linecap="round">` +
+    `<circle cx="16" cy="16" r="9"/>` +
+    `<path d="M16 1v7M16 24v7M1 16h7M24 16h7"/></g>` +
+    `<circle cx="16" cy="16" r="1.6" fill="#F4B942"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 16 16, crosshair`;
+})();
+
 type ThreatType = 'missile' | 'drone' | 'mine' | 'patrol';
 
 interface Tower {
@@ -68,6 +83,7 @@ interface Bullet {
   done?: boolean;
   fromAir?: boolean; // air-support rounds don't count as player intercepts
   speed?: number; // overrides turret.bulletSpeed (tower rounds fly slower)
+  kind?: 'tracer' | 'rocket'; // rocket = tower rounds: missile sprite + smoke trail
 }
 
 interface Tanker {
@@ -275,6 +291,8 @@ export class GameScene extends Phaser.Scene {
     // day 1 kicks off once the UI scene is up and listening
     this.time.delayedCall(400, () => this.startDay(1));
 
+    this.input.setDefaultCursor(AIM_CURSOR);
+
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       // ignore taps while a UI modal (upgrades panel) is open
       if (this.registry.get('ui-modal')) return;
@@ -317,6 +335,7 @@ export class GameScene extends Phaser.Scene {
       bus.removeAllListeners('defense-map-open');
       bus.removeAllListeners('defense-map-close');
       bus.removeAllListeners(EV.NEXT_DAY_REQUEST);
+      this.input.setDefaultCursor('default');
       sfx.stopAmbient();
     });
   }
@@ -1520,21 +1539,33 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** One tower round: same homing Bullet the gunner fires (so it shares the
-   *  tracer-streak pass and the intercept payout), slower and tinted. */
+  /** One tower round: same homing Bullet update loop the gunner uses (so it
+   *  shares the intercept payout), but rendered + trailed as a missile. */
   private towerFire(tw: Tower, target: Threat): void {
     const slot = this.towerSlots[tw.slotIdx];
     const mx = slot.x;
     const my = slot.y - 66;
-    const spr = this.add.image(mx, my, 'tracerGen').setDepth(55);
-    spr.setTint(0x9be8ff);
+    if (!this.textures.exists('towerRocketGen')) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      g.fillStyle(0x4a5057, 1); // rear fins
+      g.fillTriangle(4, 4, 4, 0, 11, 4);
+      g.fillTriangle(4, 10, 4, 14, 11, 10);
+      g.fillStyle(0x8a939b, 1); // body
+      g.fillRoundedRect(4, 4, 22, 6, 3);
+      g.fillStyle(0xe6543d, 1); // nose cone
+      g.fillTriangle(26, 4, 26, 10, 34, 7);
+      g.generateTexture('towerRocketGen', 36, 14);
+      g.destroy();
+    }
+    const spr = this.add.image(mx, my, 'towerRocketGen').setDepth(55);
     spr.setRotation(Math.atan2(target.sprite.y - my, target.sprite.x - mx));
     this.bullets.push({
       sprite: spr,
       target,
       aimX: target.sprite.x,
       aimY: target.sprite.y,
-      speed: TUNING.towers.bulletSpeed
+      speed: TUNING.towers.bulletSpeed,
+      kind: 'rocket'
     });
     const body = tw.container.list[0];
     if (body instanceof Phaser.GameObjects.Sprite && this.anims.exists('tower-fire') && !settings.reducedMotion) {
@@ -1544,14 +1575,14 @@ export class GameScene extends Phaser.Scene {
     sfx.tap();
     if (!settings.reducedMotion) {
       const flash = this.add
-        .circle(mx, my, 9, 0xd9f4ff, 1)
+        .circle(mx, my, 11, 0xffb37a, 1)
         .setDepth(56)
         .setBlendMode(Phaser.BlendModes.ADD);
       this.tweens.add({
         targets: flash,
-        scale: { from: 0.5, to: 1.5 },
+        scale: { from: 0.5, to: 1.8 },
         alpha: { from: 0.9, to: 0 },
-        duration: 90,
+        duration: 140,
         ease: 'Quad.easeOut',
         onComplete: () => flash.destroy()
       });
@@ -1952,6 +1983,23 @@ export class GameScene extends Phaser.Scene {
     if (!settings.reducedMotion) {
       for (const b of this.bullets) {
         const ang = b.sprite.rotation;
+        if (b.kind === 'rocket') {
+          // exhaust core + a receding plume of smoke puffs — a missile, not a tracer
+          const tailX = b.sprite.x - Math.cos(ang) * 15;
+          const tailY = b.sprite.y - Math.sin(ang) * 15;
+          this.trailGfx.fillStyle(0xfff2b8, 0.9);
+          this.trailGfx.fillCircle(tailX, tailY, 5);
+          this.trailGfx.fillStyle(0xff8a3d, 0.55);
+          this.trailGfx.fillCircle(tailX, tailY, 9);
+          for (let i = 1; i <= 5; i++) {
+            const dist = 15 + i * 11;
+            const px = b.sprite.x - Math.cos(ang) * dist;
+            const py = b.sprite.y - Math.sin(ang) * dist;
+            this.trailGfx.fillStyle(0xc9d2d8, 0.32 * (1 - i / 6));
+            this.trailGfx.fillCircle(px, py, 4 + i * 1.5);
+          }
+          continue;
+        }
         this.trailGfx.lineStyle(3, 0xffe08a, 0.3);
         this.trailGfx.lineBetween(b.sprite.x - Math.cos(ang) * 30, b.sprite.y - Math.sin(ang) * 30, b.sprite.x, b.sprite.y);
         this.trailGfx.lineStyle(2, 0xfff6cf, 0.55);
