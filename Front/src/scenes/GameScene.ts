@@ -53,6 +53,10 @@ interface Tower {
   pips: Phaser.GameObjects.Graphics;
   cooldownRing: Phaser.GameObjects.Graphics;
   fireTimer: number;
+  // brief lock-on before firing: target is picked, then held under a
+  // shrinking reticle for LOCK_TIME before the round actually launches
+  lockTarget?: Threat | null;
+  lockTimer?: number;
 }
 
 interface Threat {
@@ -191,6 +195,7 @@ export class GameScene extends Phaser.Scene {
 
   private waveGfx!: Phaser.GameObjects.Graphics;
   private trailGfx!: Phaser.GameObjects.Graphics; // tracer streaks, redrawn per frame
+  private towerLockGfx!: Phaser.GameObjects.Graphics; // tower lock-on reticles, redrawn per frame
   private lastHitstopAt = -10;
   private tensionTimer = 0;
   private waveT = 0;
@@ -277,6 +282,7 @@ export class GameScene extends Phaser.Scene {
     if (import.meta.env.DEV && devState.towerSlotEdit) this.enableTowerSlotEdit(true);
     this.waveGfx = this.add.graphics().setDepth(6);
     this.trailGfx = this.add.graphics().setDepth(54);
+    this.towerLockGfx = this.add.graphics().setDepth(53);
     this.lastHitstopAt = -10;
     this.tensionTimer = 0;
     // day/night light: navy wash over the world, alpha driven in update()
@@ -1547,12 +1553,37 @@ export class GameScene extends Phaser.Scene {
 
   /** Auto-fire loop: each tower locks the nearest threat in range (any type)
    *  on its own cooldown. */
+  /** Seconds a tower holds its reticle on a target before the round actually
+   *  launches — the anticipation beat that sells "taking aim". */
+  private static readonly TOWER_LOCK_SEC = 0.3;
+
   private updateTowers(rawDt: number): void {
     const cfg = TUNING.towers;
+    this.towerLockGfx.clear();
     for (const tw of this.towers) {
       if (!tw) continue;
       tw.fireTimer = Math.max(0, tw.fireTimer - rawDt);
       this.drawTowerCooldown(tw, cfg.fireInterval[tw.level - 1]);
+
+      // mid lock-on: keep the reticle on the target, then fire when it closes
+      if (tw.lockTarget) {
+        if (tw.lockTarget.dead) {
+          tw.lockTarget = null;
+          tw.lockTimer = 0;
+        } else {
+          tw.lockTimer = Math.max(0, (tw.lockTimer ?? 0) - rawDt);
+          const progress = 1 - (tw.lockTimer ?? 0) / GameScene.TOWER_LOCK_SEC;
+          this.drawTowerLockReticle(tw.lockTarget.sprite.x, tw.lockTarget.sprite.y, progress);
+          if (tw.lockTimer <= 0) {
+            const target = tw.lockTarget;
+            tw.lockTarget = null;
+            tw.fireTimer = cfg.fireInterval[tw.level - 1];
+            this.towerFire(tw, target);
+          }
+        }
+        continue;
+      }
+
       if (tw.fireTimer > 0) continue;
       const slot = this.towerSlots[tw.slotIdx];
       const range = cfg.range[tw.level - 1];
@@ -1567,8 +1598,32 @@ export class GameScene extends Phaser.Scene {
         }
       }
       if (!best) continue;
-      tw.fireTimer = cfg.fireInterval[tw.level - 1];
-      this.towerFire(tw, best);
+      // begin lock-on instead of firing instantly — towerFire() runs once it expires
+      tw.lockTarget = best;
+      tw.lockTimer = GameScene.TOWER_LOCK_SEC;
+    }
+  }
+
+  /** Shrinking bracket reticle drawn on a locking tower's target — progress
+   *  0..1 from lock-start to fire. */
+  private drawTowerLockReticle(x: number, y: number, progress: number): void {
+    const R = Phaser.Math.Linear(34, 16, Phaser.Math.Clamp(progress, 0, 1));
+    const g = this.towerLockGfx;
+    g.lineStyle(2.5, 0xff8a3d, 0.9);
+    const corner = R * 0.5;
+    for (const [sx, sy] of [
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1]
+    ]) {
+      const cx = x + sx * R;
+      const cy = y + sy * R;
+      g.beginPath();
+      g.moveTo(cx, cy - sy * corner);
+      g.lineTo(cx, cy);
+      g.lineTo(cx - sx * corner, cy);
+      g.strokePath();
     }
   }
 
@@ -1625,10 +1680,34 @@ export class GameScene extends Phaser.Scene {
         ease: 'Quad.easeOut',
         onComplete: () => flash.destroy()
       });
-      // recoil dip: the raft bobs into the water and pops back
+      // lingering muzzle smoke — a soft puff that drifts and fades slower
+      // than the flash, so the launch reads as heavier ordnance
+      const smoke = this.add.circle(mx, my, 10, 0xc9d2d8, 0.55).setDepth(54);
+      this.tweens.add({
+        targets: smoke,
+        x: mx + Phaser.Math.Between(-14, 14),
+        y: my - Phaser.Math.Between(10, 22),
+        scale: { from: 0.8, to: 2.6 },
+        alpha: { from: 0.55, to: 0 },
+        duration: 650,
+        ease: 'Quad.easeOut',
+        onComplete: () => smoke.destroy()
+      });
+      // recoil dip + knockback away from the target — the raft bobs into the
+      // water and kicks back, then pops back to rest
+      const kickAng = Math.atan2(target.sprite.y - my, target.sprite.x - mx);
+      const kickX = -Math.cos(kickAng) * 10;
       this.tweens.killTweensOf(tw.container);
-      tw.container.setY(slot.y + 3);
-      this.tweens.add({ targets: tw.container, y: slot.y, duration: 110, ease: 'Back.easeOut' });
+      tw.container.setPosition(slot.x + kickX, slot.y + 7);
+      tw.container.setAngle(-Math.cos(kickAng) * 4);
+      this.tweens.add({
+        targets: tw.container,
+        x: slot.x,
+        y: slot.y,
+        angle: 0,
+        duration: 180,
+        ease: 'Back.easeOut'
+      });
     }
   }
 
@@ -1997,9 +2076,19 @@ export class GameScene extends Phaser.Scene {
       const d = Phaser.Math.Distance.Between(b.sprite.x, b.sprite.y, b.aimX, b.aimY);
       if (d <= Math.max(step, tu.bulletHitRadius)) {
         if (b.target && !b.target.dead) {
-          // round-on-armor sparks at the point of arrival — separate from the
-          // death burst, so armored first hits still feel like metal on metal
-          this.burst(b.sprite.x, b.sprite.y, 0xffe08a, 'spark', 4);
+          if (b.kind === 'rocket') {
+            // heavier ordnance = heavier impact: bigger ring/flash/shake than
+            // the gunner's tracer rounds get, plus a flashed hit on the target
+            b.target.sprite.setTint(0xffffff);
+            impactFlash(this, b.sprite.x, b.sprite.y);
+            shockwave(this, b.sprite.x, b.sprite.y, 0xffb37a, 130);
+            this.burst(b.sprite.x, b.sprite.y, 0xffb37a, 'spark', 12);
+            camImpulse(this, TUNING.juice.shakeSmall * 1.8, 100);
+          } else {
+            // round-on-armor sparks at the point of arrival — separate from the
+            // death burst, so armored first hits still feel like metal on metal
+            this.burst(b.sprite.x, b.sprite.y, 0xffe08a, 'spark', 4);
+          }
           this.intercept(b.target, !b.fromAir);
         } else {
           // wasted round — small splash so the miss still reads
