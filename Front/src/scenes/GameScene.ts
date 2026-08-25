@@ -178,6 +178,7 @@ export class GameScene extends Phaser.Scene {
   private routeGfx?: Phaser.GameObjects.Graphics;
   private routeLabel?: Phaser.GameObjects.Text;
   private routeHandles: Phaser.GameObjects.Arc[] = [];
+  private towerSlotHandles: Phaser.GameObjects.Arc[] = [];
 
   // meme context/watchers: GameScene's own copy of the last emit time (so a
   // watcher edge is never blindly fired into UIScene's cooldown with nothing
@@ -250,6 +251,7 @@ export class GameScene extends Phaser.Scene {
     this.drawWorld();
     this.spawnTurret();
     if (import.meta.env.DEV && devState.routeEdit) this.enableRouteEdit(true);
+    if (import.meta.env.DEV && devState.towerSlotEdit) this.enableTowerSlotEdit(true);
     this.waveGfx = this.add.graphics().setDepth(6);
     this.trailGfx = this.add.graphics().setDepth(54);
     this.lastHitstopAt = -10;
@@ -434,6 +436,31 @@ export class GameScene extends Phaser.Scene {
         });
         this.routeHandles.push(h as Phaser.GameObjects.Arc);
       });
+    });
+  }
+
+  /** Dev-only: draggable handles on every tower slot — drag to reposition,
+   *  written straight into TUNING.towers.slots (💾 Save to disk persists). */
+  enableTowerSlotEdit(on: boolean): void {
+    if (!import.meta.env.DEV) return;
+    this.towerSlotHandles.forEach(h => h.destroy());
+    this.towerSlotHandles = [];
+    if (!on) return;
+    TUNING.towers.slots.forEach((p, i) => {
+      const h = this.add
+        .circle(p[0], p[1], 16, 0x8fd6ef, 0.85)
+        .setStrokeStyle(3, 0xffffff)
+        .setDepth(2500)
+        .setInteractive({ useHandCursor: true, draggable: true });
+      h.on('drag', (_ptr: Phaser.Input.Pointer, dragX: number, dragY: number) => {
+        h.setPosition(dragX, dragY);
+        TUNING.towers.slots[i] = [Math.round(dragX), Math.round(dragY)];
+        this.computeTowerSlots();
+        const tw = this.towers[i];
+        if (tw) tw.container.setPosition(this.towerSlots[i].x, this.towerSlots[i].y);
+        persistTuningLocal();
+      });
+      this.towerSlotHandles.push(h as Phaser.GameObjects.Arc);
     });
   }
 
@@ -954,10 +981,6 @@ export class GameScene extends Phaser.Scene {
     if (nearMiss && byPlayer) {
       this.stats.nearMisses++;
       this.slowMo(TUNING.juice.slowmoScale, TUNING.juice.slowmoMs);
-      if (!settings.reducedMotion) {
-        this.cameras.main.zoomTo(this.baseZoom * 1.12, 150, 'Cubic.easeOut', true);
-        this.time.delayedCall(450, () => this.cameras.main.zoomTo(this.baseZoom, 250, 'Cubic.easeOut', true));
-      }
       this.changePrice(-TUNING.economy.nearMissDrop);
       sfx.bigHit();
       vibrate([20, 30, 40]);
@@ -1327,7 +1350,7 @@ export class GameScene extends Phaser.Scene {
     const n = towerMaxLevel();
     for (let i = 0; i < n; i++) {
       tw.pips.fillStyle(i < tw.level ? PAL.gold : 0x3a4048, 1);
-      tw.pips.fillCircle((i - (n - 1) / 2) * 18, 66, 5);
+      tw.pips.fillCircle((i - (n - 1) / 2) * 27, 99, 7);
     }
   }
 
@@ -1459,7 +1482,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.towers.forEach((tw, i) => {
       if (!tw) return;
-      tw.container.setSize(112, 112);
+      tw.container.setSize(168, 168);
       if (!tw.container.input) tw.container.setInteractive({ useHandCursor: true });
       else tw.container.setInteractive();
       tw.container.off('pointerdown');
@@ -1502,7 +1525,7 @@ export class GameScene extends Phaser.Scene {
   private towerFire(tw: Tower, target: Threat): void {
     const slot = this.towerSlots[tw.slotIdx];
     const mx = slot.x;
-    const my = slot.y - 44;
+    const my = slot.y - 66;
     const spr = this.add.image(mx, my, 'tracerGen').setDepth(55);
     spr.setTint(0x9be8ff);
     spr.setRotation(Math.atan2(target.sprite.y - my, target.sprite.x - mx));

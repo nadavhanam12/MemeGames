@@ -778,7 +778,7 @@
       "alpha": true,
       "trim": false,
       "pivot": "center",
-      "targetWidth": 120,
+      "targetWidth": 180,
       "use": "SEA TURRET tower-defense unit: Trump from behind at a 4-tube missile launcher console. 8 cells of 512x512 — top row idle 1-4 (breathing loop), bottom row fire 1-4 (button press / contained ignition flash / empty tube + smoke puff / recovery). trim:false on purpose — frames must keep identical geometry so pose swaps don't jitter.",
       "frames": {
         "tower_idle_1": {

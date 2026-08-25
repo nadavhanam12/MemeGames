@@ -9,6 +9,7 @@ export const devState = {
   layoutEdit: false,
   routeEdit: false,
   routeDensified: false, // midpoint nodes injected once per session
+  towerSlotEdit: false,
   speedMultiplier: autostart ? 2 : 1, // 2x speed devtool — scales GameScene's simulation dt
   // 'gameplay' auto-fires at threats but leaves day-summary interaction (shop,
   // next day) to the player; 'full' also buys upgrades and advances days itself

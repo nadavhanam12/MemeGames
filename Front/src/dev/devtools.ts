@@ -62,6 +62,7 @@ const TIPS: Record<string, string> = {
   'Editors.pauseGame': 'Freeze the gameplay scene (timer, threats, tankers). HUD stays live. Toggle off to resume.',
   'Editors.layoutEdit': 'Drag HUD groups to move them; mouse-wheel over one to scale. Gameplay taps are disabled while on.',
   'Editors.routeEdit': 'Drag the purple waypoints to reshape the tanker shipping route live.',
+  'Editors.towerSlotEdit': 'Drag the cyan handles to reposition SEA TURRET build slots. 💾 Save to disk makes them permanent.',
   'Editors.speedX2': 'Doubles the gameplay simulation speed (spawns, movement, day timer). Visual FX stay normal speed.',
   'Editors.sound': 'Mutes/unmutes game SFX. Persisted to this browser only (localStorage) — does not affect other players or machines.',
   'Editors.autoPlay':
@@ -215,6 +216,7 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
     pauseGame: false,
     layoutEdit: devState.layoutEdit,
     routeEdit: devState.routeEdit,
+    towerSlotEdit: devState.towerSlotEdit,
     speedX2: devState.speedMultiplier === 2,
     autoPlay: devState.autoPlay,
     sound: settings.sound
@@ -245,6 +247,15 @@ function buildPanel(GUI: any, game: Phaser.Game): void {
     }),
     'Editors',
     'routeEdit'
+  );
+  tipped(
+    editors.add(editorState, 'towerSlotEdit').name('Edit tower slots').onChange((v: boolean) => {
+      devState.towerSlotEdit = v;
+      const gs = game.scene.getScene('Game') as any;
+      gs?.enableTowerSlotEdit?.(v);
+    }),
+    'Editors',
+    'towerSlotEdit'
   );
   tipped(
     editors
