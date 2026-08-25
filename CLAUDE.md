@@ -229,6 +229,27 @@ present, since it's not an intentional code change.
     warnings. Threats and upgrades unlock by day (`tuning.json` → `days`).
     The news band is **reserved for day-system news** — per-event gameplay
     headlines were removed; silent market nudges use `EV.MARKET_NUDGE`.
+  - **Day-break decision system**: between NEXT DAY and the new day starting,
+    UIScene.showDecisionScreen shows a full-screen "viral post" interstitial
+    (feedChrome header + story + fake engagement row) with two choice cards
+    and an oil-price card (recent sparkline + dashed A/B projection branches,
+    red=price up / green=down). `src/core/decisions.ts` is the run-scoped
+    logic: multi-day multiplier effects (`decisionMult('enemyRate'|
+    'enemySpeed'|'weaponCooldown'|'credits')` read at GameScene's spawn-
+    interval / threat-speed / tower+player fire / addCredits sites), a hidden
+    -100..100 reputation meter (aggressive picks +, diplomatic -; >=+40 adds a
+    permanent enemyRate mult, <=-40 taxes credits — thresholds in tuning),
+    and pool rolling with `minDay`/`repMin`/`repMax` gates, no repeats until
+    the eligible pool cycles. Content: `tuning.json → decisions.events` (8
+    events; text + effectLines are hand-authored there, never in code).
+    Flow: GameScene.endDay calls tickDecisionDay() + rollDecision(day+1) and
+    publishes registry 'priceHistory'; UIScene.requestNextDay intercepts when
+    a decision is pending (full-autoplay dev mode auto-picks instead);
+    choosing emits EV.DECISION → GameScene applies the instant oilDelta
+    (clamped 40..220) → overlay emits EV.NEXT_DAY_REQUEST and scrolls off
+    with the same 420ms EASE.inOut grammar as the feed curtain. Effects
+    reset every run (resetDecisions() next to resetMemeLog()); nothing is
+    persisted. No swipe-skip on the decision screen by design.
   - **Tower-defense layer ("SEA TURRETS")**: ONE universal tower type that
     auto-fires at any threat in range (Nadav simplified it down from an
     earlier 3-type CIWS/depth/jammer design — don't reintroduce types).
