@@ -83,7 +83,8 @@ export class MenuScene extends Phaser.Scene {
       if (leaving) return;
       leaving = true;
       sfx.unlock(); sfx.fanfare();
-      this.time.delayedCall(140, () => broadcastCut(this, () => this.scene.start('Intro')));
+      // intro map-zoom cinematic disabled for now — jump straight into the game
+      this.time.delayedCall(140, () => broadcastCut(this, () => this.scene.start('Game')));
     });
     const leaderboard = this.makeButton(194, 578, 304, 64, 'RANKINGS', PAL.ocean, false, () => {
       if (leaving) return;
