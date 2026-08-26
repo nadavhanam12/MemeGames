@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { COMMENTS, ENGAGEMENT, FONT_DISPLAY, FONT_SANS, GAME_H, GAME_W, HEADER, HEX, PAL, VIEW } from '../core/palette';
 import { settings } from '../core/settings';
 import { sfx } from '../core/sfx';
-import { MemeContext, MEMES, pickMeme } from '../core/memes';
+import { MemeContext, MEMES, MemePick, pickMeme, renderMeme } from '../core/memes';
 import { captureAndShare, captureAndShareTo } from '../core/share';
 import { addExportButtonRow } from '../core/shareButtons';
 import { hasArt } from '../core/art';
@@ -164,7 +164,7 @@ export class UIScene extends Phaser.Scene {
   // over the ENGAGEMENT icon row, but only while the water is clear of live
   // threats (see tryShowUnlockBanner); first-ever unlocks get a gold
   // "NEW MEME UNLOCKED" title
-  private unlockBannerQueue: { id: string; isNew: boolean }[] = [];
+  private unlockBannerQueue: MemePick[] = [];
   private unlockBanner?: Phaser.GameObjects.Container;
 
   // SEA TURRETS shop card (a 4th card in the TACTICAL UPGRADES row) + the
@@ -2221,7 +2221,7 @@ export class UIScene extends Phaser.Scene {
     this.lastMemeAt = this.time.now;
     const pick = pickMeme(label, ctx);
     if (pick.isNew) bus.emit('meme-unlocked', pick.id);
-    this.unlockBannerQueue.push({ id: pick.id, isNew: pick.isNew });
+    this.unlockBannerQueue.push(pick);
     this.onHeadline('📸 new post added to today’s feed', 'event', 2000);
     sfx.tap();
   }
@@ -2317,11 +2317,11 @@ export class UIScene extends Phaser.Scene {
     const aliveThreats = ((game.threats ?? []) as { dead: boolean }[]).filter(t => !t.dead).length;
     if (aliveThreats > TUNING.social.memeBannerMaxThreats) return;
     const next = this.unlockBannerQueue.shift()!;
-    this.showUnlockBanner(next.id, next.isNew);
+    this.showUnlockBanner(next);
   }
 
-  private showUnlockBanner(id: string, isNew: boolean): void {
-    const tpl = MEMES.templates[id];
+  private showUnlockBanner(pick: MemePick): void {
+    const { tpl, isNew } = pick;
     if (!tpl) return;
     // square card spanning the whole lower band: from the top line of the
     // engagement icon row down to the bottom line of the INTEL panel
@@ -2354,11 +2354,11 @@ export class UIScene extends Phaser.Scene {
     const artW = Math.min(boxW, boxH / tpl.aspect);
     const artH = artW * tpl.aspect;
     const artY = -size / 2 + 44 + boxH / 2;
-    if (hasArt(this, tpl.artKey)) {
-      banner.add(this.add.image(0, artY, tpl.artKey).setDisplaySize(artW, artH));
-    } else {
-      banner.add(this.add.rectangle(0, artY, artW, artH, 0x39424e));
-    }
+    // captions live only on this in-flight card — renderMeme overlays the
+    // picked variant's text on the art (thumbnails elsewhere stay textless)
+    const memeHost = this.add.container(0, artY);
+    renderMeme(this, memeHost, pick, boxW, boxH);
+    banner.add(memeHost);
     banner.add(this.add.rectangle(0, artY, artW, artH).setStrokeStyle(2, PAL.gold));
     sfx.tap();
     // half-transparent black dim over the whole lower band (stats / graph /
