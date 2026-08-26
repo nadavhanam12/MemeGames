@@ -139,6 +139,9 @@ export class UIScene extends Phaser.Scene {
   // day-break decision interstitial (see showDecisionScreen)
   private decisionOverlay?: Phaser.GameObjects.Container;
   private decisionChosen = false;
+  // plays the chosen branch's solid-line advance on the oil graph after a
+  // pick, calling back when the sweep lands (rebuilt by buildDecisionGraph)
+  private decisionGraphAnim?: (idx: number, onDone: () => void) => void;
   // feed-scroll swipe-to-dismiss on the day summary: finalY is the panel's
   // resting position (drag offsets it from there), ready gates swipes until
   // the entrance beat (stamp + slide-in) has actually finished
@@ -1955,6 +1958,8 @@ export class UIScene extends Phaser.Scene {
     y += graphH + 20;
 
     // ---- choice cards (quote-reply style), tagged A/B to match the graph
+    // inner-local rects per card, for the scene-level tap fallback below
+    const cardRects: { idx: number; top: number; h: number; card: Phaser.GameObjects.Container; cardBg: Phaser.GameObjects.Graphics }[] = [];
     ev.options.forEach((opt, idx) => {
       const lines = opt.effectLines;
       const cardH = 60 + lines.length * 26 + 18;
@@ -1996,8 +2001,26 @@ export class UIScene extends Phaser.Scene {
       });
       card.setData('optIdx', idx);
       inner.add(card);
+      cardRects.push({ idx, top: y, h: cardH, card, cardBg });
       y += cardH + 16;
     });
+
+    // scene-level tap fallback: Phaser's per-object dispatch can drop taps on
+    // the cards while the overlay is still sliding in (or when the full-screen
+    // bg swallower outranks them in the pointer sort), which read as the
+    // buttons being dead for the first moments of the screen. This path
+    // hit-tests the card rects directly off the raw pointer, so a choice
+    // registers the instant the card is under the finger — commitDecision's
+    // decisionChosen guard dedupes against the cards' own handlers.
+    const tapCatcher = (p: Phaser.Input.Pointer) => {
+      if (this.decisionChosen || this.decisionOverlay !== overlay || !overlay.active) return;
+      const wp = this.cameras.main.getWorldPoint(p.x, p.y);
+      const ly = wp.y - overlay.y - inner.y;
+      const hit = cardRects.find(r => ly >= r.top && ly <= r.top + r.h && Math.abs(wp.x - cx) <= W / 2);
+      if (hit) this.commitDecision(ev, hit.idx, hit.card, hit.cardBg, W, hit.h);
+    };
+    this.input.on('pointerdown', tapCatcher);
+    overlay.once('destroy', () => this.input.off('pointerdown', tapCatcher));
 
     // center the stack in the canvas (bg stays full-bleed) — top-anchoring
     // instead just dumps all the same slack below the cards on short decision
@@ -2086,6 +2109,8 @@ export class UIScene extends Phaser.Scene {
       labelYs[0] = mid + (firstOnTop ? -9 : 9);
       labelYs[1] = mid + (firstOnTop ? 9 : -9);
     }
+    const dashes: Phaser.GameObjects.Graphics[] = [];
+    const endLabels: Phaser.GameObjects.Text[] = [];
     options.forEach((o, i) => {
       const color = branchColor(o);
       const yEnd = yFor(ends[i]);
@@ -2103,13 +2128,63 @@ export class UIScene extends Phaser.Scene {
         );
       }
       c.add(dash);
+      dashes.push(dash);
       const hex = `#${color.toString(16).padStart(6, '0')}`;
-      c.add(
-        this.add
-          .text(endX + 8, labelYs[i], `${'AB'[i]} $${Math.round(ends[i])}`, { fontFamily: FONT_SANS, fontSize: '16px', fontStyle: 'bold', color: hex })
-          .setOrigin(0, 0.5)
-      );
+      const endLabel = this.add
+        .text(endX + 8, labelYs[i], `${'AB'[i]} $${Math.round(ends[i])}`, { fontFamily: FONT_SANS, fontSize: '16px', fontStyle: 'bold', color: hex })
+        .setOrigin(0, 0.5);
+      c.add(endLabel);
+      endLabels.push(endLabel);
     });
+
+    // post-pick payoff: sweep a solid line along the chosen branch (dashed
+    // projection becomes "reality"), sliding the price dot with it and
+    // counting the end label up/down to the landed price, while the road not
+    // taken dims out (see commitDecision, which awaits onDone before exiting)
+    const animLine = this.add.graphics();
+    c.add(animLine);
+    const animDot = this.add.circle(nowX, yFor(cur), 5, PAL.gold).setVisible(false);
+    c.add(animDot);
+    this.decisionGraphAnim = (idx, onDone) => {
+      const color = branchColor(options[idx]);
+      const y0 = yFor(cur);
+      const yEnd = yFor(ends[idx]);
+      options.forEach((_o, i) => {
+        if (i === idx) return;
+        if (settings.reducedMotion) {
+          dashes[i].setAlpha(0.2);
+          endLabels[i].setAlpha(0.2);
+        } else {
+          this.tweens.add({ targets: [dashes[i], endLabels[i]], alpha: 0.2, duration: 250 });
+        }
+      });
+      if (settings.reducedMotion) {
+        animLine.lineStyle(4, color, 1).lineBetween(nowX, y0, endX, yEnd);
+        animDot.setPosition(endX, yEnd).setVisible(true);
+        onDone();
+        return;
+      }
+      animDot.setVisible(true);
+      const prog = { t: 0 };
+      this.tweens.add({
+        targets: prog,
+        t: 1,
+        duration: 900,
+        ease: EASE.inOut,
+        onUpdate: () => {
+          const x = nowX + (endX - nowX) * prog.t;
+          const yy = y0 + (yEnd - y0) * prog.t;
+          animLine.clear().lineStyle(4, color, 1).lineBetween(nowX, y0, x, yy);
+          animDot.setPosition(x, yy);
+          endLabels[idx].setText(`${'AB'[idx]} $${Math.round(cur + (ends[idx] - cur) * prog.t)}`);
+        },
+        onComplete: () => {
+          endLabels[idx].setText(`${'AB'[idx]} $${Math.round(ends[idx])}`);
+          this.tweens.add({ targets: endLabels[idx], scale: 1.25, duration: 140, yoyo: true });
+          onDone();
+        }
+      });
+    };
     return c;
   }
 
@@ -2148,7 +2223,11 @@ export class UIScene extends Phaser.Scene {
       }
     });
     bus.emit(EV.DECISION, ev.id, idx, opt);
-    this.time.delayedCall(settings.reducedMotion ? 80 : 800, () => this.exitDecisionScreen());
+    // play the graph's chosen-branch advance first, hold a beat on the landed
+    // price, then scroll off into the new day
+    const finish = () => this.time.delayedCall(settings.reducedMotion ? 80 : 450, () => this.exitDecisionScreen());
+    if (this.decisionGraphAnim) this.decisionGraphAnim(idx, finish);
+    else finish();
   }
 
   /** Kick off the next day underneath, then scroll the decision overlay up
@@ -2156,12 +2235,16 @@ export class UIScene extends Phaser.Scene {
   private exitDecisionScreen(): void {
     const overlay = this.decisionOverlay;
     if (!overlay) return;
+    this.decisionGraphAnim = undefined;
     bus.emit(EV.NEXT_DAY_REQUEST);
     if (settings.reducedMotion) {
       overlay.destroy();
       this.decisionOverlay = undefined;
       return;
     }
+    // a pick made while the overlay was still sliding in leaves the entrance
+    // tween alive — kill it so it can't fight the exit scroll
+    this.tweens.killTweensOf(overlay);
     this.tweens.add({
       targets: overlay,
       y: -GAME_H,

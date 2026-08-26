@@ -249,8 +249,20 @@ present, since it's not an intentional code change.
     publishes registry 'priceHistory'; UIScene.requestNextDay intercepts when
     a decision is pending (full-autoplay dev mode auto-picks instead);
     choosing emits EV.DECISION → GameScene applies the instant oilDelta
-    (clamped 40..220) → overlay emits EV.NEXT_DAY_REQUEST and scrolls off
-    with the same 420ms EASE.inOut grammar as the feed curtain. Effects
+    (clamped 40..220) → the oil graph plays a 900ms "projection becomes
+    reality" sweep (solid line along the chosen dashed branch, price dot
+    sliding with it, end label counting to the landed price, other branch
+    dimmed — `decisionGraphAnim`, built in `buildDecisionGraph`) → after a
+    450ms beat the overlay emits EV.NEXT_DAY_REQUEST and scrolls off with
+    the same 420ms EASE.inOut grammar as the feed curtain (reducedMotion:
+    sweep snaps to final, 80ms exit as before). Choice-card taps are ALSO
+    caught by a scene-level pointerdown fallback in showDecisionScreen
+    that hit-tests the card rects off the raw pointer (deduped by the
+    `decisionChosen` guard) — Phaser's per-object dispatch could drop taps
+    on the cards while the overlay slides in / when the full-screen bg
+    swallower outranks them in the pointer sort, which read as the buttons
+    being dead for the first moments of the screen; don't remove the
+    fallback when touching this code. Effects
     reset every run (resetDecisions() next to resetMemeLog()); nothing is
     persisted. No swipe-skip on the decision screen by design.
   - **Tower-defense layer ("SEA TURRETS")**: ONE universal tower type that
