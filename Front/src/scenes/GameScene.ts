@@ -1692,7 +1692,7 @@ export class GameScene extends Phaser.Scene {
       g.generateTexture('towerRocketGen', 36, 14);
       g.destroy();
     }
-    const spr = this.add.image(mx, my, 'towerRocketGen').setDepth(55);
+    const spr = this.add.image(mx, my, 'towerRocketGen').setDepth(55).setScale(TUNING.towers.missileScale);
     spr.setRotation(Math.atan2(target.sprite.y - my, target.sprite.x - mx));
     const birthDist = Phaser.Math.Distance.Between(mx, my, target.sprite.x, target.sprite.y);
     this.bullets.push({
@@ -2193,19 +2193,21 @@ export class GameScene extends Phaser.Scene {
       for (const b of this.bullets) {
         const ang = b.sprite.rotation;
         if (b.kind === 'rocket') {
-          // exhaust core + a receding plume of smoke puffs — a missile, not a tracer
-          const tailX = b.sprite.x - Math.cos(ang) * 15;
-          const tailY = b.sprite.y - Math.sin(ang) * 15;
+          // exhaust core + a receding plume of smoke puffs — a missile, not a
+          // tracer; geometry tracks missileScale so the plume clears the body
+          const ms = TUNING.towers.missileScale;
+          const tailX = b.sprite.x - Math.cos(ang) * 15 * ms;
+          const tailY = b.sprite.y - Math.sin(ang) * 15 * ms;
           this.trailGfx.fillStyle(0xfff2b8, 0.9);
-          this.trailGfx.fillCircle(tailX, tailY, 5);
+          this.trailGfx.fillCircle(tailX, tailY, 5 * ms);
           this.trailGfx.fillStyle(0xff8a3d, 0.55);
-          this.trailGfx.fillCircle(tailX, tailY, 9);
+          this.trailGfx.fillCircle(tailX, tailY, 9 * ms);
           for (let i = 1; i <= 5; i++) {
-            const dist = 15 + i * 11;
+            const dist = (15 + i * 11) * ms;
             const px = b.sprite.x - Math.cos(ang) * dist;
             const py = b.sprite.y - Math.sin(ang) * dist;
             this.trailGfx.fillStyle(0xc9d2d8, 0.32 * (1 - i / 6));
-            this.trailGfx.fillCircle(px, py, 4 + i * 1.5);
+            this.trailGfx.fillCircle(px, py, (4 + i * 1.5) * ms);
           }
           continue;
         }

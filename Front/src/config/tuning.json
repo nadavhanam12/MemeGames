@@ -337,10 +337,11 @@
       340
     ],
     "fireInterval": [
-      48,
-      40,
-      32
+      24,
+      20,
+      16
     ],
+    "missileScale": 2,
     "lockSec": 0.7
   },
   "juice": {
