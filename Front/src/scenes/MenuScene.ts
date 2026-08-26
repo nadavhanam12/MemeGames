@@ -25,6 +25,13 @@ export class MenuScene extends Phaser.Scene {
   create(): void {
     loadSettings();
     broadcastReveal(this);
+    // audio needs a user gesture — the first tap anywhere starts the menu
+    // theme (kept as `on`, not `once`: unlock can no-op if the gesture is
+    // swallowed, and startMusic is idempotent)
+    this.input.on('pointerdown', () => {
+      sfx.unlock();
+      sfx.startMusic('menu');
+    });
     let leaving = false;
     const cx = GAME_W / 2;
     const contentW = GAME_W - 64;

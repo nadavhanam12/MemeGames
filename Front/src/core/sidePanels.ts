@@ -55,6 +55,14 @@ export async function initSidePanels(): Promise<void> {
   buildGalleryPanel(leftPanel);
   buildPreviewPanel(rightPanel);
 
+  // Instant unlock: the moment a brand-new meme fires mid-day (UIScene emits
+  // right after pickMeme), glow its tile and auto-open it in the preview panel.
+  bus.on('meme-unlocked', (id: string) => {
+    onNewUnlocks([id]);
+    selectTile(id);
+    refreshSections();
+  });
+
   bus.on(EV.DAY_END, (summary: DaySummary) => {
     if (summary.newMemesUnlocked?.length) onNewUnlocks(summary.newMemesUnlocked);
     refreshSections();

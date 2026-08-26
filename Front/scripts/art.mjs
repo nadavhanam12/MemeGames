@@ -214,7 +214,15 @@ async function main() {
     tower_fire_1: 'tower_fire_1.png',
     tower_fire_2: 'tower_fire_2.png',
     tower_fire_3: 'tower_fire_3.png',
-    tower_fire_4: 'tower_fire_4.png'
+    tower_fire_4: 'tower_fire_4.png',
+    tower_s_idle_1: 'tower_s_idle_1.png',
+    tower_s_idle_2: 'tower_s_idle_2.png',
+    tower_s_idle_3: 'tower_s_idle_3.png',
+    tower_s_idle_4: 'tower_s_idle_4.png',
+    tower_s_fire_1: 'tower_s_fire_1.png',
+    tower_s_fire_2: 'tower_s_fire_2.png',
+    tower_s_fire_3: 'tower_s_fire_3.png',
+    tower_s_fire_4: 'tower_s_fire_4.png'
   };
   const memesCfg = JSON.parse(await readFile(path.join(root, 'src', 'config', 'memes.json'), 'utf8'));
   for (const t of Object.values(memesCfg.templates)) ART_MAP[t.artKey] = t.artFile;

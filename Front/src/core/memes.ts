@@ -234,9 +234,11 @@ export function pickMeme(label: string, ctx?: MemeContext): MemePick {
   let candidates = pool.filter(v => v.t !== lastTemplate && inTier(v));
   if (!candidates.length) candidates = pool.filter(inTier);
   // No template within reach yet for this trigger (e.g. a trigger whose
-  // whole pool happens to sit in a later tier) — fall back to ignoring the
-  // tier gate rather than showing nothing.
-  if (!candidates.length) candidates = pool.filter(v => MEMES.templates[v.t]);
+  // whole pool sits in a later tier) — use the generic fallback pool, still
+  // tier-gated, rather than leaking a later-tier template early. The
+  // trigger-specific caption is lost, but the collection gate holds.
+  if (!candidates.length) candidates = MEMES.fallback.filter(inTier);
+  if (!candidates.length) candidates = MEMES.fallback.filter(v => MEMES.templates[v.t]);
   if (!candidates.length) candidates = pool;
 
   let eligible = candidates.filter(v => whenSatisfied(v.when, ctx));

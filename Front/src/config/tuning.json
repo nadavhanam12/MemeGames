@@ -307,7 +307,7 @@
       ]
     ],
     "sellRefundFrac": 0.5,
-    "bulletSpeed": 112.5,
+    "bulletSpeed": 56.25,
     "revealDay": 2,
     "buildCosts": [
       80,
@@ -337,9 +337,9 @@
       340
     ],
     "fireInterval": [
-      24,
-      20,
-      16
+      48,
+      40,
+      32
     ],
     "lockSec": 0.7
   },
@@ -564,7 +564,8 @@
   "social": {
     "shareGrowthMin": 50,
     "shareGrowthMax": 100,
-    "unlockBannerHoldMs": 2600
+    "unlockBannerHoldMs": 5000,
+    "memeBannerMaxThreats": 3
   },
   "decisions": {
     "repAggroThreshold": 40,

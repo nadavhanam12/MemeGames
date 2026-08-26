@@ -216,7 +216,10 @@ present, since it's not an intentional code change.
   - `src/core/` — game-side systems: `state.ts` (run state + `computeScore()`,
     the canonical submitted score, plus the `DayMission`/`DaySummary` types and
     day-system bus events), `art.ts`, `juice.ts`, `sfx.ts` (synthesized SFX +
-    ambient ocean/tension bed via `startAmbient`/`setTension`), `palette.ts`,
+    ambient ocean/tension bed via `startAmbient`/`setTension`, plus two
+    synthesized hijaz-scale music loops via `startMusic('game'|'menu')`/
+    `stopMusic`, gated live on `settings.music`; SFX default OFF, music
+    defaults ON, settings localStorage key bumped to `hormuz-settings-v3`), `palette.ts`,
     `settings.ts`, `memeUnlocks.ts` (persisted meme-collection progress),
     `broadcast.ts` (shared "TV broadcast" screen language: `broadcastCut`/
     `broadcastReveal` channel-cut scene transitions, `staticBlink`,
@@ -287,7 +290,15 @@ present, since it's not an intentional code change.
     `GameScene.spawnTowerSprite` builds the `tower-idle` (4fps loop) and
     `tower-fire` (12fps one-shot, played from `towerFire`, returns to idle)
     anims, falling back to the old generated `towerGen2x` raft when the
-    sliced art is missing.
+    sliced art is missing. **South-facing variant**: `assets/raw/
+    sea_turret_south_atlas.png` (manifest entry `sea_turret_south`, same
+    8-cell grammar) slices into `tower_s_idle_1..4`/`tower_s_fire_1..4`;
+    slots 0–7 in `tuning.json → towers.slots` are the upper/Iran coast
+    (authored order — first 8 upper, last 8 lower) and get this variant
+    (tubes point south toward the strait), with its own `tower_s-idle`/
+    `tower_s-fire` anims; `towerFire` picks the anim set from the sprite's
+    texture-key prefix. Falls back to the base atlas if the south art is
+    missing.
   - **Meme collection system**: `src/core/memeUnlocks.ts` persists which meme
     templates have ever fired (localStorage `hormuz-memes-v1`, per-account like
     `src/backend/`), populated by `pickMeme()` in `src/core/memes.ts`.

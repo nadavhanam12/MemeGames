@@ -832,6 +832,70 @@
       }
     },
     {
+      "name": "sea_turret_south",
+      "file": "sea_turret_south_atlas.png",
+      "kind": "atlas",
+      "size": [
+        2048,
+        1024
+      ],
+      "alpha": true,
+      "trim": false,
+      "pivot": "center",
+      "targetWidth": 180,
+      "use": "SEA TURRET south-facing variant for the 8 upper/Iran-coast slots (launcher tubes point south/down toward the strait; Trump behind the console at top). Same grammar as sea_turret: 8 cells of 512x512 — top row idle 1-4 (breathing loop), bottom row fire 1-4. trim:false on purpose — frames must keep identical geometry so pose swaps don't jitter.",
+      "frames": {
+        "tower_s_idle_1": {
+          "x": 0,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        },
+        "tower_s_idle_2": {
+          "x": 512,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        },
+        "tower_s_idle_3": {
+          "x": 1024,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        },
+        "tower_s_idle_4": {
+          "x": 1536,
+          "y": 0,
+          "w": 512,
+          "h": 512
+        },
+        "tower_s_fire_1": {
+          "x": 0,
+          "y": 512,
+          "w": 512,
+          "h": 512
+        },
+        "tower_s_fire_2": {
+          "x": 512,
+          "y": 512,
+          "w": 512,
+          "h": 512
+        },
+        "tower_s_fire_3": {
+          "x": 1024,
+          "y": 512,
+          "w": 512,
+          "h": 512
+        },
+        "tower_s_fire_4": {
+          "x": 1536,
+          "y": 512,
+          "w": 512,
+          "h": 512
+        }
+      }
+    },
+    {
       "name": "meme_expandingbrain_atlas",
       "file": "Meme/meme_expandingbrain_atlas.png",
       "kind": "atlas",

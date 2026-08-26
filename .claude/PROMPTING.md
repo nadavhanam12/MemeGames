@@ -21,3 +21,11 @@ Add a new section when a recurring misunderstanding or wasted-effort pattern sur
 ## Worktree / background-session changes
 
 Background sessions in this repo work in isolated git worktrees, separate from the live main checkout the dev server actually serves. A change reported as "done" on a worktree branch is invisible on `http://localhost:5173` (or the phone-accessible LAN URL) until it's merged into main. When finishing a worktree change, proactively note that it needs merging and offer to do it (or ask), rather than waiting for the user to separately ask "is it merged?" or "merge to main" after the fact. Also check for uncommitted local changes in the main checkout before merging — the worktree branches from `origin/main`, not local state, so it can miss in-flight edits the user is making in their own session.
+
+## Dev-tool / tuning.json footgun
+
+Whenever you change values in `Front/src/config/tuning.json` (directly, or via the dev panel's "Save to disk" / `/__save`), proactively tell the user:
+- The browser's `dev-tuning` localStorage override (if any) will still win over the file on reload — mention the dev panel's "⚠ Reset local overrides" button if they might have local edits sitting on top of the committed values.
+- If the change touches route waypoints specifically, note that opening "Edit route waypoints" in the dev panel auto-densifies (adds a midpoint between each pair) and immediately persists that to localStorage — so a clean waypoint count only stays clean until that tool is opened again.
+
+Say this up front, before the user notices a mismatch, not only after they ask why their browser doesn't match the file.

@@ -41,7 +41,15 @@ const CORE_ART: Record<string, string> = {
   tower_fire_1: 'tower_fire_1.png',
   tower_fire_2: 'tower_fire_2.png',
   tower_fire_3: 'tower_fire_3.png',
-  tower_fire_4: 'tower_fire_4.png'
+  tower_fire_4: 'tower_fire_4.png',
+  tower_s_idle_1: 'tower_s_idle_1.png',
+  tower_s_idle_2: 'tower_s_idle_2.png',
+  tower_s_idle_3: 'tower_s_idle_3.png',
+  tower_s_idle_4: 'tower_s_idle_4.png',
+  tower_s_fire_1: 'tower_s_fire_1.png',
+  tower_s_fire_2: 'tower_s_fire_2.png',
+  tower_s_fire_3: 'tower_s_fire_3.png',
+  tower_s_fire_4: 'tower_s_fire_4.png'
 };
 
 const MEME_ART: Record<string, string> = Object.fromEntries(

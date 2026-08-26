@@ -1,8 +1,11 @@
 // Player-facing options, persisted to localStorage.
-const KEY = 'hormuz-settings-v1';
+// v3: music now defaults ON (sound/SFX still defaults OFF) — key bumped so
+// previously-saved values don't override the new defaults.
+const KEY = 'hormuz-settings-v3';
 
 export interface Settings {
   sound: boolean;
+  music: boolean;
   vibration: boolean;
   reducedMotion: boolean;
 }
@@ -16,7 +19,8 @@ function systemReducedMotion(): boolean {
 }
 
 export const settings: Settings = {
-  sound: true,
+  sound: false,
+  music: true,
   vibration: true,
   reducedMotion: systemReducedMotion()
 };

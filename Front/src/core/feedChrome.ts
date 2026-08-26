@@ -243,15 +243,15 @@ export function createSuggestedCard(scene: Phaser.Scene, opts: SuggestedCardOpts
   const parts: Phaser.GameObjects.GameObject[] = [bg];
 
   const wrapW = opts.w - 20;
-  let titleY = -opts.h / 2 + 20;
+  let titleY = -opts.h / 2 + 24;
   if (opts.icon) {
-    parts.push(scene.add.text(0, -opts.h / 2 + 30, opts.icon, { fontFamily: FONT_SANS, fontSize: '26px' }).setOrigin(0.5));
-    titleY = -opts.h / 2 + 58;
+    parts.push(scene.add.text(0, -opts.h / 2 + 42, opts.icon, { fontFamily: FONT_SANS, fontSize: '38px' }).setOrigin(0.5));
+    titleY = -opts.h / 2 + 80;
   }
   const title = scene.add
     .text(0, titleY, opts.title, {
       fontFamily: FONT_SANS,
-      fontSize: '15px',
+      fontSize: '19px',
       fontStyle: 'bold',
       color: HEX.cream,
       align: 'center',
@@ -259,9 +259,9 @@ export function createSuggestedCard(scene: Phaser.Scene, opts: SuggestedCardOpts
     })
     .setOrigin(0.5, 0);
   const subtitle = scene.add
-    .text(0, opts.h / 2 - 18, opts.subtitle, {
+    .text(0, opts.h / 2 - 24, opts.subtitle, {
       fontFamily: FONT_SANS,
-      fontSize: '13px',
+      fontSize: '16px',
       color: HEX.muted,
       align: 'center',
       wordWrap: { width: wrapW }

@@ -551,6 +551,16 @@ export class UIScene extends Phaser.Scene {
           sfx.tap();
           return;
         }
+        // no turrets yet + can't afford the first one → refuse with the same
+        // shake the other upgrade cards give; once at least one is built the
+        // card doubles as the manage/upgrade/sell entry, so it stays tappable
+        const state = (this.registry.get('towerState') ?? []) as Array<TowerStateEntry | null>;
+        const built = state.filter(Boolean).length;
+        if (built === 0 && this.displayedCredits < towerBuildCost(0)) {
+          this.tweens.add({ targets: card, x: x - 6, duration: 40, yoyo: true, repeat: 2 });
+          sfx.tap();
+          return;
+        }
         pressPulse(this, card);
         this.enterPlacementMode();
       }
@@ -583,6 +593,10 @@ export class UIScene extends Phaser.Scene {
     subtitle
       .setText(`PLACE ON MAP \u00b7 $${cost} (${built}/${total})`)
       .setColor(affordable ? HEX.green : HEX.muted);
+    // mirror the locked-card dim when the first turret is out of reach \u2014
+    // with none built the card is purely a purchase button, so it should
+    // read disabled exactly like an unaffordable/locked upgrade
+    card.setAlpha(built === 0 && !affordable ? 0.6 : 1);
   }
 
   private onTowersChanged(): void {
@@ -1666,7 +1680,7 @@ export class UIScene extends Phaser.Scene {
     stretchMarks.push(panel.list.length);
     panel.add(this.add.rectangle(0, y, cardW, 1, DIVIDER));
     y += 22;
-    const upgradeCardH = 130;
+    const upgradeCardH = 175;
     // live cash readout right above the shop; onCredits keeps it current on buys
     this.summaryCashText = this.add
       .text(-cardW / 2, y + 12, `CASH  $${Math.round(this.displayedCredits)}`, {
@@ -1685,9 +1699,10 @@ export class UIScene extends Phaser.Scene {
     );
     const upgradeCardsY = upgradesHeaderY + 28 + upgradeCardH / 2;
     // 4 cards side by side (3 upgrades + the SEA TURRET defense card) must
-    // fit the portrait panel: 4x150 + 3x13 = 639 ≈ cardW
-    const upgradeCardW = 150;
-    const upgradeCardGap = 13;
+    // fit the portrait panel: 4x168 + 3x8 = 696 < GAME_W (the shop row runs
+    // nearly edge-to-edge on purpose — bigger tap targets)
+    const upgradeCardW = 168;
+    const upgradeCardGap = 8;
     const upgradeCardStep = upgradeCardW + upgradeCardGap;
     UPGRADES.forEach((u, i) =>
       this.buildUpgradeCard(panel, u, (i - 1.5) * upgradeCardStep, upgradeCardsY, upgradeCardH, upgradeCardW)

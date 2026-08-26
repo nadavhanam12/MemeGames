@@ -305,6 +305,9 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch('UI');
     // day 1 kicks off once the UI scene is up and listening
     this.time.delayedCall(400, () => this.startDay(1));
+    // if audio is already unlocked (came from the menu), switch the music
+    // to the game track now; otherwise the first fire tap starts it
+    sfx.startMusic('game');
 
     this.input.setDefaultCursor(AIM_CURSOR);
 
@@ -322,6 +325,7 @@ export class GameScene extends Phaser.Scene {
       this.fireTimer = TUNING.turret.fireInterval * decisionMult('weaponCooldown');
       sfx.unlock();
       sfx.startAmbient(); // ocean bed can only start once audio is unlocked
+      sfx.startMusic('game');
       shockwave(this, wp.x, wp.y, 0xffffff, 36); // designation marker
       this.fireShot(wp.x, wp.y);
     });
@@ -362,6 +366,7 @@ export class GameScene extends Phaser.Scene {
       bus.removeAllListeners(EV.DECISION);
       this.input.setDefaultCursor('default');
       sfx.stopAmbient();
+      sfx.stopMusic();
     });
   }
 
@@ -932,7 +937,7 @@ export class GameScene extends Phaser.Scene {
     spr.setRotation(Math.atan2(this.turretAimY - m.y, this.turretAimX - m.x));
     this.bullets.push({ sprite: spr, target: best, aimX: this.turretAimX, aimY: this.turretAimY });
 
-    sfx.tap();
+    sfx.shoot();
     vibrate(5);
     // muzzle flash: additive hot disc at the barrel (kills get the big ring)
     if (!settings.reducedMotion) {
@@ -1116,6 +1121,27 @@ export class GameScene extends Phaser.Scene {
     }).setDepth(800);
     em.explode(count);
     this.time.delayedCall(700, () => em.destroy());
+  }
+
+  /** Lingering smoke puff for a bigger impact — slower, longer-lived than
+   *  burst() so the explosion reads as still smoldering after the flash. */
+  private smokePuff(x: number, y: number, tint: number, count: number): void {
+    let c = Math.round(count * TUNING.juice.particleScale);
+    if (settings.reducedMotion) c = Math.min(c, 3);
+    if (c <= 0) return;
+    const em = this.add
+      .particles(x, y, 'puff', {
+        speed: { min: 10, max: 45 },
+        angle: { min: 240, max: 300 },
+        scale: { start: 1.6, end: 0.3 },
+        alpha: { start: 0.6, end: 0 },
+        lifespan: { min: 900, max: 1700 },
+        tint,
+        emitting: false
+      })
+      .setDepth(23);
+    em.explode(c);
+    this.time.delayedCall(1900, () => em.destroy());
   }
 
   // ------------------------------------------------------------- combo
@@ -1347,23 +1373,28 @@ export class GameScene extends Phaser.Scene {
    *  generated raft + CIWS dome when the sliced art isn't available. */
   private spawnTowerSprite(slotIdx: number): Phaser.GameObjects.Container {
     const slot = this.towerSlots[slotIdx];
-    if (hasArt(this, 'tower_idle_1')) {
-      if (!this.anims.exists('tower-idle')) {
+    // Slots 0-7 are the upper/Iran coast (see tuning.json authoring order) —
+    // they get the south-facing atlas (tubes point down toward the strait),
+    // falling back to the base atlas if the south art isn't generated yet.
+    const south = slotIdx < 8 && hasArt(this, 'tower_s_idle_1');
+    const fk = south ? 'tower_s' : 'tower';
+    if (hasArt(this, `${fk}_idle_1`)) {
+      if (!this.anims.exists(`${fk}-idle`)) {
         this.anims.create({
-          key: 'tower-idle',
-          frames: [1, 2, 3, 4].map(i => ({ key: `tower_idle_${i}` })),
+          key: `${fk}-idle`,
+          frames: [1, 2, 3, 4].map(i => ({ key: `${fk}_idle_${i}` })),
           frameRate: 4,
           repeat: -1
         });
         this.anims.create({
-          key: 'tower-fire',
-          frames: [1, 2, 3, 4].map(i => ({ key: `tower_fire_${i}` })),
+          key: `${fk}-fire`,
+          frames: [1, 2, 3, 4].map(i => ({ key: `${fk}_fire_${i}` })),
           frameRate: 12,
           repeat: 0
         });
       }
-      const spr = this.add.sprite(0, 0, 'tower_idle_1');
-      if (!settings.reducedMotion) spr.play('tower-idle');
+      const spr = this.add.sprite(0, 0, `${fk}_idle_1`);
+      if (!settings.reducedMotion) spr.play(`${fk}-idle`);
       const pips = this.add.graphics();
       const cooldownGfx = this.add.graphics();
       return this.add.container(slot.x, slot.y, [spr, pips, cooldownGfx]).setDepth(26);
@@ -1678,9 +1709,13 @@ export class GameScene extends Phaser.Scene {
       birthDist
     });
     const body = tw.container.list[0];
-    if (body instanceof Phaser.GameObjects.Sprite && this.anims.exists('tower-fire') && !settings.reducedMotion) {
-      body.play('tower-fire');
-      body.once(Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + 'tower-fire', () => body.play('tower-idle'));
+    if (body instanceof Phaser.GameObjects.Sprite && !settings.reducedMotion) {
+      // fk matches spawnTowerSprite: south-variant sprites use tower_s_* frames
+      const fk = body.texture.key.startsWith('tower_s_') ? 'tower_s' : 'tower';
+      if (this.anims.exists(`${fk}-fire`)) {
+        body.play(`${fk}-fire`);
+        body.once(Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + `${fk}-fire`, () => body.play(`${fk}-idle`));
+      }
     }
     sfx.tap();
     if (!settings.reducedMotion) {
@@ -1805,6 +1840,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.mission = this.rollMission(n);
+    sfx.dayStart();
     bus.emit(EV.MISSION, { ...this.mission });
     bus.emit(EV.DAY_START, n, this.mission.text, reveals);
   }
@@ -1862,6 +1898,7 @@ export class GameScene extends Phaser.Scene {
   /** Day boundary: resolve the mission, pay the prize, freeze the world for the
    *  news-band recap, and pre-announce tomorrow's escalations. */
   private endDay(): void {
+    sfx.dayEnd();
     const d = TUNING.days;
     const m = this.mission!;
     if (m.type === 'price') m.done = this.stats.oilPrice < m.target;
@@ -1993,9 +2030,10 @@ export class GameScene extends Phaser.Scene {
       sfx.hit();
       camImpulse(this, TUNING.juice.shakeSmall, 150);
       vibrate(25);
-      impactFlash(this, t.sprite.x, t.sprite.y, PAL.orange, 60);
-      shockwave(this, t.sprite.x, t.sprite.y, PAL.orange, 50);
-      this.burst(t.sprite.x, t.sprite.y, PAL.orange, 'puff', 8);
+      impactFlash(this, t.sprite.x, t.sprite.y, PAL.orange, 80);
+      shockwave(this, t.sprite.x, t.sprite.y, PAL.orange, 90);
+      this.burst(t.sprite.x, t.sprite.y, PAL.orange, 'puff', 14);
+      this.smokePuff(t.sprite.x, t.sprite.y, 0x3a4148, 6);
       const dmgSpike = Math.round(
         (t.vip ? TUNING.economy.vipHitSpike : TUNING.economy.hitSpike) * TUNING.upgrades.hullDamagedSpikeFactor
       );
@@ -2038,9 +2076,10 @@ export class GameScene extends Phaser.Scene {
       this.time.delayedCall(280, () => this.cameras.main.zoomTo(this.baseZoom, 300, 'Cubic.easeOut', true));
     }
     vibrate([40, 40, 80]);
-    impactFlash(this, t.sprite.x, t.sprite.y, PAL.orange, 80);
-    shockwave(this, t.sprite.x, t.sprite.y, PAL.red, 200);
-    this.burst(t.sprite.x, t.sprite.y, PAL.orange, 'puff', 14);
+    impactFlash(this, t.sprite.x, t.sprite.y, PAL.orange, 110);
+    shockwave(this, t.sprite.x, t.sprite.y, PAL.red, 260);
+    this.burst(t.sprite.x, t.sprite.y, PAL.orange, 'puff', 20);
+    this.smokePuff(t.sprite.x, t.sprite.y, 0x2a2f35, 10);
     const spike = t.vip ? TUNING.economy.vipHitSpike : TUNING.economy.hitSpike;
     this.changePrice(spike);
     sfx.priceUp();
@@ -2627,6 +2666,7 @@ export class GameScene extends Phaser.Scene {
     });
     bus.emit(EV.DANGER, null);
     sfx.stopAmbient();
+    sfx.stopMusic();
     sfx.whoosh();
     this.tweens.add({ targets: this.cameras.main, zoom: this.baseZoom * 1.05, duration: 350, ease: 'Sine.easeOut' });
     this.registry.set('finalStats', this.stats);
