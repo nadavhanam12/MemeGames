@@ -242,30 +242,31 @@ export function createSuggestedCard(scene: Phaser.Scene, opts: SuggestedCardOpts
   const bg = roundedRect(scene, opts.w, opts.h, 0x101820, 1, RADIUS, DIVIDER, 1);
   const parts: Phaser.GameObjects.GameObject[] = [bg];
 
-  let textX = -opts.w / 2 + 16;
+  const wrapW = opts.w - 20;
+  let titleY = -opts.h / 2 + 20;
   if (opts.icon) {
-    const icon = scene.add.text(textX, 0, opts.icon, { fontFamily: FONT_SANS, fontSize: '26px' }).setOrigin(0, 0.5);
-    parts.push(icon);
-    textX += icon.width + 12;
+    parts.push(scene.add.text(0, -opts.h / 2 + 30, opts.icon, { fontFamily: FONT_SANS, fontSize: '26px' }).setOrigin(0.5));
+    titleY = -opts.h / 2 + 58;
   }
-  const wrapW = Math.max(opts.w / 2 - textX - 14, 40);
   const title = scene.add
-    .text(textX, -opts.h / 2 + 20, opts.title, {
+    .text(0, titleY, opts.title, {
       fontFamily: FONT_SANS,
-      fontSize: '16px',
+      fontSize: '15px',
       fontStyle: 'bold',
       color: HEX.cream,
+      align: 'center',
       wordWrap: { width: wrapW }
     })
-    .setOrigin(0, 0.5);
+    .setOrigin(0.5, 0);
   const subtitle = scene.add
-    .text(textX, opts.h / 2 - 18, opts.subtitle, {
+    .text(0, opts.h / 2 - 18, opts.subtitle, {
       fontFamily: FONT_SANS,
-      fontSize: '14px',
+      fontSize: '13px',
       color: HEX.muted,
+      align: 'center',
       wordWrap: { width: wrapW }
     })
-    .setOrigin(0, 0.5);
+    .setOrigin(0.5);
   parts.push(title, subtitle);
   c.add(parts);
 

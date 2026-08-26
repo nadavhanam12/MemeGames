@@ -160,10 +160,11 @@ export class UIScene extends Phaser.Scene {
   private upgradeLevels: Record<string, number> = { air: 0, hull: 0, gold: 0 };
   private upgradeButtons: Record<string, Phaser.GameObjects.Container> = {};
   private lastMemeAt = -Infinity;
-  // in-play "new meme unlocked" banner: first-ever unlocks queue here as they
-  // fire and play one at a time over the ENGAGEMENT icon row, but only while
-  // the water is clear of live threats (see tryShowUnlockBanner)
-  private unlockBannerQueue: string[] = [];
+  // in-play meme banner: every meme fire queues here and plays one at a time
+  // over the ENGAGEMENT icon row, but only while the water is clear of live
+  // threats (see tryShowUnlockBanner); first-ever unlocks get a gold
+  // "NEW MEME UNLOCKED" title
+  private unlockBannerQueue: { id: string; isNew: boolean }[] = [];
   private unlockBanner?: Phaser.GameObjects.Container;
 
   // SEA TURRETS shop card (a 4th card in the TACTICAL UPGRADES row) + the
@@ -1400,30 +1401,35 @@ export class UIScene extends Phaser.Scene {
     lines: { text: string; color: string; size?: string }[],
     accent: number
   ): number {
-    const padTop = 20;
-    const lineH = 18;
-    const padBottom = 8;
-    const h = padTop + lines.length * lineH + padBottom;
+    // header gets its own row; content lines flow below it instead of
+    // sharing rows with (and dodging around) the header text.
+    // sections are capped at 3 content rows so no single card can crowd
+    // the report off-screen on a heavy day.
+    const shownLines = lines.slice(0, 3);
+    const headerH = 38;
+    const lineH = 32;
+    const padBottom = 16;
+    const h = headerH + shownLines.length * lineH + padBottom;
     const card = this.add.container(0, y + h / 2);
     card.add(this.add.rectangle(0, 0, width, h, PANEL, 0.98).setStrokeStyle(1, DIVIDER, 1));
     card.add(this.add.rectangle(-width / 2 + 2, 0, 4, h - 4, accent, 0.9));
     card.add(
       this.add
-        .text(-width / 2 + 18, -h / 2 + 15, header, {
+        .text(-width / 2 + 18, -h / 2 + 18, header, {
           fontFamily: FONT_SANS,
-          fontSize: '13px',
+          fontSize: '16px',
           fontStyle: 'bold',
           color: `#${accent.toString(16).padStart(6, '0')}`,
           letterSpacing: 1
         })
         .setOrigin(0, 0.5)
     );
-    lines.forEach((ln, i) => {
+    shownLines.forEach((ln, i) => {
       card.add(
         this.add
-          .text(0, -h / 2 + padTop + i * lineH, ln.text, {
+          .text(0, -h / 2 + headerH + lineH / 2 + i * lineH, ln.text, {
             fontFamily: FONT_SANS,
-            fontSize: ln.size ?? '16px',
+            fontSize: ln.size ?? '20px',
             fontStyle: 'bold',
             color: ln.color,
             align: 'center',
@@ -1455,19 +1461,26 @@ export class UIScene extends Phaser.Scene {
     // scaling by feel) so it never spills past the card's edges
     const sumInvAspect = shown.reduce((s, id) => s + 1 / MEMES.templates[id].aspect, 0);
     const fitH = sumInvAspect ? (maxRowW - 8 - (shown.length - 1) * gap) / sumInvAspect : 0;
-    const thumbH = shown.length ? Math.max(30, Math.min(108, Math.round(fitH))) : 0;
+    // mock layout: centered thumbnail row under the header, tally centered
+    // beneath it. Thumbnails run large — the card is the report's showpiece
+    const thumbH = shown.length ? Math.max(30, Math.min(160, Math.round(fitH))) : 0;
     const widths = shown.map(id => Math.max(24, Math.floor(thumbH / MEMES.templates[id].aspect)));
     const rowW = widths.reduce((a, b) => a + b + gap, -gap);
-    const h = 20 + thumbH + (shown.length ? 8 : 0) + 20 + 8;
+    const headerH = 38;
+    // row starts 8px below the header so a NEW badge (inside the thumbnail's
+    // top-right corner) never crowds the header text
+    const rowPad = 8;
+    const tallyH = 34;
+    const h = shown.length ? headerH + rowPad + thumbH + 10 + tallyH + 8 : headerH + 30;
     const card = this.add.container(0, y + h / 2);
     card.add(this.add.rectangle(0, 0, width, h, PANEL, 0.98).setStrokeStyle(1, DIVIDER, 1));
     card.add(this.add.rectangle(-width / 2 + 2, 0, 4, h - 4, PAL.gold, 0.9));
     const cardTitle = newIds.length ? 'MEMES / NEW UNLOCKS' : 'MEMES';
     card.add(
       this.add
-        .text(-width / 2 + 18, -h / 2 + 15, cardTitle, {
+        .text(-width / 2 + 18, -h / 2 + 18, cardTitle, {
           fontFamily: FONT_SANS,
-          fontSize: '13px',
+          fontSize: '16px',
           fontStyle: 'bold',
           color: '#AAB4BD'
         })
@@ -1475,7 +1488,7 @@ export class UIScene extends Phaser.Scene {
     );
     if (shown.length) {
       let x = -rowW / 2;
-      const rowY = -h / 2 + 20 + thumbH / 2;
+      const rowY = -h / 2 + headerH + rowPad + thumbH / 2;
       shown.forEach((id, i) => {
         const tpl = MEMES.templates[id];
         const w = widths[i];
@@ -1487,9 +1500,11 @@ export class UIScene extends Phaser.Scene {
         }
         thumb.add(this.add.rectangle(0, 0, w, thumbH).setStrokeStyle(2, PAL.gold));
         if (newIds.includes(id)) {
-          const badge = this.add.container(w / 2, -thumbH / 2);
+          // tucked inside the thumbnail's top-right corner (overhanging the
+          // edge collided with the card header / accent stripe)
           const badgeW = 34;
           const badgeH = 16;
+          const badge = this.add.container(w / 2 - badgeW / 2 - 4, -thumbH / 2 + badgeH / 2 + 4);
           badge.add(this.add.rectangle(0, 0, badgeW, badgeH, PAL.gold));
           badge.add(
             this.add
@@ -1516,9 +1531,9 @@ export class UIScene extends Phaser.Scene {
       : `NO MEMES TODAY · COLLECTION: ${unlocked}/${total}`;
     card.add(
       this.add
-        .text(0, h / 2 - 16, tallyText, {
+        .text(0, shown.length ? -h / 2 + headerH + rowPad + thumbH + 10 + tallyH / 2 : 0, tallyText, {
           fontFamily: FONT_SANS,
-          fontSize: '16px',
+          fontSize: '18px',
           fontStyle: 'bold',
           color: shown.length ? HEX.gold : HEX.cream
         })
@@ -1570,6 +1585,10 @@ export class UIScene extends Phaser.Scene {
     y += 34;
     panel.add(this.add.rectangle(0, y, cardW, 1, DIVIDER));
     y += 18;
+    // everything from the headline down is the centerable content column —
+    // leftover height on a light day splits above/below it (see below),
+    // while the AFTER ACTION REPORT header row above stays pinned to the top
+    const centerStartIdx = panel.list.length;
     // "global repercussions" — a big bizarre/tabloid headline picked from
     // this day's price swing + how well it went, real numbers underneath
     const perf = dayPerfScore(s.missionDone, s.safe, s.lost);
@@ -1603,17 +1622,23 @@ export class UIScene extends Phaser.Scene {
     );
     y += 38;
 
+    // list indices where a stretchable gap precedes the children added next —
+    // used below to spread a short day's leftover vertical space evenly
+    // between the sections instead of leaving it lumped under the button
+    const stretchMarks: number[] = [];
+
     // section 1 — mission outcome: the primary result gets first billing
+    stretchMarks.push(panel.list.length);
     y += this.buildSummaryCard(panel, y, cardW, 'MISSION OUTCOME', [
       {
         text: s.missionDone ? `✓ ${s.missionText}` : `✗ ${s.missionText}`,
         color: s.missionDone ? HEX.green : HEX.red,
-        size: '18px'
+        size: '22px'
       },
       {
         text: s.missionDone ? `BONUS PAID: +$${s.rewardCredits}` : 'NO BONUS TODAY',
         color: s.missionDone ? HEX.green : '#AAB4BD',
-        size: '14px'
+        size: '16px'
       }
     ], s.missionDone ? PAL.green : PAL.red);
     y += 18;
@@ -1622,24 +1647,26 @@ export class UIScene extends Phaser.Scene {
     const intelLines: { text: string; color: string; size?: string }[] = s.warnings.map(w => ({
       text: `⚠ ${w}`,
       color: '#F2D8FF',
-      size: '13px'
+      size: '17px'
     }));
     if (intelLines.length) {
+      stretchMarks.push(panel.list.length);
       y += this.buildSummaryCard(panel, y, cardW, 'INTEL', intelLines, PAL.purple);
       y += 18;
     }
 
     // section 3 — rewards: unlock state lives with its thumbnail instead of
     // repeating the same information in a separate block above the mission
+    stretchMarks.push(panel.list.length);
     y += this.buildMemesCard(panel, y, cardW, s.memesToday, s.newMemesUnlocked);
     y += 20;
 
-    // shop — form a distinct decision zone near the foot of a short report, but
-    // keep flowing downward if warnings/rewards made the recap taller
-    y = Math.max(y, H / 2 - 414);
+    // shop — hugs the recap content directly instead of pinning to a fixed
+    // floor, so a short day doesn't leave a dead gap above it
+    stretchMarks.push(panel.list.length);
     panel.add(this.add.rectangle(0, y, cardW, 1, DIVIDER));
     y += 22;
-    const upgradeCardH = 170;
+    const upgradeCardH = 130;
     // live cash readout right above the shop; onCredits keeps it current on buys
     this.summaryCashText = this.add
       .text(-cardW / 2, y + 12, `CASH  $${Math.round(this.displayedCredits)}`, {
@@ -1669,7 +1696,30 @@ export class UIScene extends Phaser.Scene {
     // directly on the map (see enterPlacementMode)
     this.buildDefenseCard(panel, 1.5 * upgradeCardStep, upgradeCardsY, upgradeCardH, upgradeCardW);
 
-    const nextBtnY = Math.max(upgradeCardsY + upgradeCardH / 2 + 36, H / 2 - 76);
+    // spread a little of a short day's leftover height across the section
+    // gaps — deliberately capped low (density comes from the cards' own
+    // padding, per Nadav's call): gaps stay tight and any remaining slack
+    // sits below the button rather than puffing up the rhythm.
+    const flowBtnY = upgradeCardsY + upgradeCardH / 2 + 36;
+    const gapCount = stretchMarks.length + 1; // +1: the gap before the button
+    const per = Math.min(18, Math.max(0, (H / 2 - 96 - flowBtnY) / gapCount));
+    if (per > 0) {
+      panel.list.forEach((child, i) => {
+        const passed = stretchMarks.reduce((n, m) => n + (i >= m ? 1 : 0), 0);
+        if (passed) (child as Phaser.GameObjects.Components.Transform & Phaser.GameObjects.GameObject).y += per * passed;
+      });
+    }
+    // whatever slack the capped stretch didn't absorb splits evenly above and
+    // below the content column, so a light day reads centered instead of
+    // top-heavy with a dead band under the button
+    const slack = Math.max(0, H / 2 - 96 - (flowBtnY + per * gapCount));
+    const centerShift = slack / 2;
+    if (centerShift > 0) {
+      panel.list.forEach((child, i) => {
+        if (i >= centerStartIdx) (child as Phaser.GameObjects.Components.Transform & Phaser.GameObjects.GameObject).y += centerShift;
+      });
+    }
+    const nextBtnY = flowBtnY + per * gapCount + centerShift;
     // size the panel's own opaque background to however far the content
     // actually ran (+ the swipe hint under the button), floored at a full
     // screen — this panel is the next full-bleed "post" replacing the game
@@ -1845,10 +1895,10 @@ export class UIScene extends Phaser.Scene {
     y += 52;
     inner.add(
       this.add
-        .text(cx, y, 'your call, commander — the market is watching', { fontFamily: FONT_SANS, fontSize: '14px', color: HEX.muted })
+        .text(cx, y, 'your call, commander — the market is watching', { fontFamily: FONT_SANS, fontSize: '16px', color: HEX.muted })
         .setOrigin(0.5, 0)
     );
-    y += 40;
+    y += 44;
 
     // ---- the "viral post" card (top-anchored: children measured, then bg drawn)
     const postCard = this.add.container(cx, y);
@@ -1856,43 +1906,43 @@ export class UIScene extends Phaser.Scene {
     postCard.add(postBg);
     postCard.add(createPostHeader(this, { x: -W / 2 + 18, y: 42, w: W - 36, handle: ev.handle, subtext: ev.subtext, live: true }));
     const story = this.add
-      .text(-W / 2 + 18, 78, ev.story, {
+      .text(-W / 2 + 18, 84, ev.story, {
         fontFamily: FONT_SANS,
-        fontSize: '17px',
+        fontSize: '20px',
         color: HEX.cream,
         wordWrap: { width: W - 36 },
-        lineSpacing: 5
+        lineSpacing: 7
       })
       .setOrigin(0, 0);
     postCard.add(story);
-    const engageY = 78 + story.height + 14;
+    const engageY = 84 + story.height + 16;
     postCard.add(
       this.add
         .text(-W / 2 + 18, engageY, `💬 ${nextDay * 3 + 7}K      🔁 ${nextDay * 11 + 40}K      ❤️ ${nextDay * 23 + 120}K      👁 ${nextDay * 2 + 3}M`, {
           fontFamily: FONT_SANS,
-          fontSize: '14px',
+          fontSize: '16px',
           color: HEX.muted
         })
         .setOrigin(0, 0)
     );
-    const postH = engageY + 34;
+    const postH = engageY + 38;
     postBg.fillStyle(PANEL, 0.98);
     postBg.fillRoundedRect(-W / 2, 0, W, postH, 14);
     postBg.lineStyle(2, DIVIDER, 1);
     postBg.strokeRoundedRect(-W / 2, 0, W, postH, 14);
     inner.add(postCard);
-    y += postH + 18;
+    y += postH + 20;
 
     // ---- oil projection graph
     const branchColor = (o: DecisionOption) => (o.oilDelta > 0 ? PAL.red : o.oilDelta < 0 ? PAL.green : PAL.muted);
-    const graphH = 200;
+    const graphH = 240;
     inner.add(this.buildDecisionGraph(cx, y, W, graphH, ev.options, branchColor));
-    y += graphH + 18;
+    y += graphH + 20;
 
     // ---- choice cards (quote-reply style), tagged A/B to match the graph
     ev.options.forEach((opt, idx) => {
       const lines = opt.effectLines;
-      const cardH = 52 + lines.length * 22 + 16;
+      const cardH = 60 + lines.length * 26 + 18;
       const card = this.add.container(cx, y);
       const cardBg = this.add.graphics();
       cardBg.fillStyle(PANEL, 0.98);
@@ -1901,21 +1951,21 @@ export class UIScene extends Phaser.Scene {
       cardBg.strokeRoundedRect(-W / 2, 0, W, cardH, 14);
       card.add(cardBg);
       const bColor = branchColor(opt);
-      card.add(this.add.circle(-W / 2 + 34, 30, 15, bColor, 0.18).setStrokeStyle(2, bColor));
+      card.add(this.add.circle(-W / 2 + 36, 34, 17, bColor, 0.18).setStrokeStyle(2, bColor));
       card.add(
         this.add
-          .text(-W / 2 + 34, 30, 'AB'[idx], { fontFamily: FONT_DISPLAY, fontSize: '17px', color: `#${bColor.toString(16).padStart(6, '0')}` })
+          .text(-W / 2 + 36, 34, 'AB'[idx], { fontFamily: FONT_DISPLAY, fontSize: '19px', color: `#${bColor.toString(16).padStart(6, '0')}` })
           .setOrigin(0.5)
       );
       card.add(
         this.add
-          .text(-W / 2 + 62, 30, opt.label, { fontFamily: FONT_DISPLAY, fontSize: '23px', color: HEX.cream })
+          .text(-W / 2 + 66, 34, opt.label, { fontFamily: FONT_DISPLAY, fontSize: '27px', color: HEX.cream })
           .setOrigin(0, 0.5)
       );
       lines.forEach((line, li) => {
         card.add(
           this.add
-            .text(-W / 2 + 62, 56 + li * 22, line, { fontFamily: FONT_SANS, fontSize: '14px', color: HEX.muted })
+            .text(-W / 2 + 66, 64 + li * 26, line, { fontFamily: FONT_SANS, fontSize: '17px', color: HEX.muted })
             .setOrigin(0, 0)
         );
       });
@@ -1931,10 +1981,12 @@ export class UIScene extends Phaser.Scene {
       });
       card.setData('optIdx', idx);
       inner.add(card);
-      y += cardH + 14;
+      y += cardH + 16;
     });
 
-    // center the stack in the canvas (bg stays full-bleed)
+    // center the stack in the canvas (bg stays full-bleed) — top-anchoring
+    // instead just dumps all the same slack below the cards on short decision
+    // text, which reads worse than splitting it evenly
     inner.y = Math.max(24, (GAME_H - y) / 2);
 
     // scroll in from below, same motion grammar as the feed curtain
@@ -1964,9 +2016,16 @@ export class UIScene extends Phaser.Scene {
     bg.lineStyle(2, DIVIDER, 1);
     bg.strokeRoundedRect(-w / 2, 0, w, h, 14);
     c.add(bg);
+    // emoji drawn as its own text node, no letterSpacing — Phaser's canvas
+    // text renderer splits the 🛢 glyph apart (renders as tofu boxes) when
+    // letterSpacing is set on the same text run
+    const oilIcon = this.add
+      .text(-w / 2 + 18, 14, '🛢', { fontFamily: FONT_SANS, fontSize: '15px' })
+      .setOrigin(0, 0);
+    c.add(oilIcon);
     c.add(
       this.add
-        .text(-w / 2 + 18, 14, '🛢 BRENT CRUDE — PROJECTED REACTION', { fontFamily: FONT_SANS, fontSize: '13px', fontStyle: 'bold', color: HEX.muted, letterSpacing: 1 })
+        .text(-w / 2 + 18 + oilIcon.width + 6, 14, 'BRENT CRUDE — PROJECTED REACTION', { fontFamily: FONT_SANS, fontSize: '15px', fontStyle: 'bold', color: HEX.muted, letterSpacing: 1 })
         .setOrigin(0, 0)
     );
 
@@ -1999,7 +2058,7 @@ export class UIScene extends Phaser.Scene {
     c.add(this.add.circle(nowX, yFor(cur), 4, PAL.gold));
     c.add(
       this.add
-        .text(nowX - 6, yFor(cur) - 8, `$${Math.round(cur)}`, { fontFamily: FONT_SANS, fontSize: '13px', fontStyle: 'bold', color: HEX.gold })
+        .text(nowX - 6, yFor(cur) - 8, `$${Math.round(cur)}`, { fontFamily: FONT_SANS, fontSize: '15px', fontStyle: 'bold', color: HEX.gold })
         .setOrigin(1, 1)
     );
 
@@ -2032,7 +2091,7 @@ export class UIScene extends Phaser.Scene {
       const hex = `#${color.toString(16).padStart(6, '0')}`;
       c.add(
         this.add
-          .text(endX + 8, labelYs[i], `${'AB'[i]} $${Math.round(ends[i])}`, { fontFamily: FONT_SANS, fontSize: '14px', fontStyle: 'bold', color: hex })
+          .text(endX + 8, labelYs[i], `${'AB'[i]} $${Math.round(ends[i])}`, { fontFamily: FONT_SANS, fontSize: '16px', fontStyle: 'bold', color: hex })
           .setOrigin(0, 0.5)
       );
     });
@@ -2161,7 +2220,8 @@ export class UIScene extends Phaser.Scene {
     if (!force && this.time.now - this.lastMemeAt < MEMES.settings.minGapMs) return;
     this.lastMemeAt = this.time.now;
     const pick = pickMeme(label, ctx);
-    if (pick.isNew) this.unlockBannerQueue.push(pick.id);
+    if (pick.isNew) bus.emit('meme-unlocked', pick.id);
+    this.unlockBannerQueue.push({ id: pick.id, isNew: pick.isNew });
     this.onHeadline('📸 new post added to today’s feed', 'event', 2000);
     sfx.tap();
   }
@@ -2246,59 +2306,83 @@ export class UIScene extends Phaser.Scene {
     this.tryShowUnlockBanner();
   }
 
-  /** Plays the next queued first-ever unlock as a banner over the engagement
-   *  row — but only during calm gameplay: no live threats on the water, no
-   *  day-end UI up, world not frozen. Queued unlocks wait for the next lull. */
+  /** Plays the next queued meme as a banner over the lower band — but only
+   *  during calm-ish gameplay: at most memeBannerMaxThreats live threats, no
+   *  day-end UI up, world not frozen. Queued memes wait for the next lull. */
   private tryShowUnlockBanner(): void {
     if (!this.unlockBannerQueue.length || this.unlockBanner) return;
     if (this.summaryPanel?.active || this.placementOpen) return;
     const game = this.scene.get('Game') as any;
     if (!game || game.over || game.frozen) return;
     const aliveThreats = ((game.threats ?? []) as { dead: boolean }[]).filter(t => !t.dead).length;
-    if (aliveThreats > 0) return;
-    this.showUnlockBanner(this.unlockBannerQueue.shift()!);
+    if (aliveThreats > TUNING.social.memeBannerMaxThreats) return;
+    const next = this.unlockBannerQueue.shift()!;
+    this.showUnlockBanner(next.id, next.isNew);
   }
 
-  private showUnlockBanner(id: string): void {
+  private showUnlockBanner(id: string, isNew: boolean): void {
     const tpl = MEMES.templates[id];
     if (!tpl) return;
-    const cx = ENGAGEMENT.x + ENGAGEMENT.w / 2;
-    const cy = ENGAGEMENT.y + ENGAGEMENT.h / 2;
+    // square card spanning the whole lower band: from the top line of the
+    // engagement icon row down to the bottom line of the INTEL panel
+    const top = ENGAGEMENT.y;
+    const bottom = TICKER_Y + 22;
+    const size = bottom - top;
+    const cx = GAME_W / 2;
+    const cy = (top + bottom) / 2;
     const banner = this.add.container(cx, cy).setDepth(1100);
     this.unlockBanner = banner;
-    banner.add(this.add.rectangle(0, 0, ENGAGEMENT.w, ENGAGEMENT.h, 0x1a2027, 1).setStrokeStyle(2, PAL.gold, 1));
-    const thumbH = ENGAGEMENT.h - 10;
-    const thumbW = Math.max(24, Math.floor(thumbH / tpl.aspect));
-    const tx = -ENGAGEMENT.w / 2 + 10 + thumbW / 2;
-    if (hasArt(this, tpl.artKey)) {
-      banner.add(this.add.image(tx, 0, tpl.artKey).setDisplaySize(thumbW, thumbH));
-    } else {
-      banner.add(this.add.rectangle(tx, 0, thumbW, thumbH, 0x39424e));
-    }
-    banner.add(this.add.rectangle(tx, 0, thumbW, thumbH).setStrokeStyle(2, PAL.gold));
     const total = Object.keys(MEMES.templates).length;
-    banner.add(
-      this.add
-        .text(tx + thumbW / 2 + 14, 0, `✨ NEW MEME UNLOCKED · ${getUnlockedTemplates().size}/${total}`, {
-          fontFamily: FONT_SANS,
-          fontSize: '19px',
-          fontStyle: 'bold',
-          color: HEX.gold
-        })
-        .setOrigin(0, 0.5)
-    );
+    const tally = `${getUnlockedTemplates().size}/${total}`;
+    const title = isNew ? `✨ NEW MEME UNLOCKED · ${tally}` : `📸 MEME POSTED · ${tally}`;
+    const titleText = this.add
+      .text(0, -size / 2 + 22, title, {
+        fontFamily: FONT_SANS,
+        fontSize: '20px',
+        fontStyle: 'bold',
+        color: isNew ? HEX.gold : HEX.cream
+      })
+      .setOrigin(0.5);
+    // panel keeps the band's full height but widens past square when the
+    // title needs the room
+    const panelW = Math.max(size, Math.ceil(titleText.width) + 48);
+    banner.add(this.add.rectangle(0, 0, panelW, size, 0x1a2027, 1).setStrokeStyle(2, PAL.gold, 1));
+    banner.add(titleText);
+    // meme art fills the rest of the panel below the title, kept in aspect
+    const boxW = panelW - 16;
+    const boxH = size - 44 - 8;
+    const artW = Math.min(boxW, boxH / tpl.aspect);
+    const artH = artW * tpl.aspect;
+    const artY = -size / 2 + 44 + boxH / 2;
+    if (hasArt(this, tpl.artKey)) {
+      banner.add(this.add.image(0, artY, tpl.artKey).setDisplaySize(artW, artH));
+    } else {
+      banner.add(this.add.rectangle(0, artY, artW, artH, 0x39424e));
+    }
+    banner.add(this.add.rectangle(0, artY, artW, artH).setStrokeStyle(2, PAL.gold));
     sfx.tap();
+    // half-transparent black dim over the whole lower band (stats / graph /
+    // intel) so the meme card is the only thing that reads while it's up
+    const dim = this.add
+      .rectangle(GAME_W / 2, (top + GAME_H) / 2, GAME_W, GAME_H - top, 0x000000, 0.5)
+      .setDepth(1099);
     const hold = TUNING.social.unlockBannerHoldMs;
     const done = () => {
+      dim.destroy();
       banner.destroy();
       this.unlockBanner = undefined;
     };
     if (settings.reducedMotion) {
       this.time.delayedCall(hold, done);
     } else {
-      banner.setAlpha(0).setY(cy + 26);
-      this.tweens.add({ targets: banner, alpha: 1, y: cy, duration: 240, ease: EASE.pop });
-      this.tweens.add({ targets: banner, alpha: 0, y: cy + 26, duration: 240, ease: EASE.inOut, delay: hold, onComplete: done });
+      // card slides in fully opaque from the right, holds centered, exits left
+      const inMs = 300;
+      banner.setX(GAME_W + panelW / 2);
+      dim.setAlpha(0);
+      this.tweens.add({ targets: dim, alpha: 1, duration: inMs });
+      this.tweens.add({ targets: banner, x: cx, duration: inMs, ease: EASE.inOut });
+      this.tweens.add({ targets: banner, x: -panelW / 2 - 10, duration: inMs, ease: EASE.inOut, delay: inMs + hold });
+      this.tweens.add({ targets: dim, alpha: 0, duration: inMs, delay: inMs + hold, onComplete: done });
     }
   }
 
